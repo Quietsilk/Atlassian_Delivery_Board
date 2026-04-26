@@ -39,8 +39,9 @@ Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses 
 - Вводит Jira credentials (хранит в localStorage)
 - Управляет проектными табами, автоматически переключает данные при смене таба
 - При `GET /latest → 404` автоматически запускает `POST /sync` + поллит каждые 3s
-- Читает историю снапшотов через `GET /history` для графиков и KPI-карточек
-- Period-фильтр влияет и на KPI, и на графики (агрегация на фронте)
+- Параллельно запрашивает `GET /latest` и `GET /history` для вычисления Throughput через `completedCount` дельту
+- 8 KPI-карточек: Throughput · Cycle Time · Time to Market · Flow Efficiency / Reopened · WIP · Backlog · Backlog Aging
+- AI-блок сразу под KPI; period picker и графики удалены (UI Simplification MVP)
 
 ---
 
@@ -48,11 +49,11 @@ Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses 
 
 1. **UI read-only** — браузер только читает снапшоты, никогда не считает метрики
 2. **Иммутабельные снапшоты** — только INSERT в SQLite, никогда UPDATE/DELETE
-3. **`throughput` = интервальный** — кол-во resolved с `timestamp` предыдущего снапшота; 0 если нет предыдущего
+3. **`throughput` (бэкенд) = интервальный** — кол-во resolved с `timestamp` предыдущего снапшота; 0 если нет предыдущего
 4. **`completedCount` = кумулятивный** — всего завершённых на момент синка; хранится в каждом снапшоте
-5. **`throughputPerDay` не хранится** — фронт вычисляет: `(last.completedCount − first.completedCount) / дней`
+5. **Throughput на фронте** — вычисляется как `completedCount[n] − completedCount[n-1]` из последних 2 снапшотов истории; при первом синке = `completedCount` (total)
 6. **Flow metrics раздельно** — `calculate_metrics` → только `backlogSize, inProgressCount, completedCount, reopenedCount, backlogAgingDays`; `calculate_flow_metrics` → `cycleTimeP50/P85, timeToMarketP50/P85, flowEfficiencyPercent`
-7. **Period фильтр** — `GET /history?period=30d` фильтрует строки по timestamp; агрегация (avg, delta) на фронте
+7. **Period фильтр удалён из UI** — `GET /history` без параметра; KPI всегда из последнего снапшота; агрегация по периоду не применяется
 8. **`calculate_metrics` без period** — нет параметров cutoff/period в сигнатуре
 
 ---
@@ -140,3 +141,11 @@ python3 -m unittest discover -s tests -v
     - `wipRatio` удалён
     - Period-фильтр обновляет KPI-карточки (раньше только графики)
     - 120 тестов
+15. **UI Simplification MVP (апрель 2026):**
+    - 8 KPI-карточек: Throughput · Cycle Time · Time to Market · Flow Efficiency (proxy) · Reopened · WIP · Backlog · Backlog Aging
+    - Period picker удалён — метрики всегда interval-based (последний снапшот)
+    - Графики удалены (chart panels, drawChart, drawThroughputChart, loadHistory)
+    - Throughput на фронте: `completedCount` дельта между последними 2 снапшотами
+    - AI-блок поднят сразу под KPI; статические hints при отсутствии OpenAI
+    - Stale data: >30 мин — amber, >120 мин — red
+    - Empty state: короткий заголовок + 4 буллета
