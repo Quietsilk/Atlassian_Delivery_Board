@@ -235,8 +235,8 @@
 
     /* ── KPI Cards ───────────────────────────────────────── */
 
-    /* Grid: 4 columns (7 cards = 4+3) */
-    .kpi-secondary { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+    /* Grid: 3 columns (6 cards = 3+3) */
+    .kpi-secondary { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
 
     .kpi-card {
       background: var(--card); border: 1px solid var(--border);
@@ -448,17 +448,6 @@
 
         <!-- KPI grid: 4-col -->
         <div class="kpi-secondary hidden" id="kpi-secondary">
-
-          <div class="kpi-card" id="kpi-throughput-card">
-            <div class="kpi-label">Throughput</div>
-            <div class="kpi-sublabel" id="kpi-throughput-sublabel">tasks completed since last update</div>
-            <div class="kpi-bottom">
-              <div class="kpi-number">
-                <span class="kpi-value" id="kpi-throughput-value">—</span>
-              </div>
-              <span class="kpi-delta" id="kpi-throughput-delta"></span>
-            </div>
-          </div>
 
           <div class="kpi-card" id="kpi-cycle-time-card" title="Measured from last start to completion">
             <div class="kpi-label">Cycle Time</div>
@@ -819,7 +808,7 @@
     // ── Skeleton ──────────────────────────────────────────────
     function setLoading(on) {
       const vals = document.querySelectorAll(
-        "#kpi-throughput-value, #kpi-cycle-time-value, #kpi-ttm-value, #kpi-flow-eff-value, #kpi-reopened-value, #kpi-wip-value, #kpi-aging-value, #kpi-cycle-time-p85, #kpi-ttm-p85"
+        "#kpi-cycle-time-value, #kpi-ttm-value, #kpi-flow-eff-value, #kpi-reopened-value, #kpi-wip-value, #kpi-aging-value, #kpi-cycle-time-p85, #kpi-ttm-p85"
       );
       vals.forEach(el => {
         if (on) { el.dataset.real = el.textContent; el.textContent = "··"; el.classList.add("skeleton-pulse"); }
@@ -835,7 +824,7 @@
     }
 
     function flashKpi() {
-      ["kpi-throughput-card", "kpi-cycle-time-card", "kpi-ttm-card", "kpi-flow-eff-card",
+      ["kpi-cycle-time-card", "kpi-ttm-card", "kpi-flow-eff-card",
        "kpi-reopened-card", "kpi-wip-card", "kpi-aging-card"]
         .forEach((id, i) => setTimeout(() => {
           const el = document.getElementById(id);
@@ -871,7 +860,6 @@
       revealContent();
       setLoading(false);
 
-      const throughput = d.throughput ?? 0;
       const cycleP50   = d.cycleTimeP50 ?? d.cycleTimeDays ?? 0;
       const cycleP85   = d.cycleTimeP85 ?? 0;
       const ttmP50     = d.timeToMarketP50 ?? d.timeToMarketDays ?? 0;
@@ -882,11 +870,6 @@
       const aging      = d.backlogAgingDays ?? 0;
 
       const _prev = prevKpiMap.get(activeId);
-
-      // Throughput
-      document.getElementById("kpi-throughput-value").textContent = throughput;
-      setDelta("kpi-throughput-delta", throughput, _prev?.throughput ?? null, false, "");
-      document.getElementById("kpi-throughput-card").classList.toggle("kpi-status-bad", throughput === 0);
 
       // Secondary values + units
       const set = (valId, unitId, num, unit, decimals = 1) => {
