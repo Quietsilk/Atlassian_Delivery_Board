@@ -1178,21 +1178,27 @@
 
         const metrics = { ...body.snapshot.metrics };
 
-        // Compute effective throughput from completedCount delta (last 2 snapshots)
+        // Compute effective throughput + seed prevKpiMap from history
         if (historyRes.ok) {
           const hBody = await historyRes.json();
-          const snaps = (hBody.snapshots || []).filter(s => s.metrics.completedCount != null);
+          const allSnaps = hBody.snapshots || [];
+          const snaps = allSnaps.filter(s => s.metrics.completedCount != null);
           const sublabelEl = document.getElementById("kpi-throughput-sublabel");
           if (snaps.length >= 2) {
             const last = snaps[snaps.length - 1].metrics;
             const prev = snaps[snaps.length - 2].metrics;
             metrics.throughput = Math.max(0, last.completedCount - prev.completedCount);
             if (sublabelEl) sublabelEl.textContent = "tasks completed since last update";
+            // Seed prev so arrows show on first load without needing a second sync
+            if (!prevKpiMap.has(p.id)) prevKpiMap.set(p.id, prev);
           } else if (snaps.length === 1) {
             metrics.throughput = snaps[0].metrics.completedCount;
             if (sublabelEl) sublabelEl.textContent = "total completed tasks (first sync)";
+          } else if (allSnaps.length >= 2) {
+            // Old snapshots without completedCount — seed prev for arrows
+            if (!prevKpiMap.has(p.id)) prevKpiMap.set(p.id, allSnaps[allSnaps.length - 2].metrics);
           }
-          // snaps.length === 0: old snapshots without completedCount — use backend value as-is
+          // allSnaps.length <= 1: first sync, no prev available
         }
 
         updateDashboard(metrics);
