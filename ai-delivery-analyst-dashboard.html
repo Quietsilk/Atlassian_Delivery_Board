@@ -858,7 +858,7 @@
 
       if (!validate()) {
         setConnected(true, "Connected");
-        refreshDashboard();
+        autoSyncStale();
       }
     }
 
@@ -1091,6 +1091,25 @@
     }
 
     // ── Sync flow ─────────────────────────────────────────────
+
+    // POST /sync for a specific project (credentials from sidebar form)
+    async function _postSyncProject(proj) {
+      try {
+        await fetch(`${SERVER_BASE}/sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project:  proj.label,
+            baseUrl:  jiraBaseUrlInput.value.trim(),
+            email:    jiraEmailInput.value.trim(),
+            apiToken: jiraTokenInput.value.trim(),
+            jql:      proj.jql,
+          }),
+        });
+      } catch (_) {}
+    }
+
+    // Sync ALL projects in parallel, then refresh active tab
     async function runSyncFlow() {
       if (!jiraConnected) return;
       const syncErr = validateSync();
@@ -1101,7 +1120,7 @@
       syncBannerNode.className = "sync-banner";
 
       try {
-        await _postSync();
+        await Promise.all(projects.map(p => _postSyncProject(p)));
         _pollLatest();
       } catch (e) {
         setDataStatus(null, false);
@@ -1110,26 +1129,33 @@
       }
     }
 
+    // Auto-sync projects whose last snapshot is older than 1 hour
+    async function autoSyncStale() {
+      if (!jiraConnected || projects.length === 0) return;
+      const STALE_MS = 3600 * 1000;
+      const now = Date.now();
+
+      await Promise.all(projects.map(async proj => {
+        try {
+          const res = await fetch(`${SERVER_BASE}/latest?project=${encodeURIComponent(proj.label)}`);
+          if (res.status === 404) {
+            await _postSyncProject(proj);
+            return;
+          }
+          if (!res.ok) return;
+          const body = await res.json();
+          if (!body.ok) return;
+          const age = now - new Date(body.snapshot.timestamp).getTime();
+          if (age > STALE_MS) await _postSyncProject(proj);
+        } catch (_) {}
+      }));
+
+      // Refresh the active tab after background syncs are queued
+      await refreshDashboard();
+    }
+
     // ── API calls ─────────────────────────────────────────────
     let _pollTimer = null;
-
-    async function _postSync() {
-      const p = active();
-      if (!p || validateSync()) return;
-      try {
-        await fetch(`${SERVER_BASE}/sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project:  p.label,
-            baseUrl:  jiraBaseUrlInput.value.trim(),
-            email:    jiraEmailInput.value.trim(),
-            apiToken: jiraTokenInput.value.trim(),
-            jql:      jiraJqlInput.value.trim(),
-          }),
-        });
-      } catch (_) {}
-    }
 
     function _pollLatest(attempts = 0) {
       clearTimeout(_pollTimer);
@@ -1167,7 +1193,7 @@
         ]);
 
         if (latestRes.status === 404) {
-          await _postSync();
+          await _postSyncProject(p);
           _pollLatest();
           return;
         }
