@@ -235,30 +235,8 @@
 
     /* ── KPI Cards ───────────────────────────────────────── */
 
-    /* Hero: Throughput full-width */
-    .kpi-hero {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px 24px;
-      display: flex; align-items: center; justify-content: space-between; gap: 24px;
-      transition: border-color 0.2s, background 0.2s;
-    }
-    .kpi-hero:hover { border-color: var(--border-hi); }
-    .kpi-hero.kpi-status-bad { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); }
-
-    .kpi-hero-left { display: flex; flex-direction: column; gap: 4px; }
-    .kpi-hero-label { font-size: 0.78rem; color: var(--secondary); font-weight: 600; letter-spacing: 0.02em; }
-    .kpi-hero-sublabel { font-size: 0.72rem; color: var(--muted); }
-
-    .kpi-hero-right { display: flex; align-items: baseline; gap: 16px; }
-    .kpi-hero-value { font-size: 3.2rem; font-weight: 800; color: var(--text); letter-spacing: -0.04em; font-feature-settings: "tnum"; line-height: 1; }
-    .kpi-hero-delta { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
-    .kpi-hero-delta.delta-good { color: var(--green); }
-    .kpi-hero-delta.delta-bad  { color: var(--red); }
-
-    /* Secondary grid: 3 columns */
-    .kpi-secondary { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+    /* Grid: 4 columns (7 cards = 4+3) */
+    .kpi-secondary { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
 
     .kpi-card {
       background: var(--card); border: 1px solid var(--border);
@@ -311,7 +289,7 @@
       35%  { border-color: rgba(79,124,255,0.55); }
       100% { border-color: var(--border); }
     }
-    .kpi-card.flashing, .kpi-hero.flashing { animation: kpi-flash 0.75s ease forwards; }
+    .kpi-card.flashing { animation: kpi-flash 0.75s ease forwards; }
 
     /* ── AI Panel ────────────────────────────────────────── */
     .panel-ai {
@@ -395,7 +373,6 @@
     }
     @media (max-width: 520px) {
       .kpi-secondary { grid-template-columns: 1fr; }
-      .kpi-hero { flex-direction: column; align-items: flex-start; gap: 8px; }
     }
   </style>
 </head>
@@ -469,20 +446,19 @@
           <button class="btn-demo" id="demo-btn">⚡ Load demo data</button>
         </div>
 
-        <!-- Hero KPI: Throughput -->
-        <div class="kpi-hero hidden" id="kpi-hero">
-          <div class="kpi-hero-left">
-            <div class="kpi-hero-label">Throughput</div>
-            <div class="kpi-hero-sublabel" id="kpi-throughput-sublabel">tasks completed since last update</div>
-          </div>
-          <div class="kpi-hero-right">
-            <span class="kpi-hero-value" id="kpi-throughput-value">—</span>
-            <span class="kpi-hero-delta" id="kpi-throughput-delta"></span>
-          </div>
-        </div>
-
-        <!-- Secondary KPIs: 3-col grid -->
+        <!-- KPI grid: 4-col -->
         <div class="kpi-secondary hidden" id="kpi-secondary">
+
+          <div class="kpi-card" id="kpi-throughput-card">
+            <div class="kpi-label">Throughput</div>
+            <div class="kpi-sublabel" id="kpi-throughput-sublabel">tasks completed since last update</div>
+            <div class="kpi-bottom">
+              <div class="kpi-number">
+                <span class="kpi-value" id="kpi-throughput-value">—</span>
+              </div>
+              <span class="kpi-delta" id="kpi-throughput-delta"></span>
+            </div>
+          </div>
 
           <div class="kpi-card" id="kpi-cycle-time-card" title="Measured from last start to completion">
             <div class="kpi-label">Cycle Time</div>
@@ -827,15 +803,6 @@
       el.className = "kpi-delta " + (good ? "delta-good" : "delta-bad");
     }
 
-    function setHeroDelta(elId, curr, prev) {
-      const el = document.getElementById(elId);
-      if (!el) return;
-      if (prev === null || Math.abs(curr - prev) < 0.5) { el.textContent = ""; el.className = "kpi-hero-delta"; return; }
-      const up = curr > prev;
-      el.textContent = (up ? "↑" : "↓") + Math.abs(curr - prev).toFixed(0);
-      el.className = "kpi-hero-delta " + (up ? "delta-good" : "delta-bad");
-    }
-
     function setKpiStatus(cardId, value, goodThreshold, badThreshold, higherIsBetter = false) {
       const el = document.getElementById(cardId);
       if (!el) return;
@@ -863,12 +830,12 @@
     // ── Reveal ────────────────────────────────────────────────
     function revealContent() {
       document.getElementById("empty-state")?.remove();
-      document.querySelectorAll("#kpi-hero, #kpi-secondary, #ai-section")
+      document.querySelectorAll("#kpi-secondary, #ai-section")
         .forEach(el => el.classList.remove("hidden"));
     }
 
     function flashKpi() {
-      ["kpi-hero", "kpi-cycle-time-card", "kpi-ttm-card", "kpi-flow-eff-card",
+      ["kpi-throughput-card", "kpi-cycle-time-card", "kpi-ttm-card", "kpi-flow-eff-card",
        "kpi-reopened-card", "kpi-wip-card", "kpi-aging-card"]
         .forEach((id, i) => setTimeout(() => {
           const el = document.getElementById(id);
@@ -916,10 +883,10 @@
 
       const _prev = prevKpiMap.get(activeId);
 
-      // Hero
+      // Throughput
       document.getElementById("kpi-throughput-value").textContent = throughput;
-      setHeroDelta("kpi-throughput-delta", throughput, _prev?.throughput ?? null);
-      document.getElementById("kpi-hero").classList.toggle("kpi-status-bad", throughput === 0);
+      setDelta("kpi-throughput-delta", throughput, _prev?.throughput ?? null, false, "");
+      document.getElementById("kpi-throughput-card").classList.toggle("kpi-status-bad", throughput === 0);
 
       // Secondary values + units
       const set = (valId, unitId, num, unit, decimals = 1) => {
