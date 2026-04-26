@@ -446,7 +446,7 @@
           <button class="btn-demo" id="demo-btn">⚡ Load demo data</button>
         </div>
 
-        <!-- KPI grid: 4-col -->
+        <!-- KPI grid: 3-col -->
         <div class="kpi-secondary hidden" id="kpi-secondary">
 
           <div class="kpi-card" id="kpi-cycle-time-card" title="Measured from last start to completion">
@@ -534,7 +534,6 @@
             <div class="ai-tab-pane active" id="ai-pane-summary">
               <p class="muted-text" id="ai-summary-text">Sync to get AI-generated insights.</p>
               <div class="ai-hints" id="ai-hints">
-                <div class="ai-hint">Low throughput may indicate bottlenecks or blocked work</div>
                 <div class="ai-hint">Low flow efficiency may indicate excessive waiting time</div>
                 <div class="ai-hint">Reopened tasks may indicate quality or clarity issues</div>
               </div>
@@ -1056,20 +1055,8 @@
         if (historyRes.ok) {
           const hBody = await historyRes.json();
           const allSnaps = hBody.snapshots || [];
-          const snaps = allSnaps.filter(s => s.metrics.completedCount != null);
-          const sublabelEl = document.getElementById("kpi-throughput-sublabel");
-          if (snaps.length >= 2) {
-            const last = snaps[snaps.length - 1].metrics;
-            const prev = snaps[snaps.length - 2].metrics;
-            metrics.throughput = Math.max(0, last.completedCount - prev.completedCount);
-            if (sublabelEl) sublabelEl.textContent = "tasks completed since last update";
-            if (!prevKpiMap.has(p.id)) prevKpiMap.set(p.id, prev);
-          } else if (snaps.length === 1) {
-            metrics.throughput = snaps[0].metrics.completedCount;
-            if (sublabelEl) sublabelEl.textContent = "total completed tasks (first sync)";
-          } else if (allSnaps.length >= 2) {
-            if (!prevKpiMap.has(p.id)) prevKpiMap.set(p.id, allSnaps[allSnaps.length - 2].metrics);
-          }
+          if (allSnaps.length >= 2 && !prevKpiMap.has(p.id))
+            prevKpiMap.set(p.id, allSnaps[allSnaps.length - 2].metrics);
         }
 
         updateDashboard(metrics);
@@ -1086,11 +1073,11 @@
     // ── Demo data ─────────────────────────────────────────────
     function loadDemoData() {
       const snaps = [
-        { throughput: 14, cycleTimeP50: 6.1, cycleTimeP85: 9.8,  timeToMarketP50: 11.4, timeToMarketP85: 18.2, flowEfficiencyPercent: 53.5, reopenedCount: 2, inProgressCount: 8,  backlogAgingDays: 28 },
-        { throughput: 16, cycleTimeP50: 5.7, cycleTimeP85: 9.1,  timeToMarketP50: 10.8, timeToMarketP85: 17.1, flowEfficiencyPercent: 52.8, reopenedCount: 1, inProgressCount: 7,  backlogAgingDays: 25 },
-        { throughput: 19, cycleTimeP50: 4.9, cycleTimeP85: 8.2,  timeToMarketP50: 9.3,  timeToMarketP85: 15.4, flowEfficiencyPercent: 52.7, reopenedCount: 0, inProgressCount: 6,  backlogAgingDays: 22 },
-        { throughput: 17, cycleTimeP50: 5.3, cycleTimeP85: 8.7,  timeToMarketP50: 9.9,  timeToMarketP85: 16.2, flowEfficiencyPercent: 53.5, reopenedCount: 3, inProgressCount: 9,  backlogAgingDays: 24 },
-        { throughput: 23, cycleTimeP50: 4.2, cycleTimeP85: 7.1,  timeToMarketP50: 8.7,  timeToMarketP85: 13.9, flowEfficiencyPercent: 48.3, reopenedCount: 0, inProgressCount: 5,  backlogAgingDays: 18 },
+        { cycleTimeP50: 6.1, cycleTimeP85: 9.8,  timeToMarketP50: 11.4, timeToMarketP85: 18.2, flowEfficiencyPercent: 53.5, reopenedCount: 2, inProgressCount: 8,  backlogAgingDays: 28 },
+        { cycleTimeP50: 5.7, cycleTimeP85: 9.1,  timeToMarketP50: 10.8, timeToMarketP85: 17.1, flowEfficiencyPercent: 52.8, reopenedCount: 1, inProgressCount: 7,  backlogAgingDays: 25 },
+        { cycleTimeP50: 4.9, cycleTimeP85: 8.2,  timeToMarketP50: 9.3,  timeToMarketP85: 15.4, flowEfficiencyPercent: 52.7, reopenedCount: 0, inProgressCount: 6,  backlogAgingDays: 22 },
+        { cycleTimeP50: 5.3, cycleTimeP85: 8.7,  timeToMarketP50: 9.9,  timeToMarketP85: 16.2, flowEfficiencyPercent: 53.5, reopenedCount: 3, inProgressCount: 9,  backlogAgingDays: 24 },
+        { cycleTimeP50: 4.2, cycleTimeP85: 7.1,  timeToMarketP50: 8.7,  timeToMarketP85: 13.9, flowEfficiencyPercent: 48.3, reopenedCount: 0, inProgressCount: 5,  backlogAgingDays: 18 },
       ];
       const analysis =
         "Summary: Flow is stabilising but QA remains the primary bottleneck — cycle time improved 31% over 5 syncs.\n" +
