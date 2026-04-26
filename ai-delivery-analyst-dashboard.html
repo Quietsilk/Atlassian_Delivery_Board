@@ -762,7 +762,6 @@
       renderTabs();
       if (p && jiraConnected) {
         setDataStatus(null, true);
-        prevKpi = null;
         await refreshDashboard();
       }
     }
@@ -793,7 +792,7 @@
     const sidebarToggleBtn     = document.getElementById("sidebar-toggle");
 
     let jiraConnected    = false;
-    let prevKpi          = null;
+    const prevKpiMap     = new Map();
     let sidebarCollapsed = false;
 
     // ── Sidebar collapse ──────────────────────────────────────
@@ -1023,14 +1022,15 @@
       document.getElementById("kpi-aging-value").textContent       = aging.toFixed(0) + "d";
 
       // Deltas
-      setDelta("kpi-throughput-delta",  throughput, prevKpi?.throughput  ?? null, false, "");
-      setDelta("kpi-cycle-time-delta",  cycleP50,   prevKpi?.cycleTimeP50 ?? prevKpi?.cycleTimeDays ?? null, true, "d");
-      setDelta("kpi-ttm-delta",         ttmP50,     prevKpi?.timeToMarketP50 ?? prevKpi?.timeToMarketDays ?? null, true, "d");
-      setDelta("kpi-flow-eff-delta",    flowEff,    prevKpi?.flowEfficiencyPercent ?? null, false, "%");
-      setDelta("kpi-reopened-delta",    reopened,   prevKpi?.reopenedCount ?? null, true, "");
-      setDelta("kpi-wip-delta",         wip,        prevKpi?.inProgressCount ?? null, true, "");
-      setDelta("kpi-backlog-delta",     backlog,    prevKpi?.backlogSize ?? null, true, "");
-      setDelta("kpi-aging-delta",       aging,      prevKpi?.backlogAgingDays ?? null, true, "d");
+      const _prev = prevKpiMap.get(activeId);
+      setDelta("kpi-throughput-delta",  throughput, _prev?.throughput  ?? null, false, "");
+      setDelta("kpi-cycle-time-delta",  cycleP50,   _prev?.cycleTimeP50 ?? _prev?.cycleTimeDays ?? null, true, "d");
+      setDelta("kpi-ttm-delta",         ttmP50,     _prev?.timeToMarketP50 ?? _prev?.timeToMarketDays ?? null, true, "d");
+      setDelta("kpi-flow-eff-delta",    flowEff,    _prev?.flowEfficiencyPercent ?? null, false, "%");
+      setDelta("kpi-reopened-delta",    reopened,   _prev?.reopenedCount ?? null, true, "");
+      setDelta("kpi-wip-delta",         wip,        _prev?.inProgressCount ?? null, true, "");
+      setDelta("kpi-backlog-delta",     backlog,    _prev?.backlogSize ?? null, true, "");
+      setDelta("kpi-aging-delta",       aging,      _prev?.backlogAgingDays ?? null, true, "d");
 
       // Status coloring
       setKpiStatus("kpi-throughput-card",  throughput, 0,  0, true);  // bad if 0
@@ -1043,7 +1043,7 @@
       // Backlog: no threshold coloring (neutral)
       document.getElementById("kpi-throughput-card").classList.toggle("kpi-status-bad", throughput === 0);
 
-      prevKpi = { ...d };
+      prevKpiMap.set(activeId, { ...d });
 
       // AI section
       const hintsEl = document.getElementById("ai-hints");
@@ -1192,6 +1192,7 @@
             metrics.throughput = snaps[0].metrics.completedCount;
             if (sublabelEl) sublabelEl.textContent = "total completed tasks (first sync)";
           }
+          // snaps.length === 0: old snapshots without completedCount — use backend value as-is
         }
 
         updateDashboard(metrics);
@@ -1225,7 +1226,7 @@
         "- Reduce next sprint scope by 15% to align with measured velocity\n" +
         "- Run a 30-min cycle-time retro focused on the 3 longest outlier tickets";
 
-      prevKpi = null;
+      prevKpiMap.delete(activeId);
       demoSnapshots.forEach((snap, i) => {
         setTimeout(() => {
           const isLast = i === demoSnapshots.length - 1;
