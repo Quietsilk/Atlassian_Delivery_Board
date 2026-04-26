@@ -29,9 +29,9 @@ Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses 
 
 | Модуль | Ключевые экспорты |
 |---|---|
-| `metrics.py` | `calculate_metrics(issues)` — чистая функция без period/cutoff |
+| `metrics.py` | `calculate_metrics(issues, mapped=None)` → структурные метрики; `calculate_flow_metrics(completed_items)` → P50/P85; `_map_issue`, `_percentile`, `_parse_dt` |
 | `storage.py` | `init_db`, `save_snapshot`, `get_latest`, `get_history`, `get_previous_snapshot` |
-| `ingestion.py` | `run_ingestion(project_key, base_url, email, api_token, jql, db_path)` |
+| `ingestion.py` | `run_ingestion(...)`, `_get_completed_in_interval(mapped, since_ts)` |
 | `api.py` | `handle_get_latest`, `handle_get_history`, `handle_post_sync` |
 | `scheduler.py` | `start_scheduler(projects, db_path, interval)` |
 
@@ -39,8 +39,8 @@ Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses 
 - Вводит Jira credentials (хранит в localStorage)
 - Управляет проектными табами, автоматически переключает данные при смене таба
 - При `GET /latest → 404` автоматически запускает `POST /sync` + поллит каждые 3s
-- Читает историю снапшотов через `GET /history` для графиков
-- Period-фильтр влияет только на окно графиков, не на KPI
+- Читает историю снапшотов через `GET /history` для графиков и KPI-карточек
+- Period-фильтр влияет и на KPI, и на графики (агрегация на фронте)
 
 ---
 
@@ -48,9 +48,12 @@ Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses 
 
 1. **UI read-only** — браузер только читает снапшоты, никогда не считает метрики
 2. **Иммутабельные снапшоты** — только INSERT в SQLite, никогда UPDATE/DELETE
-3. **Throughput = дельта** — кол-во resolved с `timestamp` предыдущего снапшота, выставляется в `ingestion.py`
-4. **Period без пересчёта** — `GET /history?period=30d` фильтрует строки по timestamp
-5. **`calculate_metrics` без period** — нет параметров cutoff/period в сигнатуре
+3. **`throughput` = интервальный** — кол-во resolved с `timestamp` предыдущего снапшота; 0 если нет предыдущего
+4. **`completedCount` = кумулятивный** — всего завершённых на момент синка; хранится в каждом снапшоте
+5. **`throughputPerDay` не хранится** — фронт вычисляет: `(last.completedCount − first.completedCount) / дней`
+6. **Flow metrics раздельно** — `calculate_metrics` → только `backlogSize, inProgressCount, completedCount, reopenedCount, backlogAgingDays`; `calculate_flow_metrics` → `cycleTimeP50/P85, timeToMarketP50/P85, flowEfficiencyPercent`
+7. **Period фильтр** — `GET /history?period=30d` фильтрует строки по timestamp; агрегация (avg, delta) на фронте
+8. **`calculate_metrics` без period** — нет параметров cutoff/period в сигнатуре
 
 ---
 
@@ -80,7 +83,7 @@ DONE    = {"done", "closed", "resolved", "выполнено", "complete"}
 
 ## Тесты
 
-108 тестов в 5 файлах, stdlib unittest, zero deps:
+120 тестов в 5 файлах, stdlib unittest, zero deps:
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -91,7 +94,7 @@ python3 -m unittest discover -s tests -v
 | `tests/test_server.py` | 87 (legacy) |
 | `tests/test_metrics.py` | 15 |
 | `tests/test_storage.py` | 13 |
-| `tests/test_ingestion.py` | 8 |
+| `tests/test_ingestion.py` | 12 |
 | `tests/test_api.py` | 8 |
 
 ---
@@ -128,3 +131,12 @@ python3 -m unittest discover -s tests -v
     - Фоновый планировщик (PROJECTS env + SYNC_INTERVAL_SECONDS)
     - 108 тестов в 5 файлах
 13. Tab switch: переключение проекта автоматически загружает его данные (`switchProject` async)
+14. **Flow Metrics Refactor v2 (апрель 2026):**
+    - P50/P85 перцентили вместо средних для Cycle Time и Time to Market
+    - `calculate_metrics` разделён: структурные → `calculate_metrics`, flow → `calculate_flow_metrics`
+    - Интервальная фильтрация: flow metrics считаются только по задачам, завершённым с последнего снапшота
+    - `completedCount` — новое кумулятивное поле; `throughputPerDay` вычисляется фронтом
+    - Статус: одна метка "Updated Xm ago" вместо чипов Connected/Refreshed
+    - `wipRatio` удалён
+    - Period-фильтр обновляет KPI-карточки (раньше только графики)
+    - 120 тестов

@@ -91,13 +91,20 @@ ai-delivery-analyst/
 {
   "ok": true,
   "snapshot": {
-    "timestamp": "2026-04-25T12:00:00",
+    "timestamp": "2026-04-26T10:00:00+00:00",
     "metrics": {
-      "cycleTimeDays": 4.2,
-      "throughput": 23,
-      "timeToMarketDays": 8.7,
-      "reopenedCount": 0,
-      "flowEfficiencyPercent": 48.3
+      "cycleTimeP50": 5.0,
+      "cycleTimeP85": 17.8,
+      "timeToMarketP50": 12.0,
+      "timeToMarketP85": 62.2,
+      "flowEfficiencyPercent": 41.7,
+      "throughput": 0,
+      "completedCount": 147,
+      "backlogSize": 56,
+      "inProgressCount": 9,
+      "reopenedCount": 2,
+      "backlogAgingDays": 208.3,
+      "predictabilityPercent": 59.1
     }
   }
 }
@@ -140,10 +147,12 @@ ai-delivery-analyst/
 
 | Метрика | Определение | Хорошо | Плохо |
 |---|---|---|---|
-| **Cycle Time** | Среднее время от последнего "In Progress" до Done | ≤ 5d | ≥ 10d |
-| **Time to Market** | Среднее время от создания до Done | ≤ 10d | ≥ 20d |
-| **Flow Efficiency** | cycleTime / timeToMarket × 100%, кап 100% | ≥ 40% | ≤ 15% |
-| **Throughput** | Кол-во resolved с предыдущего снапшота | > 0 | = 0 |
+| **Cycle Time P50/P85** | Медиана/85-й перцентиль времени от "In Progress" до Done | P50 ≤ 5d | P50 ≥ 10d |
+| **Time to Market P50/P85** | Медиана/85-й перцентиль времени от создания до Done | P50 ≤ 10d | P50 ≥ 20d |
+| **Flow Efficiency** | cycleTimeP50 / timeToMarketP50 × 100%, кап 100% | ≥ 40% | ≤ 15% |
+| **Throughput** | Кол-во resolved с предыдущего снапшота (интервальный) | > 0 | = 0 |
+| **completedCount** | Кумулятивное кол-во завершённых задач (для KPI-дельты) | — | — |
+| **Throughput/day** | (completedCount_last − completedCount_first) / дней периода | > 0 | = 0 |
 | **Reopened** | Задачи, вернувшиеся из Done | = 0 | > 2 |
 
 ---
@@ -154,14 +163,14 @@ ai-delivery-analyst/
 python3 -m unittest discover -s tests -v
 ```
 
-108 тестов, zero external dependencies:
+120 тестов, zero external dependencies:
 
 | Файл | Тестов | Покрытие |
 |---|---|---|
 | `test_server.py` | 87 | Legacy pipeline |
-| `test_metrics.py` | 15 | `calculate_metrics` — edge cases, flow efficiency, parse_dt |
+| `test_metrics.py` | 15 | `calculate_metrics`, `calculate_flow_metrics`, `_percentile`, `_parse_dt` |
 | `test_storage.py` | 13 | SQLite CRUD, иммутабельность, фильтрация по периоду |
-| `test_ingestion.py` | 8 | Throughput delta, первый/второй снапшот |
+| `test_ingestion.py` | 12 | Throughput interval/cumulative, completedCount, flow metrics interval |
 | `test_api.py` | 8 | HTTP handlers, 400/404/202 статусы |
 
 ---
@@ -170,9 +179,12 @@ python3 -m unittest discover -s tests -v
 
 1. **UI read-only** — браузер только читает снапшоты, никогда не считает метрики
 2. **Иммутабельные снапшоты** — только INSERT в SQLite, никогда UPDATE/DELETE
-3. **Throughput = дельта** — кол-во resolved с `timestamp` предыдущего снапшота
-4. **Period без пересчёта** — `GET /history?period=30d` фильтрует строки по timestamp
-5. **`calculate_metrics` без period** — чистая функция, нет параметров cutoff/period
+3. **`throughput` = интервальный счётчик** — кол-во resolved с `timestamp` предыдущего снапшота
+4. **`completedCount` = кумулятивный** — всего завершённых задач на момент синка; дельта между снапшотами = throughput за период
+5. **`throughputPerDay` не хранится** — вычисляется фронтом как `ΔcompletedCount / дней_периода`
+6. **Flow metrics раздельно** — `calculate_metrics` возвращает только структурные метрики; `calculate_flow_metrics(completed_items)` — P50/P85 flow-метрики
+7. **Period фильтр** — влияет и на KPI-карточки, и на графики; агрегация выполняется на фронте из снапшотов периода
+8. **`calculate_metrics` без period** — чистая функция, нет параметров cutoff/period
 
 ---
 

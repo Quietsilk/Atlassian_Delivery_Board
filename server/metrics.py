@@ -140,6 +140,7 @@ def calculate_metrics(issues, mapped=None):
     return {
         "backlogSize":      len(backlog),
         "inProgressCount":  len(in_progress),
+        "completedCount":   len(completed),
         "reopenedCount":    sum(1 for m in completed if m["reopened"]),
         "backlogAgingDays": backlog_aging,
     }

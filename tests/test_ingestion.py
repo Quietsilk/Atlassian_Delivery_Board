@@ -105,33 +105,18 @@ class TestRunIngestion(unittest.TestCase):
             m = run_ingestion("PROJ", "https://j.test", "u", "t", "project=X", self.db)
         self.assertEqual(m["throughput"], 0)
 
-    def test_second_snapshot_throughput_is_delta(self):
-        # Manually save a snapshot before DONE_ISSUE resolution (2024-01-05)
-        con = sqlite3.connect(self.db)
-        con.execute(
-            "INSERT INTO snapshots (project_key, timestamp, metrics_json) VALUES (?, ?, ?)",
-            ("PROJ", "2024-01-03T00:00:00+00:00", '{"throughput": 0}'),
-        )
-        con.commit()
-        con.close()
-
+    def test_completed_count_is_cumulative(self):
+        """completedCount = total completed issues, independent of sync interval."""
         with self._mock_fetch([DONE_ISSUE]):
             m = run_ingestion("PROJ", "https://j.test", "u", "t", "project=X", self.db)
-        self.assertEqual(m["throughput"], 1)
+        # DONE_ISSUE is completed → completedCount = 1 regardless of interval
+        self.assertEqual(m["completedCount"], 1)
 
-    def test_throughput_per_day_computed(self):
-        con = sqlite3.connect(self.db)
-        con.execute(
-            "INSERT INTO snapshots (project_key, timestamp, metrics_json) VALUES (?, ?, ?)",
-            ("PROJ", "2024-01-03T00:00:00+00:00", '{"throughput": 0}'),
-        )
-        con.commit()
-        con.close()
-
+    def test_throughput_per_day_not_in_snapshot(self):
+        """throughputPerDay is computed by the frontend from snapshot deltas, not stored."""
         with self._mock_fetch([DONE_ISSUE]):
             m = run_ingestion("PROJ", "https://j.test", "u", "t", "project=X", self.db)
-        self.assertIn("throughputPerDay", m)
-        self.assertGreaterEqual(m["throughputPerDay"], 0)
+        self.assertNotIn("throughputPerDay", m)
 
     def test_snapshot_is_saved(self):
         with self._mock_fetch([DONE_ISSUE]):
@@ -146,7 +131,7 @@ class TestRunIngestion(unittest.TestCase):
             "cycleTimeP50", "cycleTimeP85",
             "timeToMarketP50", "timeToMarketP85",
             "flowEfficiencyPercent",
-            "throughput", "throughputPerDay",
+            "throughput", "completedCount",
             "backlogSize", "inProgressCount", "reopenedCount",
             "predictabilityPercent", "backlogAgingDays",
         )
@@ -172,8 +157,10 @@ class TestRunIngestion(unittest.TestCase):
         # DONE_ISSUE resolved 2024-01-05, which is BEFORE prev snapshot 2024-01-10
         with self._mock_fetch([DONE_ISSUE]):
             m = run_ingestion("PROJ", "https://j.test", "u", "t", "project=X", self.db)
-        # No issue resolved in interval → throughput 0, flow metrics from empty interval
+        # No issue resolved in interval → throughput 0
         self.assertEqual(m["throughput"], 0)
+        # completedCount is cumulative total — 1 completed issue regardless of interval
+        self.assertEqual(m["completedCount"], 1)
 
 
 if __name__ == "__main__":

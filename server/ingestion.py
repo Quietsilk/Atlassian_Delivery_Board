@@ -161,29 +161,19 @@ def run_ingestion(project_key, base_url, email, api_token, jql, db_path="snapsho
     # Structural metrics (backlog, inProgress, reopened, aging)
     metrics = calculate_metrics(issues, mapped=mapped)
 
-    # Previous snapshot for interval boundary
+    # Previous snapshot for interval boundary (flow metrics only)
     prev     = get_latest(project_key, db_path)
     since_ts = prev["timestamp"] if prev else None
 
     # Step 2–3: interval-based completed list
     completed_interval = _get_completed_in_interval(mapped, since_ts)
+    # throughput = issues completed since last snapshot (interval count, sync-frequency aware)
     metrics["throughput"] = len(completed_interval)
-
-    # Step 4: throughput per day (normalized, sync-frequency independent)
-    if since_ts and metrics["throughput"] > 0:
-        try:
-            delta_days = (
-                datetime.now(timezone.utc) - _parse_dt(since_ts)
-            ).total_seconds() / 86400
-            metrics["throughputPerDay"] = round(metrics["throughput"] / delta_days, 2) if delta_days > 0 else 0
-        except Exception:
-            metrics["throughputPerDay"] = 0
-    else:
-        metrics["throughputPerDay"] = 0
 
     # Step 5–7: flow metrics from interval (same window for all three)
     # Fall back to all completed issues on first sync (no prev snapshot)
-    flow_source = completed_interval if completed_interval else [m for m in mapped if m["resolved_at"]]
+    completed_all = [m for m in mapped if m["resolved_at"]]
+    flow_source = completed_interval if completed_interval else completed_all
     metrics.update(calculate_flow_metrics(flow_source))
 
     # Step 8: predictability (marked approximation — rolling 30d window)

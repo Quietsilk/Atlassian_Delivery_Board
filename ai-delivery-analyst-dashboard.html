@@ -1051,16 +1051,38 @@
 
     function drawThroughputChart(snapshots) {
       const content = document.getElementById("chart-throughput-content");
-      // Use throughputPerDay; fall back to legacy throughput for old snapshots
-      const pts = (snapshots || []).filter(s => s.metrics.throughputPerDay != null || s.metrics.throughput != null);
-      if (pts.length === 0) {
+      // Compute throughput/day per snapshot:
+      // - Prefer completedCount delta between consecutive snapshots / elapsed days
+      // - Fall back to interval throughput / elapsed days
+      // - Legacy: throughputPerDay stored directly (old format)
+      const all = (snapshots || []);
+      if (all.length === 0) {
         content.innerHTML = '<text x="490" y="100" fill="rgba(255,255,255,0.2)" font-size="11" text-anchor="middle">Run a sync to see the trend</text>';
         return;
       }
+      const pts = all;
 
       const xL = 20, xR = 966, yT = 25, yB = 170;
       const n = pts.length;
-      const raw  = pts.map(s => s.metrics.throughputPerDay ?? s.metrics.throughput ?? 0);
+      const raw = pts.map((s, i) => {
+        const m = s.metrics;
+        // Prefer completedCount delta
+        if (i > 0 && m.completedCount != null) {
+          const pm = pts[i-1].metrics;
+          if (pm.completedCount != null) {
+            const delta = Math.max(0, m.completedCount - pm.completedCount);
+            const days  = Math.max(0.001, (new Date(s.timestamp) - new Date(pts[i-1].timestamp)) / 86400000);
+            return delta / days;
+          }
+        }
+        // Fall back to stored throughputPerDay or interval throughput/day
+        if (m.throughputPerDay != null && m.throughputPerDay > 0) return m.throughputPerDay;
+        if (m.throughput > 0 && i > 0) {
+          const days = Math.max(0.001, (new Date(s.timestamp) - new Date(pts[i-1].timestamp)) / 86400000);
+          return m.throughput / days;
+        }
+        return 0;
+      });
       const vals = n >= 3 ? _smooth(raw) : raw;
       const maxV = Math.max(...vals) * 1.25 || 1;
 
@@ -1367,15 +1389,34 @@
         const snaps = body.snapshots;
         if (snaps.length === 0) return;
         const last = snaps[snaps.length - 1].metrics;
-        const avg  = k => snaps.reduce((s, x) => s + (x.metrics[k] ?? 0), 0) / snaps.length;
+        const avg   = k => snaps.reduce((s, x) => s + (x.metrics[k] ?? 0), 0) / snaps.length;
+        // avgOr: use primary field; if average is 0, fall back to legacy field name (old snapshots)
+        const avgOr = (primary, fallback, decimals = 1) => {
+          const v = avg(primary);
+          return +(v > 0 ? v : avg(fallback)).toFixed(decimals);
+        };
         updateDashboard({
-          cycleTimeP50:          +avg("cycleTimeP50").toFixed(1),
+          cycleTimeP50:          avgOr("cycleTimeP50",    "cycleTimeDays"),
           cycleTimeP85:          +avg("cycleTimeP85").toFixed(1),
-          timeToMarketP50:       +avg("timeToMarketP50").toFixed(1),
+          timeToMarketP50:       avgOr("timeToMarketP50", "timeToMarketDays"),
           timeToMarketP85:       +avg("timeToMarketP85").toFixed(1),
           flowEfficiencyPercent: +avg("flowEfficiencyPercent").toFixed(1),
-          throughput:            snaps.reduce((s, x) => s + (x.metrics.throughput ?? 0), 0),
-          throughputPerDay:      +avg("throughputPerDay").toFixed(2),
+          throughput:            (() => {
+            // completedCount is cumulative — delta between first and last new-format snap.
+            // Only use snaps that have completedCount to avoid mixing old interval data (always 0).
+            const ns = snaps.filter(s => s.metrics.completedCount != null);
+            if (ns.length < 2) return 0;
+            return Math.max(0, ns[ns.length-1].metrics.completedCount - ns[0].metrics.completedCount);
+          })(),
+          throughputPerDay:      (() => {
+            const ns = snaps.filter(s => s.metrics.completedCount != null);
+            if (ns.length < 2) return 0;
+            const delta = Math.max(0, ns[ns.length-1].metrics.completedCount - ns[0].metrics.completedCount);
+            if (delta === 0) return 0;
+            const ms   = new Date(ns[ns.length-1].timestamp) - new Date(ns[0].timestamp);
+            const days = Math.max(1, ms / 86400000);
+            return +( delta / days ).toFixed(2);
+          })(),
           predictabilityPercent: last.predictabilityPercent ?? 0,
           inProgressCount:       last.inProgressCount       ?? 0,
           backlogSize:           last.backlogSize            ?? 0,
