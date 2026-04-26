@@ -18,7 +18,6 @@
       --green:     #22c55e;
       --red:       #ef4444;
       --amber:     #f59e0b;
-      --purple:    #8b5cf6;
       --accent:    #4f7cff;
       --radius:    10px;
     }
@@ -37,10 +36,7 @@
       min-height: 100vh;
     }
 
-    button, input, select, textarea {
-      font-family: inherit;
-      font-size: inherit;
-    }
+    button, input, select, textarea { font-family: inherit; font-size: inherit; }
 
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -49,14 +45,9 @@
 
     /* ── App bar ─────────────────────────────────────────── */
     .app-bar {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 0 20px;
-      height: 48px;
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 20px; height: 48px;
       background: rgba(13,15,19,0.95);
       backdrop-filter: blur(10px);
       border-bottom: 1px solid var(--border);
@@ -65,67 +56,49 @@
 
     .sidebar-toggle {
       width: 32px; height: 32px;
-      border: 1px solid var(--border-hi);
-      border-radius: 7px;
-      background: rgba(255,255,255,0.04);
-      color: var(--secondary);
-      font-size: 1rem;
-      cursor: pointer;
+      border: 1px solid var(--border-hi); border-radius: 7px;
+      background: rgba(255,255,255,0.04); color: var(--secondary);
+      font-size: 1rem; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      transition: color 0.15s, background 0.15s;
-      flex-shrink: 0;
+      transition: color 0.15s, background 0.15s; flex-shrink: 0;
     }
     .sidebar-toggle:hover { color: var(--text); background: rgba(255,255,255,0.07); }
 
+    /* Logo — left side */
     .app-logo {
-      font-size: 0.88rem;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      color: var(--text);
-      white-space: nowrap;
-      opacity: 0.7;
+      font-size: 0.88rem; font-weight: 700;
+      letter-spacing: 0.02em; color: var(--text);
+      white-space: nowrap; opacity: 0.7;
     }
     .app-logo span { color: var(--accent); }
 
     .app-bar-spacer { flex: 1; }
 
-    .run-btn {
-      height: 32px;
-      padding: 0 16px;
-      border: 0;
-      border-radius: 7px;
-      background: var(--accent);
-      color: #0d0f13;
-      font-size: 0.82rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
-      box-shadow: 0 2px 10px rgba(91,156,246,0.3);
-      white-space: nowrap;
-      letter-spacing: 0.01em;
-    }
-    .run-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(91,156,246,0.45); }
-    .run-btn:disabled { opacity: 0.28; cursor: not-allowed; transform: none; box-shadow: none; }
-
-    /* ── Data status ─────────────────────────────────────── */
+    /* Data status */
     .data-status {
-      font-size: 0.72rem;
-      font-weight: 500;
-      color: var(--muted);
-      white-space: nowrap;
-      transition: color 0.2s;
+      font-size: 0.72rem; font-weight: 500;
+      color: var(--muted); white-space: nowrap; transition: color 0.2s;
     }
     .data-status.syncing  { color: var(--accent); }
     .data-status.warn     { color: var(--amber); }
     .data-status.critical { color: var(--red); }
 
+    /* Sync — right side */
+    .run-btn {
+      height: 32px; padding: 0 16px; border: 0; border-radius: 7px;
+      background: var(--accent); color: #0d0f13;
+      font-size: 0.82rem; font-weight: 700; cursor: pointer;
+      transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 2px 10px rgba(79,124,255,0.3);
+      white-space: nowrap; letter-spacing: 0.01em;
+    }
+    .run-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(79,124,255,0.45); }
+    .run-btn:disabled { opacity: 0.28; cursor: not-allowed; transform: none; box-shadow: none; }
+
     /* ── Body layout ─────────────────────────────────────── */
     .app-body {
-      display: grid;
-      grid-template-columns: 260px minmax(0, 1fr);
-      flex: 1;
-      min-height: 0;
-      transition: grid-template-columns 0.2s ease;
+      display: grid; grid-template-columns: 260px minmax(0, 1fr);
+      flex: 1; min-height: 0; transition: grid-template-columns 0.2s ease;
     }
     .app-body.sidebar-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
     .app-body.sidebar-collapsed .sidebar { overflow: hidden; border: none; }
@@ -134,364 +107,313 @@
     .sidebar {
       background: rgba(19,22,28,0.6);
       border-right: 1px solid rgba(255,255,255,0.05);
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
+      display: flex; flex-direction: column; overflow-y: auto;
     }
 
     .sidebar-section {
-      padding: 14px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+      padding: 14px; border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 10px;
     }
     .sidebar-section.grow { flex: 1; }
 
     .sidebar-label {
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
+      font-size: 0.68rem; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
     }
 
     .field { display: flex; flex-direction: column; gap: 4px; }
     .field label { font-size: 0.75rem; color: var(--secondary); font-weight: 500; }
-
     .field input {
-      height: 32px;
-      border-radius: 7px;
-      border: 1px solid var(--border-hi);
-      background: rgba(0,0,0,0.22);
-      color: var(--text);
-      padding: 0 10px;
-      font-size: 0.82rem;
-      outline: none;
-      transition: border-color 0.18s;
-      width: 100%;
+      height: 32px; border-radius: 7px;
+      border: 1px solid var(--border-hi); background: rgba(0,0,0,0.22);
+      color: var(--text); padding: 0 10px; font-size: 0.82rem;
+      outline: none; transition: border-color 0.18s; width: 100%;
     }
-    .field input:focus { border-color: rgba(91,156,246,0.6); }
+    .field input:focus { border-color: rgba(79,124,255,0.6); }
 
     .token-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
 
     .btn-ghost {
-      height: 32px;
-      padding: 0 9px;
-      border: 1px solid var(--border-hi);
-      border-radius: 7px;
-      background: rgba(255,255,255,0.04);
-      color: var(--secondary);
-      font-size: 0.76rem;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: color 0.15s;
+      height: 32px; padding: 0 9px;
+      border: 1px solid var(--border-hi); border-radius: 7px;
+      background: rgba(255,255,255,0.04); color: var(--secondary);
+      font-size: 0.76rem; cursor: pointer; white-space: nowrap; transition: color 0.15s;
     }
     .btn-ghost:hover { color: var(--text); }
 
     .btn-connect {
-      height: 32px;
-      padding: 0 12px;
-      border: 1px solid rgba(91,156,246,0.45);
-      border-radius: 7px;
-      background: rgba(91,156,246,0.1);
-      color: var(--text);
-      font-size: 0.82rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.15s, background 0.15s;
-      align-self: flex-start;
+      height: 32px; padding: 0 12px;
+      border: 1px solid rgba(79,124,255,0.45); border-radius: 7px;
+      background: rgba(79,124,255,0.1); color: var(--text);
+      font-size: 0.82rem; font-weight: 600; cursor: pointer;
+      transition: transform 0.15s, background 0.15s; align-self: flex-start;
     }
-    .btn-connect:hover { transform: translateY(-1px); background: rgba(91,156,246,0.15); }
+    .btn-connect:hover { transform: translateY(-1px); background: rgba(79,124,255,0.15); }
 
     .hidden { display: none !important; }
-
     .status-msg { font-size: 0.76rem; color: var(--secondary); line-height: 1.4; }
     .muted-text { font-size: 0.71rem; color: var(--muted); line-height: 1.4; }
 
-    /* ── Main content ────────────────────────────────────── */
+    /* ── Main ────────────────────────────────────────────── */
     .main-content { display: flex; flex-direction: column; overflow-y: auto; }
 
     /* Project tabs */
     .project-tabs-bar {
-      display: flex;
-      align-items: flex-end;
-      gap: 2px;
-      padding: 0 20px;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-      overflow-x: auto;
-      flex-shrink: 0;
-      min-height: 40px;
+      display: flex; align-items: flex-end; gap: 2px;
+      padding: 0 20px; border-bottom: 1px solid var(--border);
+      background: var(--surface); overflow-x: auto;
+      flex-shrink: 0; min-height: 40px;
     }
 
     .tab-group { display: flex; align-items: stretch; margin-bottom: -1px; }
 
     .project-tab {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 9px 12px 8px;
-      border: none;
-      border-bottom: 2px solid transparent;
-      background: none;
-      color: var(--secondary);
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: color 0.15s, border-color 0.15s;
-      letter-spacing: 0.01em;
+      display: flex; align-items: center; gap: 6px;
+      padding: 9px 12px 8px; border: none;
+      border-bottom: 2px solid transparent; background: none;
+      color: var(--secondary); font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s; letter-spacing: 0.01em;
     }
     .project-tab:hover { color: var(--text); }
     .project-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
     .tab-dot {
-      width: 5px; height: 5px;
-      border-radius: 50%;
-      background: currentColor;
-      opacity: 0.45; flex-shrink: 0;
+      width: 5px; height: 5px; border-radius: 50%;
+      background: currentColor; opacity: 0.45; flex-shrink: 0;
     }
     .project-tab.active .tab-dot { opacity: 1; }
 
     .tab-close {
       display: flex; align-items: center;
-      padding: 9px 6px 8px 0;
-      border: none; background: none;
-      color: var(--muted); font-size: 13px; cursor: pointer;
-      line-height: 1;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -1px;
-      transition: color 0.15s;
+      padding: 9px 6px 8px 0; border: none; background: none;
+      color: var(--muted); font-size: 13px; cursor: pointer; line-height: 1;
+      border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s;
     }
     .tab-close:hover { color: var(--red); }
     .tab-group:has(.project-tab.active) .tab-close { border-bottom-color: var(--accent); }
 
     .tab-add {
-      display: flex; align-items: center;
-      padding: 0 10px;
-      margin: 6px 0 7px 4px;
-      border: 1px dashed var(--border-hi);
-      border-radius: 6px; background: none;
-      color: var(--muted); font-size: 0.75rem;
-      cursor: pointer; white-space: nowrap;
-      transition: color 0.15s, border-color 0.15s;
-      align-self: center; height: 26px;
+      display: flex; align-items: center; padding: 0 10px;
+      margin: 6px 0 7px 4px; border: 1px dashed var(--border-hi);
+      border-radius: 6px; background: none; color: var(--muted);
+      font-size: 0.75rem; cursor: pointer; white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s; align-self: center; height: 26px;
     }
-    .tab-add:hover { color: var(--accent); border-color: rgba(91,156,246,0.4); }
-
-    .tab-demo {
-      display: flex; align-items: center;
-      padding: 0 10px;
-      margin: 6px 0 7px 4px;
-      border: 1px dashed rgba(62,207,142,0.35);
-      border-radius: 6px; background: none;
-      color: var(--muted); font-size: 0.75rem;
-      cursor: pointer; white-space: nowrap;
-      align-self: center; height: 26px;
-      transition: color 0.15s, border-color 0.15s;
-    }
-    .tab-demo:hover { color: var(--green); border-color: rgba(62,207,142,0.6); }
+    .tab-add:hover { color: var(--accent); border-color: rgba(79,124,255,0.4); }
 
     .tab-add-input {
       height: 26px; width: 110px;
-      border: 1px solid rgba(91,156,246,0.5);
-      border-radius: 5px;
-      background: rgba(91,156,246,0.07);
-      color: var(--text); padding: 0 8px;
-      font-size: 0.78rem; outline: none;
-      align-self: center; margin: 0 4px;
+      border: 1px solid rgba(79,124,255,0.5); border-radius: 5px;
+      background: rgba(79,124,255,0.07); color: var(--text); padding: 0 8px;
+      font-size: 0.78rem; outline: none; align-self: center; margin: 0 4px;
       letter-spacing: 0.04em;
     }
 
     /* Content area */
     .content-area {
       padding: 20px 20px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      flex: 1;
-      min-height: 0;
+      display: flex; flex-direction: column; gap: 16px;
+      flex: 1; min-height: 0;
     }
 
     /* Sync banner */
     .sync-banner {
-      display: none;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 12px 9px 14px;
-      border-radius: var(--radius);
-      font-size: 0.8rem;
-      font-weight: 500;
+      display: none; align-items: center; gap: 8px;
+      padding: 9px 12px 9px 14px; border-radius: var(--radius);
+      font-size: 0.8rem; font-weight: 500;
     }
     .sync-banner.visible { display: flex; }
-    .sync-banner.ok  { background: rgba(62,207,142,0.08);  border: 1px solid rgba(62,207,142,0.22); color: var(--green); }
-    .sync-banner.err { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.22); color: var(--red); }
+    .sync-banner.ok  { background: rgba(34,197,94,0.08);  border: 1px solid rgba(34,197,94,0.22);  color: var(--green); }
+    .sync-banner.err { background: rgba(239,68,68,0.08);  border: 1px solid rgba(239,68,68,0.22);  color: var(--red); }
     .sync-banner-text { flex: 1; }
     .sync-dismiss {
-      background: none; border: none;
-      color: currentColor; opacity: 0.5;
-      cursor: pointer; font-size: 1rem;
-      line-height: 1; padding: 0 2px;
+      background: none; border: none; color: currentColor;
+      opacity: 0.5; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 2px;
     }
     .sync-dismiss:hover { opacity: 1; }
 
-    /* KPI row — 4 columns, 2 rows of 4 */
-    .kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+    /* ── KPI Cards ───────────────────────────────────────── */
 
-    .kpi-card {
+    /* Hero: Throughput full-width */
+    .kpi-hero {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 14px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+      padding: 20px 24px;
+      display: flex; align-items: center; justify-content: space-between; gap: 24px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .kpi-hero:hover { border-color: var(--border-hi); }
+    .kpi-hero.kpi-status-bad { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); }
+
+    .kpi-hero-left { display: flex; flex-direction: column; gap: 4px; }
+    .kpi-hero-label { font-size: 0.78rem; color: var(--secondary); font-weight: 600; letter-spacing: 0.02em; }
+    .kpi-hero-sublabel { font-size: 0.72rem; color: var(--muted); }
+
+    .kpi-hero-right { display: flex; align-items: baseline; gap: 16px; }
+    .kpi-hero-value { font-size: 3.2rem; font-weight: 800; color: var(--text); letter-spacing: -0.04em; font-feature-settings: "tnum"; line-height: 1; }
+    .kpi-hero-delta { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+    .kpi-hero-delta.delta-good { color: var(--green); }
+    .kpi-hero-delta.delta-bad  { color: var(--red); }
+
+    /* Secondary grid: 3 columns */
+    .kpi-secondary { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+
+    .kpi-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 6px;
       transition: border-color 0.2s, background 0.2s;
     }
     .kpi-card:hover { border-color: var(--border-hi); }
-
-    .kpi-card.kpi-accent-blue   { border-top: 3px solid var(--accent); }
-    .kpi-card.kpi-accent-green  { border-top: 3px solid var(--green); }
-    .kpi-card.kpi-accent-purple { border-top: 3px solid #a78bfa; }
-    .kpi-card.kpi-accent-red    { border-top: 3px solid var(--red); }
-    .kpi-card.kpi-accent-amber  { border-top: 3px solid #f59e0b; }
-    .kpi-card.kpi-accent-teal   { border-top: 3px solid #2dd4bf; }
-    .kpi-card.kpi-accent-sky    { border-top: 3px solid #38bdf8; }
-    .kpi-card.kpi-accent-indigo { border-top: 3px solid #818cf8; }
-
     .kpi-card.kpi-status-good { background: rgba(34,197,94,0.08);  border-color: rgba(34,197,94,0.25); }
     .kpi-card.kpi-status-bad  { background: rgba(239,68,68,0.08);  border-color: rgba(239,68,68,0.25); }
 
     .kpi-label { font-size: 0.74rem; color: var(--secondary); font-weight: 500; }
     .kpi-sublabel { font-size: 0.68rem; color: var(--muted); line-height: 1.3; margin-top: -2px; }
 
-    .kpi-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .kpi-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: auto; }
 
-    .kpi-value { font-size: 2.4rem; font-weight: 800; color: var(--text); letter-spacing: -0.03em; font-feature-settings: "tnum"; }
+    .kpi-number { display: flex; align-items: baseline; gap: 3px; }
+    .kpi-value  { font-size: 1.9rem; font-weight: 800; color: var(--text); letter-spacing: -0.03em; font-feature-settings: "tnum"; }
+    .kpi-unit   { font-size: 0.95rem; font-weight: 600; color: var(--secondary); }
 
     .kpi-delta { font-size: 0.74rem; font-weight: 600; color: var(--muted); }
     .kpi-delta.delta-good { color: var(--green); }
     .kpi-delta.delta-bad  { color: var(--red); }
 
-    /* KPI flash */
+    /* ── Skeleton ────────────────────────────────────────── */
+    @keyframes shimmer {
+      0%   { background-position: -400px 0; }
+      100% { background-position:  400px 0; }
+    }
+    .skeleton-pulse {
+      background: linear-gradient(90deg,
+        rgba(255,255,255,0.04) 25%,
+        rgba(255,255,255,0.10) 50%,
+        rgba(255,255,255,0.04) 75%);
+      background-size: 800px 100%;
+      animation: shimmer 1.4s infinite linear;
+      border-radius: 4px; color: transparent !important;
+      user-select: none; display: inline-block; min-width: 2ch;
+    }
+
+    /* ── Flash ───────────────────────────────────────────── */
     @keyframes btn-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(91,156,246,0); }
-      50%       { box-shadow: 0 0 0 5px rgba(91,156,246,0.45); }
+      0%, 100% { box-shadow: 0 0 0 0 rgba(79,124,255,0); }
+      50%       { box-shadow: 0 0 0 5px rgba(79,124,255,0.45); }
     }
     .btn-connect.pulse { animation: btn-pulse 0.65s ease 3; }
 
     @keyframes kpi-flash {
       0%   { border-color: var(--border); }
-      35%  { border-color: rgba(91,156,246,0.55); }
+      35%  { border-color: rgba(79,124,255,0.55); }
       100% { border-color: var(--border); }
     }
-    .kpi-card.flashing { animation: kpi-flash 0.75s ease forwards; }
+    .kpi-card.flashing, .kpi-hero.flashing { animation: kpi-flash 0.75s ease forwards; }
 
-    /* Panels */
-    .panel {
+    /* ── AI Panel ────────────────────────────────────────── */
+    .panel-ai {
       background: var(--card);
-      border: 1px solid var(--border);
+      border: 1px solid rgba(79,124,255,0.2);
       border-radius: var(--radius);
-      padding: 14px 16px;
+      background: linear-gradient(135deg, rgba(79,124,255,0.04) 0%, var(--card) 60%);
+      overflow: hidden;
     }
 
-    .panel.panel-ai {
-      border-color: rgba(91,156,246,0.2);
-      background: linear-gradient(135deg, rgba(91,156,246,0.04) 0%, var(--card) 60%);
+    .ai-tab-bar {
+      display: flex; border-bottom: 1px solid var(--border);
+      padding: 0 16px; gap: 0;
     }
-
-    .panel.panel-risks { border-color: rgba(251,191,36,0.15); }
-    .panel-title-risks::before { content: "⚠ "; font-style: normal; color: #fbbf24; opacity: 0.7; }
-
-    .panel-title {
-      font-size: 0.76rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
+    .ai-tab-btn {
+      padding: 10px 14px 9px; border: none; background: none;
+      color: var(--muted); font-size: 0.76rem; font-weight: 600;
+      cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s; letter-spacing: 0.02em;
       text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 10px;
     }
+    .ai-tab-btn:hover { color: var(--secondary); }
+    .ai-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-    .panel ul { padding-left: 16px; display: flex; flex-direction: column; gap: 6px; }
-    .panel li { font-size: 0.85rem; color: var(--text); line-height: 1.65; }
-    .panel p  { font-size: 0.85rem; color: var(--text); line-height: 1.75; }
+    .ai-tab-content { padding: 14px 16px; min-height: 80px; }
 
-    .actions-list { columns: 2; column-gap: 24px; padding-left: 16px; }
-    .actions-list li { font-size: 0.82rem; color: var(--text); line-height: 1.5; margin-bottom: 6px; break-inside: avoid; }
+    .ai-tab-pane { display: none; }
+    .ai-tab-pane.active { display: block; }
 
-    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .ai-tab-pane p { font-size: 0.85rem; color: var(--text); line-height: 1.75; }
+    .ai-tab-pane ul { padding-left: 16px; display: flex; flex-direction: column; gap: 6px; }
+    .ai-tab-pane li { font-size: 0.85rem; color: var(--text); line-height: 1.65; }
 
-    /* AI hints */
-    .ai-hints {
-      margin-top: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
+    .ai-hints { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
     .ai-hint {
-      font-size: 0.75rem;
-      color: var(--muted);
-      padding: 4px 8px;
-      border-left: 2px solid var(--border-hi);
-      line-height: 1.4;
+      font-size: 0.75rem; color: var(--muted);
+      padding: 4px 8px; border-left: 2px solid var(--border-hi); line-height: 1.4;
     }
 
-    /* Empty state */
+    .ai-no-token {
+      font-size: 0.82rem; color: var(--muted); line-height: 1.6;
+    }
+    .ai-no-token code {
+      background: rgba(255,255,255,0.06); border-radius: 4px;
+      padding: 1px 5px; font-size: 0.78rem; color: var(--secondary);
+      font-family: ui-monospace, monospace;
+    }
+
+    .actions-list { padding-left: 16px; display: flex; flex-direction: column; gap: 6px; }
+
+    /* ── Empty state ─────────────────────────────────────── */
     .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 60px 20px;
-      text-align: center;
-      color: var(--muted);
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 12px;
+      padding: 60px 20px; text-align: center; color: var(--muted);
     }
     .empty-icon  { font-size: 2rem; opacity: 0.4; }
     .empty-title { font-size: 1rem; font-weight: 600; color: var(--secondary); }
     .empty-body  { font-size: 0.82rem; line-height: 1.6; max-width: 300px; }
     .empty-body strong { color: var(--text); }
     .empty-list {
-      font-size: 0.78rem;
-      color: var(--muted);
-      line-height: 1.7;
-      text-align: left;
-      list-style: none;
-      padding: 0;
+      font-size: 0.78rem; color: var(--muted); line-height: 1.7;
+      text-align: left; list-style: none; padding: 0;
     }
     .empty-list li::before { content: "· "; color: var(--border-hi); }
+    .btn-demo {
+      margin-top: 4px; padding: 6px 16px;
+      border: 1px solid rgba(34,197,94,0.35); border-radius: 7px;
+      background: rgba(34,197,94,0.06); color: var(--secondary);
+      font-size: 0.8rem; cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .btn-demo:hover { color: var(--green); border-color: rgba(34,197,94,0.6); background: rgba(34,197,94,0.1); }
 
-    /* Responsive */
+    /* ── Responsive ──────────────────────────────────────── */
     @media (max-width: 900px) {
       .app-body { grid-template-columns: 1fr; }
       .app-body.sidebar-collapsed { grid-template-columns: 1fr; }
       .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
-      .kpi-row { grid-template-columns: repeat(2, 1fr); }
-      .two-col { grid-template-columns: 1fr; }
-      .actions-list { columns: 1; }
+      .kpi-secondary { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 520px) {
-      .kpi-row { grid-template-columns: 1fr; }
+      .kpi-secondary { grid-template-columns: 1fr; }
+      .kpi-hero { flex-direction: column; align-items: flex-start; gap: 8px; }
     }
   </style>
 </head>
 <body>
 
-  <!-- App bar -->
+  <!-- App bar: ☰ · logo · spacer · status · sync -->
   <header class="app-bar">
     <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle settings">☰</button>
-    <button class="run-btn" id="refresh-button" disabled>Sync</button>
-    <span class="data-status" id="data-status"></span>
-    <div class="app-bar-spacer"></div>
     <span class="app-logo">AI <span>Delivery</span> Analyst</span>
+    <div class="app-bar-spacer"></div>
+    <span class="data-status" id="data-status"></span>
+    <button class="run-btn" id="refresh-button" disabled>Sync</button>
   </header>
 
   <div class="app-body" id="app-body">
 
     <!-- Sidebar -->
     <aside class="sidebar">
-
       <div class="sidebar-section">
         <span class="sidebar-label">Jira Connection</span>
         <div class="field">
@@ -512,7 +434,6 @@
         <button class="btn-connect" id="connect-jira-button">Connect</button>
         <p class="status-msg" id="jira-connection-status">Fill in the fields and click Connect.</p>
       </div>
-
       <div class="sidebar-section grow">
         <span class="sidebar-label">Active Query</span>
         <div class="field">
@@ -521,12 +442,10 @@
         </div>
         <p class="muted-text" id="active-project-hint"></p>
       </div>
-
     </aside>
 
     <!-- Main -->
     <main class="main-content">
-
       <div class="project-tabs-bar" id="project-tabs-bar"></div>
 
       <div class="content-area">
@@ -546,121 +465,124 @@
             <li>All metrics reflect activity since the last sync</li>
             <li>Snapshots are stored — history builds over time</li>
             <li>AI analysis requires OPENAI_API_KEY in .env</li>
-            <li>Use the Demo button to preview with sample data</li>
           </ul>
+          <button class="btn-demo" id="demo-btn">⚡ Load demo data</button>
         </div>
 
-        <!-- KPI row — Row 1: flow speed -->
-        <div class="kpi-row hidden" id="kpi-section">
-
-          <!-- 1. Throughput -->
-          <div class="kpi-card kpi-accent-green" id="kpi-throughput-card">
-            <div class="kpi-label">Throughput</div>
-            <div class="kpi-sublabel" id="kpi-throughput-sublabel">tasks completed since last update</div>
-            <div class="kpi-bottom">
-              <span class="kpi-value" id="kpi-throughput-value">—</span>
-              <span class="kpi-delta" id="kpi-throughput-delta"></span>
-            </div>
+        <!-- Hero KPI: Throughput -->
+        <div class="kpi-hero hidden" id="kpi-hero">
+          <div class="kpi-hero-left">
+            <div class="kpi-hero-label">Throughput</div>
+            <div class="kpi-hero-sublabel" id="kpi-throughput-sublabel">tasks completed since last update</div>
           </div>
+          <div class="kpi-hero-right">
+            <span class="kpi-hero-value" id="kpi-throughput-value">—</span>
+            <span class="kpi-hero-delta" id="kpi-throughput-delta"></span>
+          </div>
+        </div>
 
-          <!-- 2. Cycle Time -->
-          <div class="kpi-card kpi-accent-blue" id="kpi-cycle-time-card"
-               title="Measured from last start to completion">
+        <!-- Secondary KPIs: 3-col grid -->
+        <div class="kpi-secondary hidden" id="kpi-secondary">
+
+          <div class="kpi-card" id="kpi-cycle-time-card" title="Measured from last start to completion">
             <div class="kpi-label">Cycle Time</div>
-            <div class="kpi-sublabel">last active phase before completion · P85: <span id="kpi-cycle-time-p85">—</span></div>
+            <div class="kpi-sublabel">last active phase · P85: <span id="kpi-cycle-time-p85">—</span></div>
             <div class="kpi-bottom">
-              <span class="kpi-value" id="kpi-cycle-time-value">—</span>
+              <div class="kpi-number">
+                <span class="kpi-value" id="kpi-cycle-time-value">—</span>
+                <span class="kpi-unit" id="kpi-cycle-time-unit"></span>
+              </div>
               <span class="kpi-delta" id="kpi-cycle-time-delta"></span>
             </div>
           </div>
 
-          <!-- 3. Time to Market -->
-          <div class="kpi-card kpi-accent-purple" id="kpi-ttm-card">
+          <div class="kpi-card" id="kpi-ttm-card">
             <div class="kpi-label">Time to Market</div>
             <div class="kpi-sublabel">created → completed · P85: <span id="kpi-ttm-p85">—</span></div>
             <div class="kpi-bottom">
-              <span class="kpi-value" id="kpi-ttm-value">—</span>
+              <div class="kpi-number">
+                <span class="kpi-value" id="kpi-ttm-value">—</span>
+                <span class="kpi-unit" id="kpi-ttm-unit"></span>
+              </div>
               <span class="kpi-delta" id="kpi-ttm-delta"></span>
             </div>
           </div>
 
-          <!-- 4. Flow Efficiency -->
-          <div class="kpi-card kpi-accent-amber" id="kpi-flow-eff-card"
-               title="Approximation: cycle time / total lead time. Low values indicate time lost to waiting, handoffs, or queuing.">
-            <div class="kpi-label">Flow Efficiency (proxy)</div>
+          <div class="kpi-card" id="kpi-flow-eff-card"
+               title="Cycle time / total lead time. Low values indicate time lost to waiting, handoffs, or queuing.">
+            <div class="kpi-label">Flow Efficiency</div>
             <div class="kpi-sublabel">cycle time / total lead time</div>
             <div class="kpi-bottom">
-              <span class="kpi-value" id="kpi-flow-eff-value">—</span>
+              <div class="kpi-number">
+                <span class="kpi-value" id="kpi-flow-eff-value">—</span>
+                <span class="kpi-unit" id="kpi-flow-eff-unit"></span>
+              </div>
               <span class="kpi-delta" id="kpi-flow-eff-delta"></span>
             </div>
           </div>
 
-          <!-- 5. Reopened -->
-          <div class="kpi-card kpi-accent-red" id="kpi-reopened-card"
+          <div class="kpi-card" id="kpi-reopened-card"
                title="Counts issues that moved from Done back to an active state at least once">
             <div class="kpi-label">Reopened</div>
             <div class="kpi-sublabel">issues reopened at least once</div>
             <div class="kpi-bottom">
-              <span class="kpi-value" id="kpi-reopened-value">—</span>
+              <div class="kpi-number">
+                <span class="kpi-value" id="kpi-reopened-value">—</span>
+              </div>
               <span class="kpi-delta" id="kpi-reopened-delta"></span>
             </div>
           </div>
 
-          <!-- 6. WIP -->
-          <div class="kpi-card kpi-accent-sky" id="kpi-wip-card">
+          <div class="kpi-card" id="kpi-wip-card">
             <div class="kpi-label">WIP</div>
             <div class="kpi-sublabel">tasks currently in progress</div>
             <div class="kpi-bottom">
-              <span class="kpi-value" id="kpi-wip-value">—</span>
+              <div class="kpi-number">
+                <span class="kpi-value" id="kpi-wip-value">—</span>
+              </div>
               <span class="kpi-delta" id="kpi-wip-delta"></span>
             </div>
           </div>
 
-          <!-- 7. Backlog Size -->
-          <div class="kpi-card kpi-accent-indigo" id="kpi-backlog-card">
-            <div class="kpi-label">Backlog</div>
-            <div class="kpi-sublabel">tasks not yet started</div>
-            <div class="kpi-bottom">
-              <span class="kpi-value" id="kpi-backlog-value">—</span>
-              <span class="kpi-delta" id="kpi-backlog-delta"></span>
-            </div>
-          </div>
-
-          <!-- 8. Backlog Aging -->
-          <div class="kpi-card kpi-accent-teal" id="kpi-aging-card">
+          <div class="kpi-card" id="kpi-aging-card">
             <div class="kpi-label">Backlog Aging</div>
             <div class="kpi-sublabel">avg days sitting in backlog</div>
             <div class="kpi-bottom">
-              <span class="kpi-value" id="kpi-aging-value">—</span>
+              <div class="kpi-number">
+                <span class="kpi-value" id="kpi-aging-value">—</span>
+                <span class="kpi-unit" id="kpi-aging-unit"></span>
+              </div>
               <span class="kpi-delta" id="kpi-aging-delta"></span>
             </div>
           </div>
 
         </div>
 
-        <!-- AI Analysis + Delivery Risks -->
-        <div class="two-col hidden" id="ai-section">
-          <div class="panel panel-ai">
-            <div class="panel-title">AI Analysis</div>
-            <p class="muted-text" id="ai-analysis-text">Run a sync to get AI-generated insights.</p>
-            <div class="ai-hints" id="ai-hints">
-              <div class="ai-hint">Low throughput may indicate bottlenecks or blocked work</div>
-              <div class="ai-hint">Low flow efficiency may indicate excessive waiting time</div>
-              <div class="ai-hint">Reopened tasks may indicate quality or clarity issues</div>
+        <!-- AI Panel: tabs Summary / Risks / Actions -->
+        <div class="panel-ai hidden" id="ai-section">
+          <div class="ai-tab-bar">
+            <button class="ai-tab-btn active" data-tab="summary">Summary</button>
+            <button class="ai-tab-btn" data-tab="risks">Risks</button>
+            <button class="ai-tab-btn" data-tab="actions">Actions</button>
+          </div>
+          <div class="ai-tab-content">
+            <div class="ai-tab-pane active" id="ai-pane-summary">
+              <p class="muted-text" id="ai-summary-text">Sync to get AI-generated insights.</p>
+              <div class="ai-hints" id="ai-hints">
+                <div class="ai-hint">Low throughput may indicate bottlenecks or blocked work</div>
+                <div class="ai-hint">Low flow efficiency may indicate excessive waiting time</div>
+                <div class="ai-hint">Reopened tasks may indicate quality or clarity issues</div>
+              </div>
+            </div>
+            <div class="ai-tab-pane" id="ai-pane-risks">
+              <p class="muted-text" id="risks-placeholder">Sync to analyse delivery risks.</p>
+              <ul id="risks-list" class="hidden"></ul>
+            </div>
+            <div class="ai-tab-pane" id="ai-pane-actions">
+              <p class="muted-text" id="actions-placeholder">Sync to get recommendations.</p>
+              <ul class="actions-list hidden" id="actions-list"></ul>
             </div>
           </div>
-          <div class="panel panel-risks">
-            <div class="panel-title panel-title-risks">Delivery Risks</div>
-            <p class="muted-text" id="risks-placeholder">Run a sync to analyse delivery risks.</p>
-            <ul id="risks-list" class="hidden"></ul>
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="panel hidden" id="actions-panel">
-          <div class="panel-title">Recommended Actions</div>
-          <p class="muted-text" id="actions-placeholder">Run a sync to get recommendations.</p>
-          <ul class="actions-list hidden" id="actions-list"></ul>
         </div>
 
       </div>
@@ -669,10 +591,7 @@
 
   <script>
     const SERVER_BASE = "http://localhost:5678";
-
-    if (window.location.protocol === "file:") {
-      window.location.replace(SERVER_BASE);
-    }
+    if (window.location.protocol === "file:") window.location.replace(SERVER_BASE);
 
     // ── Projects ──────────────────────────────────────────────
     let projects = [];
@@ -698,7 +617,7 @@
         close.className = "tab-close";
         close.setAttribute("aria-label", "Remove " + p.label);
         close.textContent = "×";
-        close.addEventListener("click", (e) => { e.stopPropagation(); removeProject(p.id); });
+        close.addEventListener("click", e => { e.stopPropagation(); removeProject(p.id); });
         group.appendChild(close);
 
         bar.appendChild(group);
@@ -709,13 +628,6 @@
       addBtn.textContent = "+ Add project";
       addBtn.addEventListener("click", () => showAddInput(bar));
       bar.appendChild(addBtn);
-
-      const demoBtn = document.createElement("button");
-      demoBtn.className = "tab-demo";
-      demoBtn.textContent = "⚡ Demo";
-      demoBtn.title = "Load realistic demo data";
-      demoBtn.addEventListener("click", loadDemoData);
-      bar.appendChild(demoBtn);
     }
 
     function showAddInput(bar) {
@@ -734,12 +646,10 @@
         const id = "proj-" + Date.now();
         projects.push({ id, label: key, jql: `project = "${key}" ORDER BY updated DESC` });
         switchProject(id);
-        if (typeof jiraConnected !== "undefined" && !jiraConnected) {
+        if (!jiraConnected) {
           const btn = document.getElementById("connect-jira-button");
           if (btn) {
-            btn.classList.remove("pulse");
-            void btn.offsetWidth;
-            btn.classList.add("pulse");
+            btn.classList.remove("pulse"); void btn.offsetWidth; btn.classList.add("pulse");
             btn.addEventListener("animationend", () => btn.classList.remove("pulse"), { once: true });
             btn.scrollIntoView({ behavior: "smooth", block: "nearest" });
           }
@@ -773,8 +683,7 @@
       else {
         jiraJqlInput.value = "";
         document.getElementById("active-project-hint").textContent = "";
-        LS.saveState();
-        renderTabs();
+        LS.saveState(); renderTabs();
       }
     }
 
@@ -811,28 +720,15 @@
 
     // ── Persistence ───────────────────────────────────────────
     const LS = {
-      KEYS: {
-        baseUrl:  "ada:baseUrl",
-        email:    "ada:email",
-        token:    "ada:token",
-        projects: "ada:projects",
-        activeId: "ada:activeId",
-      },
-      save(key, val) {
-        try { localStorage.setItem(key, typeof val === "string" ? val : JSON.stringify(val)); }
-        catch (_) {}
-      },
+      KEYS: { baseUrl: "ada:baseUrl", email: "ada:email", token: "ada:token", projects: "ada:projects", activeId: "ada:activeId" },
+      save(key, val) { try { localStorage.setItem(key, typeof val === "string" ? val : JSON.stringify(val)); } catch (_) {} },
       load(key, fallback = null) {
-        try {
-          const v = localStorage.getItem(key);
-          if (v === null) return fallback;
-          try { return JSON.parse(v); } catch (_) { return v; }
-        } catch (_) { return fallback; }
+        try { const v = localStorage.getItem(key); if (v === null) return fallback; try { return JSON.parse(v); } catch (_) { return v; } } catch (_) { return fallback; }
       },
       saveState() {
-        this.save(this.KEYS.baseUrl,  jiraBaseUrlInput.value);
-        this.save(this.KEYS.email,    jiraEmailInput.value);
-        this.save(this.KEYS.token,    jiraTokenInput.value);
+        this.save(this.KEYS.baseUrl, jiraBaseUrlInput.value);
+        this.save(this.KEYS.email, jiraEmailInput.value);
+        this.save(this.KEYS.token, jiraTokenInput.value);
         this.save(this.KEYS.projects, projects);
         this.save(this.KEYS.activeId, activeId);
       },
@@ -869,58 +765,40 @@
       if (timestamp) _statusTimestamp = timestamp;
       const el = document.getElementById("data-status");
       if (!el) return;
-      if (isSyncing) {
-        el.textContent = "Syncing…";
-        el.className   = "data-status syncing";
-        return;
-      }
+      if (isSyncing) { el.textContent = "Syncing…"; el.className = "data-status syncing"; return; }
       if (!_statusTimestamp) { el.textContent = ""; el.className = "data-status"; return; }
       const mins = Math.floor((Date.now() - new Date(_statusTimestamp).getTime()) / 60000);
       el.textContent = mins < 1 ? "Updated just now"
                      : mins < 60 ? `Updated ${mins}m ago`
                      : mins < 1440 ? `Updated ${Math.floor(mins / 60)}h ago`
                      : `Updated ${Math.floor(mins / 1440)}d ago`;
-      if (mins > 120)     el.className = "data-status critical";
-      else if (mins > 30) el.className = "data-status warn";
-      else                el.className = "data-status";
+      el.className = mins > 120 ? "data-status critical" : mins > 30 ? "data-status warn" : "data-status";
     }
 
     setInterval(() => setDataStatus(null, false), 60000);
 
     // ── Connection ────────────────────────────────────────────
     function validate() {
-      const url   = jiraBaseUrlInput.value.trim();
-      const email = jiraEmailInput.value.trim();
-      const token = jiraTokenInput.value.trim();
-      if (!url || !email || !token)        return "Fill in URL, Email and API Token.";
-      if (!/^https:\/\/.+/i.test(url))     return "URL must start with https://";
-      if (!/^\S+@\S+\.\S+$/.test(email))   return "Enter a valid email.";
+      const url = jiraBaseUrlInput.value.trim(), email = jiraEmailInput.value.trim(), token = jiraTokenInput.value.trim();
+      if (!url || !email || !token)      return "Fill in URL, Email and API Token.";
+      if (!/^https:\/\/.+/i.test(url))   return "URL must start with https://";
+      if (!/^\S+@\S+\.\S+$/.test(email)) return "Enter a valid email.";
       return "";
     }
 
-    function validateSync() {
-      return jiraJqlInput.value.trim() ? "" : "JQL is empty — select a project or enter a query.";
-    }
+    function validateSync() { return jiraJqlInput.value.trim() ? "" : "JQL is empty."; }
 
     function setConnected(ok, msg) {
       jiraConnected = ok;
       runButton.disabled = !ok;
       connectionStatusNode.textContent = msg;
       connectionStatusNode.style.color = ok ? "var(--green)" : "var(--secondary)";
-      if (ok) {
-        sidebarCollapsed = true;
-        LS.save("ada:sidebarCollapsed", true);
-        applySidebarState();
-      }
+      if (ok) { sidebarCollapsed = true; LS.save("ada:sidebarCollapsed", true); applySidebarState(); }
     }
 
     function handleConnect() {
       const err = validate();
-      if (err) {
-        setConnected(false, err);
-        connectionStatusNode.style.color = "var(--red)";
-        return;
-      }
+      if (err) { setConnected(false, err); connectionStatusNode.style.color = "var(--red)"; return; }
       setConnected(true, "Connected to " + jiraBaseUrlInput.value.trim());
     }
 
@@ -929,20 +807,38 @@
       setConnected(false, "Settings changed — reconnect.");
     }
 
+    // ── AI tabs ───────────────────────────────────────────────
+    document.querySelectorAll(".ai-tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".ai-tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".ai-tab-pane").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("ai-pane-" + btn.dataset.tab)?.classList.add("active");
+      });
+    });
+
     // ── KPI helpers ───────────────────────────────────────────
     function setDelta(elId, curr, prev, lowerBetter, unit) {
       const el = document.getElementById(elId);
-      if (prev === null || Math.abs(curr - prev) < 0.05) {
-        el.textContent = "—"; el.className = "kpi-delta"; return;
-      }
-      const up = curr > prev;
-      const good = lowerBetter ? !up : up;
+      if (!el) return;
+      if (prev === null || Math.abs(curr - prev) < 0.05) { el.textContent = ""; el.className = "kpi-delta"; return; }
+      const up = curr > prev, good = lowerBetter ? !up : up;
       el.textContent = (up ? "↑" : "↓") + Math.abs(curr - prev).toFixed(1) + unit;
       el.className = "kpi-delta " + (good ? "delta-good" : "delta-bad");
     }
 
+    function setHeroDelta(elId, curr, prev) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      if (prev === null || Math.abs(curr - prev) < 0.5) { el.textContent = ""; el.className = "kpi-hero-delta"; return; }
+      const up = curr > prev;
+      el.textContent = (up ? "↑" : "↓") + Math.abs(curr - prev).toFixed(0);
+      el.className = "kpi-hero-delta " + (up ? "delta-good" : "delta-bad");
+    }
+
     function setKpiStatus(cardId, value, goodThreshold, badThreshold, higherIsBetter = false) {
       const el = document.getElementById(cardId);
+      if (!el) return;
       el.classList.remove("kpi-status-good", "kpi-status-bad");
       if (higherIsBetter) {
         if (value >= goodThreshold) el.classList.add("kpi-status-good");
@@ -953,22 +849,31 @@
       }
     }
 
-    // ── Reveal / flash ────────────────────────────────────────
+    // ── Skeleton ──────────────────────────────────────────────
+    function setLoading(on) {
+      const vals = document.querySelectorAll(
+        "#kpi-throughput-value, #kpi-cycle-time-value, #kpi-ttm-value, #kpi-flow-eff-value, #kpi-reopened-value, #kpi-wip-value, #kpi-aging-value, #kpi-cycle-time-p85, #kpi-ttm-p85"
+      );
+      vals.forEach(el => {
+        if (on) { el.dataset.real = el.textContent; el.textContent = "··"; el.classList.add("skeleton-pulse"); }
+        else    { el.classList.remove("skeleton-pulse"); }
+      });
+    }
+
+    // ── Reveal ────────────────────────────────────────────────
     function revealContent() {
       document.getElementById("empty-state")?.remove();
-      document.querySelectorAll("#kpi-section, #ai-section, #actions-panel")
+      document.querySelectorAll("#kpi-hero, #kpi-secondary, #ai-section")
         .forEach(el => el.classList.remove("hidden"));
     }
 
     function flashKpi() {
-      ["kpi-throughput-card","kpi-cycle-time-card","kpi-ttm-card","kpi-flow-eff-card",
-       "kpi-reopened-card","kpi-wip-card","kpi-backlog-card","kpi-aging-card"]
+      ["kpi-hero", "kpi-cycle-time-card", "kpi-ttm-card", "kpi-flow-eff-card",
+       "kpi-reopened-card", "kpi-wip-card", "kpi-aging-card"]
         .forEach((id, i) => setTimeout(() => {
           const el = document.getElementById(id);
           if (!el) return;
-          el.classList.remove("flashing");
-          void el.offsetWidth;
-          el.classList.add("flashing");
+          el.classList.remove("flashing"); void el.offsetWidth; el.classList.add("flashing");
         }, i * 60));
     }
 
@@ -984,12 +889,12 @@
       for (const raw of text.split("\n")) {
         const line = raw.trim();
         if (!line) continue;
-        if (/^summary:/i.test(line))  { out.summary = line.replace(/^summary:\s*/i, ""); mode = "summary"; }
-        else if (/^risks?:/i.test(line) || /^risks?$/i.test(line))   { mode = "risks"; }
-        else if (/^actions?:/i.test(line) || /^actions?$/i.test(line)) { mode = "actions"; }
-        else if (line.startsWith("- ") && mode === "risks")   { out.risks.push(line.slice(2)); }
-        else if (line.startsWith("- ") && mode === "actions") { out.actions.push(line.slice(2)); }
-        else if (mode === "summary") { out.summary += " " + line; }
+        if (/^summary:/i.test(line))                              { out.summary = line.replace(/^summary:\s*/i, ""); mode = "summary"; }
+        else if (/^risks?:?$/i.test(line))                        { mode = "risks"; }
+        else if (/^actions?:?$/i.test(line))                      { mode = "actions"; }
+        else if (line.startsWith("- ") && mode === "risks")       { out.risks.push(line.slice(2)); }
+        else if (line.startsWith("- ") && mode === "actions")     { out.actions.push(line.slice(2)); }
+        else if (mode === "summary")                               { out.summary += " " + line; }
       }
       return out;
     }
@@ -997,6 +902,7 @@
     // ── Update dashboard ──────────────────────────────────────
     function updateDashboard(d) {
       revealContent();
+      setLoading(false);
 
       const throughput = d.throughput ?? 0;
       const cycleP50   = d.cycleTimeP50 ?? d.cycleTimeDays ?? 0;
@@ -1006,58 +912,59 @@
       const flowEff    = d.flowEfficiencyPercent ?? 0;
       const reopened   = d.reopenedCount ?? 0;
       const wip        = d.inProgressCount ?? 0;
-      const backlog    = d.backlogSize ?? 0;
       const aging      = d.backlogAgingDays ?? 0;
 
-      // Values
-      document.getElementById("kpi-throughput-value").textContent  = throughput;
-      document.getElementById("kpi-cycle-time-value").textContent  = cycleP50.toFixed(1) + "d";
-      document.getElementById("kpi-cycle-time-p85").textContent    = cycleP85.toFixed(1) + "d";
-      document.getElementById("kpi-ttm-value").textContent         = ttmP50.toFixed(1) + "d";
-      document.getElementById("kpi-ttm-p85").textContent           = ttmP85.toFixed(1) + "d";
-      document.getElementById("kpi-flow-eff-value").textContent    = flowEff.toFixed(1) + "%";
-      document.getElementById("kpi-reopened-value").textContent    = reopened;
-      document.getElementById("kpi-wip-value").textContent         = wip;
-      document.getElementById("kpi-backlog-value").textContent     = backlog;
-      document.getElementById("kpi-aging-value").textContent       = aging.toFixed(0) + "d";
+      const _prev = prevKpiMap.get(activeId);
+
+      // Hero
+      document.getElementById("kpi-throughput-value").textContent = throughput;
+      setHeroDelta("kpi-throughput-delta", throughput, _prev?.throughput ?? null);
+      document.getElementById("kpi-hero").classList.toggle("kpi-status-bad", throughput === 0);
+
+      // Secondary values + units
+      const set = (valId, unitId, num, unit, decimals = 1) => {
+        document.getElementById(valId).textContent = num.toFixed(decimals);
+        if (unitId) document.getElementById(unitId).textContent = unit;
+      };
+      set("kpi-cycle-time-value", "kpi-cycle-time-unit", cycleP50, "d");
+      document.getElementById("kpi-cycle-time-p85").textContent = cycleP85.toFixed(1) + "d";
+      set("kpi-ttm-value", "kpi-ttm-unit", ttmP50, "d");
+      document.getElementById("kpi-ttm-p85").textContent = ttmP85.toFixed(1) + "d";
+      set("kpi-flow-eff-value", "kpi-flow-eff-unit", flowEff, "%");
+      document.getElementById("kpi-reopened-value").textContent = reopened;
+      document.getElementById("kpi-wip-value").textContent      = wip;
+      set("kpi-aging-value", "kpi-aging-unit", aging, "d", 0);
 
       // Deltas
-      const _prev = prevKpiMap.get(activeId);
-      setDelta("kpi-throughput-delta",  throughput, _prev?.throughput  ?? null, false, "");
-      setDelta("kpi-cycle-time-delta",  cycleP50,   _prev?.cycleTimeP50 ?? _prev?.cycleTimeDays ?? null, true, "d");
-      setDelta("kpi-ttm-delta",         ttmP50,     _prev?.timeToMarketP50 ?? _prev?.timeToMarketDays ?? null, true, "d");
-      setDelta("kpi-flow-eff-delta",    flowEff,    _prev?.flowEfficiencyPercent ?? null, false, "%");
-      setDelta("kpi-reopened-delta",    reopened,   _prev?.reopenedCount ?? null, true, "");
-      setDelta("kpi-wip-delta",         wip,        _prev?.inProgressCount ?? null, true, "");
-      setDelta("kpi-backlog-delta",     backlog,    _prev?.backlogSize ?? null, true, "");
-      setDelta("kpi-aging-delta",       aging,      _prev?.backlogAgingDays ?? null, true, "d");
+      setDelta("kpi-cycle-time-delta", cycleP50, _prev?.cycleTimeP50 ?? _prev?.cycleTimeDays ?? null, true,  "d");
+      setDelta("kpi-ttm-delta",        ttmP50,   _prev?.timeToMarketP50 ?? _prev?.timeToMarketDays ?? null, true, "d");
+      setDelta("kpi-flow-eff-delta",   flowEff,  _prev?.flowEfficiencyPercent ?? null, false, "%");
+      setDelta("kpi-reopened-delta",   reopened, _prev?.reopenedCount  ?? null, true,  "");
+      setDelta("kpi-wip-delta",        wip,      _prev?.inProgressCount ?? null, true, "");
+      setDelta("kpi-aging-delta",      aging,    _prev?.backlogAgingDays ?? null, true, "d");
 
-      // Status coloring
-      setKpiStatus("kpi-throughput-card",  throughput, 0,  0, true);  // bad if 0
-      setKpiStatus("kpi-cycle-time-card",  cycleP50,   5,  10);
-      setKpiStatus("kpi-ttm-card",         ttmP50,     10, 20);
-      setKpiStatus("kpi-flow-eff-card",    flowEff,    40, 15, true);
-      setKpiStatus("kpi-reopened-card",    reopened,   0,  3);
-      setKpiStatus("kpi-wip-card",         wip,        5,  15);
-      setKpiStatus("kpi-aging-card",       aging,      14, 30);
-      // Backlog: no threshold coloring (neutral)
-      document.getElementById("kpi-throughput-card").classList.toggle("kpi-status-bad", throughput === 0);
+      // Status colors
+      setKpiStatus("kpi-cycle-time-card", cycleP50, 5,  10);
+      setKpiStatus("kpi-ttm-card",        ttmP50,   10, 20);
+      setKpiStatus("kpi-flow-eff-card",   flowEff,  40, 15, true);
+      setKpiStatus("kpi-reopened-card",   reopened, 0,  3);
+      setKpiStatus("kpi-wip-card",        wip,      5,  15);
+      setKpiStatus("kpi-aging-card",      aging,    14, 30);
 
       prevKpiMap.set(activeId, { ...d });
 
       // AI section
-      const hintsEl = document.getElementById("ai-hints");
-      const noAiMsg = "Requires OPENAI_API_KEY in .env — see server README.";
+      const hintsEl   = document.getElementById("ai-hints");
+      const summaryEl = document.getElementById("ai-summary-text");
+      const noTokenMsg = `<span class="ai-no-token">OpenAI API key not configured. Add <code>OPENAI_API_KEY</code> to your <code>.env</code> file to enable AI analysis.</span>`;
 
       if (d.analysis) {
         const parsed = parseAnalysis(d.analysis);
         if (hintsEl) hintsEl.classList.add("hidden");
+        summaryEl.textContent = parsed.summary || d.analysis;
+        summaryEl.className = "";
 
-        const aiEl = document.getElementById("ai-analysis-text");
-        aiEl.textContent = parsed.summary || d.analysis;
-        aiEl.className = "panel p";
-
-        const risksList       = document.getElementById("risks-list");
+        const risksList = document.getElementById("risks-list");
         const risksPlaceholder = document.getElementById("risks-placeholder");
         if (parsed.risks.length) {
           risksList.innerHTML = parsed.risks.map(r => `<li>${r}</li>`).join("");
@@ -1065,7 +972,7 @@
           risksPlaceholder.classList.add("hidden");
         }
 
-        const actionsList       = document.getElementById("actions-list");
+        const actionsList = document.getElementById("actions-list");
         const actionsPlaceholder = document.getElementById("actions-placeholder");
         if (parsed.actions.length) {
           actionsList.innerHTML = parsed.actions.map(a => `<li>${a}</li>`).join("");
@@ -1073,26 +980,27 @@
           actionsPlaceholder.classList.add("hidden");
         }
       } else if (d.aiError) {
-        const msg = "AI unavailable: " + d.aiError;
-        if (hintsEl) hintsEl.classList.remove("hidden");
-        document.getElementById("ai-analysis-text").textContent  = msg;
-        document.getElementById("risks-placeholder").textContent  = msg;
-        document.getElementById("actions-placeholder").textContent = msg;
+        if (hintsEl) hintsEl.classList.add("hidden");
+        summaryEl.innerHTML = noTokenMsg;
+        summaryEl.className = "";
+        document.getElementById("risks-placeholder").textContent   = "AI unavailable: " + d.aiError;
+        document.getElementById("actions-placeholder").textContent = "AI unavailable: " + d.aiError;
       } else if (d.aiEnabled === false) {
-        if (hintsEl) hintsEl.classList.remove("hidden");
-        document.getElementById("ai-analysis-text").textContent  = noAiMsg;
-        document.getElementById("risks-placeholder").textContent  = noAiMsg;
-        document.getElementById("actions-placeholder").textContent = noAiMsg;
+        if (hintsEl) hintsEl.classList.add("hidden");
+        summaryEl.innerHTML = noTokenMsg;
+        summaryEl.className = "";
+        document.getElementById("risks-placeholder").innerHTML   = noTokenMsg;
+        document.getElementById("actions-placeholder").innerHTML = noTokenMsg;
       } else {
         if (hintsEl) hintsEl.classList.remove("hidden");
+        summaryEl.textContent = "Sync to get AI-generated insights.";
+        summaryEl.className = "muted-text";
       }
 
       flashKpi();
     }
 
     // ── Sync flow ─────────────────────────────────────────────
-
-    // POST /sync for a specific project (credentials from sidebar form)
     async function _postSyncProject(proj) {
       try {
         await fetch(`${SERVER_BASE}/sync`, {
@@ -1109,7 +1017,6 @@
       } catch (_) {}
     }
 
-    // Sync ALL projects in parallel, then refresh active tab
     async function runSyncFlow() {
       if (!jiraConnected) return;
       const syncErr = validateSync();
@@ -1117,19 +1024,20 @@
 
       runButton.disabled = true;
       setDataStatus(null, true);
+      setLoading(true);
       syncBannerNode.className = "sync-banner";
 
       try {
         await Promise.all(projects.map(p => _postSyncProject(p)));
         _pollLatest();
       } catch (e) {
+        setLoading(false);
         setDataStatus(null, false);
         showBanner("Sync error: " + e.message, false);
         runButton.disabled = false;
       }
     }
 
-    // Auto-sync projects whose last snapshot is older than 1 hour
     async function autoSyncStale() {
       if (!jiraConnected || projects.length === 0) return;
       const STALE_MS = 3600 * 1000;
@@ -1138,19 +1046,14 @@
       await Promise.all(projects.map(async proj => {
         try {
           const res = await fetch(`${SERVER_BASE}/latest?project=${encodeURIComponent(proj.label)}`);
-          if (res.status === 404) {
-            await _postSyncProject(proj);
-            return;
-          }
+          if (res.status === 404) { await _postSyncProject(proj); return; }
           if (!res.ok) return;
           const body = await res.json();
           if (!body.ok) return;
-          const age = now - new Date(body.snapshot.timestamp).getTime();
-          if (age > STALE_MS) await _postSyncProject(proj);
+          if (now - new Date(body.snapshot.timestamp).getTime() > STALE_MS) await _postSyncProject(proj);
         } catch (_) {}
       }));
 
-      // Refresh the active tab after background syncs are queued
       await refreshDashboard();
     }
 
@@ -1160,18 +1063,17 @@
     function _pollLatest(attempts = 0) {
       clearTimeout(_pollTimer);
       if (attempts >= 20) {
-        setDataStatus(null, false);
+        setLoading(false); setDataStatus(null, false);
         showBanner("Sync is taking a while — try again manually", false);
-        runButton.disabled = false;
-        return;
+        runButton.disabled = false; return;
       }
       _pollTimer = setTimeout(async () => {
         const p = active();
         if (!p) { runButton.disabled = false; return; }
         try {
           const res = await fetch(`${SERVER_BASE}/latest?project=${encodeURIComponent(p.label)}`);
-          if (res.ok) { refreshDashboard(); }
-          else { _pollLatest(attempts + 1); }
+          if (res.ok) refreshDashboard();
+          else _pollLatest(attempts + 1);
         } catch (_) { _pollLatest(attempts + 1); }
       }, 3000);
     }
@@ -1193,18 +1095,14 @@
         ]);
 
         if (latestRes.status === 404) {
-          await _postSyncProject(p);
-          _pollLatest();
-          return;
+          await _postSyncProject(p); _pollLatest(); return;
         }
-
         if (!latestRes.ok) throw new Error("HTTP " + latestRes.status);
         const body = await latestRes.json();
         if (!body.ok) throw new Error(body.error || "Server error");
 
         const metrics = { ...body.snapshot.metrics };
 
-        // Compute effective throughput + seed prevKpiMap from history
         if (historyRes.ok) {
           const hBody = await historyRes.json();
           const allSnaps = hBody.snapshots || [];
@@ -1215,21 +1113,19 @@
             const prev = snaps[snaps.length - 2].metrics;
             metrics.throughput = Math.max(0, last.completedCount - prev.completedCount);
             if (sublabelEl) sublabelEl.textContent = "tasks completed since last update";
-            // Seed prev so arrows show on first load without needing a second sync
             if (!prevKpiMap.has(p.id)) prevKpiMap.set(p.id, prev);
           } else if (snaps.length === 1) {
             metrics.throughput = snaps[0].metrics.completedCount;
             if (sublabelEl) sublabelEl.textContent = "total completed tasks (first sync)";
           } else if (allSnaps.length >= 2) {
-            // Old snapshots without completedCount — seed prev for arrows
             if (!prevKpiMap.has(p.id)) prevKpiMap.set(p.id, allSnaps[allSnaps.length - 2].metrics);
           }
-          // allSnaps.length <= 1: first sync, no prev available
         }
 
         updateDashboard(metrics);
         setDataStatus(body.snapshot.timestamp, false);
       } catch (e) {
+        setLoading(false);
         setDataStatus(null, false);
         showBanner("Error: " + e.message, false);
       } finally {
@@ -1239,31 +1135,27 @@
 
     // ── Demo data ─────────────────────────────────────────────
     function loadDemoData() {
-      const demoSnapshots = [
-        { throughput: 14, cycleTimeP50: 6.1, cycleTimeP85: 9.8,  timeToMarketP50: 11.4, timeToMarketP85: 18.2, flowEfficiencyPercent: 53.5, reopenedCount: 2, inProgressCount: 8,  backlogSize: 34, backlogAgingDays: 28 },
-        { throughput: 16, cycleTimeP50: 5.7, cycleTimeP85: 9.1,  timeToMarketP50: 10.8, timeToMarketP85: 17.1, flowEfficiencyPercent: 52.8, reopenedCount: 1, inProgressCount: 7,  backlogSize: 31, backlogAgingDays: 25 },
-        { throughput: 19, cycleTimeP50: 4.9, cycleTimeP85: 8.2,  timeToMarketP50: 9.3,  timeToMarketP85: 15.4, flowEfficiencyPercent: 52.7, reopenedCount: 0, inProgressCount: 6,  backlogSize: 28, backlogAgingDays: 22 },
-        { throughput: 17, cycleTimeP50: 5.3, cycleTimeP85: 8.7,  timeToMarketP50: 9.9,  timeToMarketP85: 16.2, flowEfficiencyPercent: 53.5, reopenedCount: 3, inProgressCount: 9,  backlogSize: 30, backlogAgingDays: 24 },
-        { throughput: 23, cycleTimeP50: 4.2, cycleTimeP85: 7.1,  timeToMarketP50: 8.7,  timeToMarketP85: 13.9, flowEfficiencyPercent: 48.3, reopenedCount: 0, inProgressCount: 5,  backlogSize: 22, backlogAgingDays: 18 },
+      const snaps = [
+        { throughput: 14, cycleTimeP50: 6.1, cycleTimeP85: 9.8,  timeToMarketP50: 11.4, timeToMarketP85: 18.2, flowEfficiencyPercent: 53.5, reopenedCount: 2, inProgressCount: 8,  backlogAgingDays: 28 },
+        { throughput: 16, cycleTimeP50: 5.7, cycleTimeP85: 9.1,  timeToMarketP50: 10.8, timeToMarketP85: 17.1, flowEfficiencyPercent: 52.8, reopenedCount: 1, inProgressCount: 7,  backlogAgingDays: 25 },
+        { throughput: 19, cycleTimeP50: 4.9, cycleTimeP85: 8.2,  timeToMarketP50: 9.3,  timeToMarketP85: 15.4, flowEfficiencyPercent: 52.7, reopenedCount: 0, inProgressCount: 6,  backlogAgingDays: 22 },
+        { throughput: 17, cycleTimeP50: 5.3, cycleTimeP85: 8.7,  timeToMarketP50: 9.9,  timeToMarketP85: 16.2, flowEfficiencyPercent: 53.5, reopenedCount: 3, inProgressCount: 9,  backlogAgingDays: 24 },
+        { throughput: 23, cycleTimeP50: 4.2, cycleTimeP85: 7.1,  timeToMarketP50: 8.7,  timeToMarketP85: 13.9, flowEfficiencyPercent: 48.3, reopenedCount: 0, inProgressCount: 5,  backlogAgingDays: 18 },
       ];
-
       const analysis =
         "Summary: Flow is stabilising but QA remains the primary bottleneck — cycle time improved 31% over 5 syncs.\n" +
-        "Risks:\n" +
-        "- QA queue depth growing — 6 tickets blocked waiting for review for 3+ days\n" +
+        "Risks:\n- QA queue depth growing — 6 tickets blocked waiting for review for 3+ days\n" +
         "- Sprint overcommitment: planned velocity 28, actual 23 (-18%)\n" +
         "- High cycle-time variance across team (range 1.1d – 9.4d) signals uneven workload\n" +
-        "Actions:\n" +
-        "- Cap WIP at QA stage to 3 items and assign a dedicated reviewer rotation\n" +
+        "Actions:\n- Cap WIP at QA stage to 3 items and assign a dedicated reviewer rotation\n" +
         "- Reduce next sprint scope by 15% to align with measured velocity\n" +
         "- Run a 30-min cycle-time retro focused on the 3 longest outlier tickets";
 
       prevKpiMap.delete(activeId);
-      demoSnapshots.forEach((snap, i) => {
+      snaps.forEach((snap, i) => {
         setTimeout(() => {
-          const isLast = i === demoSnapshots.length - 1;
-          updateDashboard({ ...snap, analysis: isLast ? analysis : "" });
-          if (isLast) setDataStatus(new Date().toISOString(), false);
+          updateDashboard({ ...snap, analysis: i === snaps.length - 1 ? analysis : "" });
+          if (i === snaps.length - 1) setDataStatus(new Date().toISOString(), false);
         }, i * 300);
       });
     }
@@ -1274,6 +1166,7 @@
 
     connectButton.addEventListener("click", handleConnect);
     runButton.addEventListener("click", runSyncFlow);
+    document.getElementById("demo-btn").addEventListener("click", loadDemoData);
 
     toggleTokenBtn.addEventListener("click", () => {
       const next = jiraTokenInput.type === "password" ? "text" : "password";
@@ -1288,11 +1181,7 @@
     jiraBaseUrlInput.addEventListener("input", () => { markOutdated(); LS.saveState(); });
     jiraEmailInput.addEventListener("input",   () => { markOutdated(); LS.saveState(); });
     jiraTokenInput.addEventListener("input",   () => { markOutdated(); LS.saveState(); });
-
-    jiraJqlInput.addEventListener("input", () => {
-      const p = active();
-      if (p) { p.jql = jiraJqlInput.value; LS.saveState(); }
-    });
+    jiraJqlInput.addEventListener("input", () => { const p = active(); if (p) { p.jql = jiraJqlInput.value; LS.saveState(); } });
   </script>
 </body>
 </html>
