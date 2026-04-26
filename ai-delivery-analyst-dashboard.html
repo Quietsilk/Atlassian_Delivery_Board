@@ -7,17 +7,19 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
   <style>
     :root {
-      --bg:        #0d0f13;
-      --surface:   #13161c;
-      --card:      #181c24;
-      --border:    rgba(255,255,255,0.07);
-      --border-hi: rgba(255,255,255,0.14);
-      --text:      #e4e7ed;
-      --secondary: #8a94a6;
-      --muted:     #4e5668;
-      --green:     #3ecf8e;
-      --red:       #ff6b6b;
-      --accent:    #5b9cf6;
+      --bg:        #0b0d12;
+      --surface:   #11141a;
+      --card:      #171b22;
+      --border:    rgba(255,255,255,0.06);
+      --border-hi: rgba(255,255,255,0.12);
+      --text:      #e6e9ef;
+      --secondary: #9aa3b2;
+      --muted:     #5b6472;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --amber:     #f59e0b;
+      --purple:    #8b5cf6;
+      --accent:    #4f7cff;
       --radius:    10px;
     }
 
@@ -26,8 +28,6 @@
 
     body {
       background: var(--bg);
-      background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
-      background-size: 24px 24px;
       color: var(--text);
       font-family: Inter, system-ui, -apple-system, sans-serif;
       font-size: 14px;
@@ -109,22 +109,15 @@
     .run-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(91,156,246,0.45); }
     .run-btn:disabled { opacity: 0.28; cursor: not-allowed; transform: none; box-shadow: none; }
 
-    /* ── Status chips ────────────────────────────────────── */
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      padding: 2px 8px;
-      font-size: 0.69rem;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-      border: 1px solid transparent;
+    /* ── Data status ─────────────────────────────────────── */
+    .data-status {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--muted);
       white-space: nowrap;
+      transition: color 0.2s;
     }
-    .chip-idle    { background: rgba(255,255,255,0.06); color: var(--secondary); border-color: var(--border-hi); }
-    .chip-pending { background: rgba(91,156,246,0.14);  color: #bdd5ff;          border-color: rgba(91,156,246,0.4); }
-    .chip-success { background: rgba(62,207,142,0.13);  color: #b6f5d8;          border-color: rgba(62,207,142,0.38); }
-    .chip-error   { background: rgba(255,107,107,0.12); color: #ffd0d0;          border-color: rgba(255,107,107,0.38); }
+    .data-status.syncing { color: var(--accent); }
 
     /* ── Body layout ─────────────────────────────────────── */
     .app-body {
@@ -384,8 +377,8 @@
     .kpi-card.kpi-accent-red    { border-top: 3px solid var(--red); }
     .kpi-card.kpi-accent-amber  { border-top: 3px solid #f59e0b; }
 
-    .kpi-card.kpi-status-good { background: rgba(62,207,142,0.05); }
-    .kpi-card.kpi-status-bad  { background: rgba(255,107,107,0.06); }
+    .kpi-card.kpi-status-good { background: rgba(34,197,94,0.08);  border-color: rgba(34,197,94,0.25); }
+    .kpi-card.kpi-status-bad  { background: rgba(239,68,68,0.08);  border-color: rgba(239,68,68,0.25); }
 
     .kpi-card.kpi-warn {
       border-left-color:   rgba(255,107,107,0.4);
@@ -398,7 +391,7 @@
 
     .kpi-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 
-    .kpi-value { font-size: 1.9rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+    .kpi-value { font-size: 2.4rem; font-weight: 800; color: var(--text); letter-spacing: -0.03em; font-feature-settings: "tnum"; }
 
     .kpi-delta { font-size: 0.74rem; font-weight: 600; color: var(--muted); }
     .kpi-delta.delta-good { color: var(--green); }
@@ -465,7 +458,9 @@
       gap: 3px;
     }
     .health-label { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-    .health-value { font-size: 1.4rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+    .health-value { font-size: 1.4rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; transition: color 0.2s; }
+    .health-value.health-good { color: var(--green); }
+    .health-value.health-bad  { color: var(--red); }
     .health-sub   { font-size: 0.68rem; color: var(--muted); }
 
     @media (max-width: 600px) { .health-row { grid-template-columns: 1fr 1fr; } }
@@ -518,8 +513,7 @@
   <header class="app-bar">
     <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle settings">☰</button>
     <button class="run-btn" id="refresh-button" disabled>Sync</button>
-    <span class="chip chip-idle" id="report-send-chip" style="display:none"></span>
-    <span class="chip chip-idle" id="jira-connection-chip">Not connected</span>
+    <span class="data-status" id="data-status"></span>
     <div class="app-bar-spacer"></div>
     <span class="app-logo">AI <span>Delivery</span> Analyst</span>
   </header>
@@ -559,12 +553,6 @@
           <input id="jira-jql-input" type="text" placeholder='project = "KEY" ORDER BY updated DESC'>
         </div>
         <p class="muted-text" id="active-project-hint"></p>
-      </div>
-
-      <!-- Last run -->
-      <div class="sidebar-section">
-        <span class="sidebar-label">Last Run</span>
-        <p class="muted-text" id="last-run-status">Connect Jira and press Sync.</p>
       </div>
 
     </aside>
@@ -652,7 +640,7 @@
             <div class="health-item">
               <span class="health-label">WIP Ratio</span>
               <span class="health-value" id="health-wip-ratio">—</span>
-              <span class="health-sub">WIP / throughput</span>
+              <span class="health-sub" id="health-wip-sub">WIP / throughput</span>
             </div>
             <div class="health-item">
               <span class="health-label">Backlog Aging</span>
@@ -797,7 +785,6 @@
         projects.push({ id, label: key, jql: `project = "${key}" ORDER BY updated DESC` });
         switchProject(id);
         if (typeof jiraConnected !== "undefined" && !jiraConnected) {
-          showBanner("Project " + key + " added — click Connect to start syncing", true);
           const btn = document.getElementById("connect-jira-button");
           if (btn) {
             btn.classList.remove("pulse");
@@ -806,8 +793,6 @@
             btn.addEventListener("animationend", () => btn.classList.remove("pulse"), { once: true });
             btn.scrollIntoView({ behavior: "smooth", block: "nearest" });
           }
-        } else {
-          showBanner("Switched to project " + key, true);
         }
       }
 
@@ -826,7 +811,7 @@
       LS.saveState();
       renderTabs();
       if (p && jiraConnected) {
-        lastRunStatusNode.textContent = "Switching project…";
+        setDataStatus(null, true);
         prevKpi = null;
         await refreshDashboard();
       }
@@ -848,9 +833,6 @@
     const runButton            = document.getElementById("refresh-button");
     const connectButton        = document.getElementById("connect-jira-button");
     const toggleTokenBtn       = document.getElementById("toggle-token-visibility-button");
-    const reportSendChip       = document.getElementById("report-send-chip");
-    const lastRunStatusNode    = document.getElementById("last-run-status");
-    const jiraConnectionChip   = document.getElementById("jira-connection-chip");
     const connectionStatusNode = document.getElementById("jira-connection-status");
     const jiraBaseUrlInput     = document.getElementById("jira-base-url-input");
     const jiraEmailInput       = document.getElementById("jira-email-input");
@@ -940,16 +922,30 @@
       }
     }
 
-    // ── Chip helpers ──────────────────────────────────────────
-    function setChip(node, state, label) {
-      node.className = "chip chip-" + state;
-      node.textContent = label;
+    // ── Data status ───────────────────────────────────────────
+    let _statusTimestamp = null;
+    let _statusTimer     = null;
+
+    function setDataStatus(timestamp, isSyncing) {
+      if (timestamp) _statusTimestamp = timestamp;
+      const el = document.getElementById("data-status");
+      if (!el) return;
+      if (isSyncing) {
+        el.textContent = "Syncing…";
+        el.className   = "data-status syncing";
+        return;
+      }
+      if (!_statusTimestamp) { el.textContent = ""; el.className = "data-status"; return; }
+      const mins = Math.floor((Date.now() - new Date(_statusTimestamp).getTime()) / 60000);
+      el.textContent = mins < 1 ? "Updated just now"
+                     : mins < 60 ? `Updated ${mins}m ago`
+                     : mins < 1440 ? `Updated ${Math.floor(mins / 60)}h ago`
+                     : `Updated ${Math.floor(mins / 1440)}d ago`;
+      el.className = "data-status";
     }
 
-    function setRunChip(state, label) {
-      reportSendChip.style.display = state === "idle" ? "none" : "";
-      setChip(reportSendChip, state, label);
-    }
+    // Auto-refresh "Xm ago" every minute
+    setInterval(() => setDataStatus(null, false), 60000);
 
     // ── Connection ────────────────────────────────────────────
     function validate() {
@@ -972,7 +968,6 @@
       runButton.disabled = !ok;
       connectionStatusNode.textContent = msg;
       connectionStatusNode.style.color = ok ? "var(--green)" : "var(--secondary)";
-      setChip(jiraConnectionChip, ok ? "success" : "idle", ok ? "Connected" : "Not connected");
       if (ok) {
         sidebarCollapsed = true;
         LS.save("ada:sidebarCollapsed", true);
@@ -981,16 +976,13 @@
     }
 
     function handleConnect() {
-      setChip(jiraConnectionChip, "pending", "Checking…");
       const err = validate();
       if (err) {
         setConnected(false, err);
         connectionStatusNode.style.color = "var(--red)";
-        setChip(jiraConnectionChip, "error", "Error");
         return;
       }
       setConnected(true, "Connected to " + jiraBaseUrlInput.value.trim());
-      lastRunStatusNode.textContent = "Ready — press Sync & Analyse.";
     }
 
     function markOutdated() {
@@ -1182,11 +1174,26 @@
         .classList.toggle("kpi-status-bad", d.throughput === 0);
 
       // System Health panel
-      document.getElementById("health-wip-ratio").textContent =
-        (d.wipRatio ?? 0).toFixed(1);
-      document.getElementById("health-backlog-aging").textContent =
-        (d.backlogAgingDays ?? 0).toFixed(0) + "d";
-      document.getElementById("health-reopen-rate").textContent = reopened;
+      const inProg    = d.inProgressCount ?? 0;
+      const wipRatio  = d.throughput > 0 ? d.wipRatio : (inProg > 0 ? inProg : 0);
+      const aging     = d.backlogAgingDays ?? 0;
+
+      const wipEl   = document.getElementById("health-wip-ratio");
+      const agingEl = document.getElementById("health-backlog-aging");
+      const reopEl  = document.getElementById("health-reopen-rate");
+
+      wipEl.textContent   = wipRatio > 0 ? wipRatio.toFixed(1) : inProg;
+      agingEl.textContent = aging.toFixed(0) + "d";
+      reopEl.textContent  = reopened;
+
+      // Sub-labels: show context
+      document.getElementById("health-wip-sub").textContent =
+        d.throughput > 0 ? "WIP / throughput" : `${inProg} tasks in progress`;
+
+      // Status colours
+      wipEl.className   = "health-value " + (wipRatio > 2 ? "health-bad" : wipRatio <= 1 && inProg > 0 ? "health-good" : "");
+      agingEl.className = "health-value " + (aging > 30 ? "health-bad" : aging <= 14 ? "health-good" : "");
+      reopEl.className  = "health-value " + (reopened === 0 ? "health-good" : reopened >= 3 ? "health-bad" : "");
 
       prevKpi = { ...d };
 
@@ -1231,19 +1238,17 @@
     async function runSyncFlow() {
       if (!jiraConnected) return;
       const syncErr = validateSync();
-      if (syncErr) { lastRunStatusNode.textContent = syncErr; return; }
+      if (syncErr) { showBanner(syncErr, false); return; }
 
       runButton.disabled = true;
-      setRunChip("pending", "Syncing…");
-      lastRunStatusNode.textContent = "Syncing Jira data…";
+      setDataStatus(null, true);
       syncBannerNode.className = "sync-banner";
 
       try {
         await _postSync();
         _pollLatest();
       } catch (e) {
-        setRunChip("error", "Failed");
-        lastRunStatusNode.textContent = "Sync error: " + e.message;
+        setDataStatus(null, false);
         showBanner("Sync error: " + e.message, false);
         runButton.disabled = false;
       }
@@ -1273,13 +1278,11 @@
     function _pollLatest(attempts = 0) {
       clearTimeout(_pollTimer);
       if (attempts >= 20) {
-        setRunChip("error", "Timeout");
-        lastRunStatusNode.textContent = "Sync is taking a while — try again manually";
+        setDataStatus(null, false);
+        showBanner("Sync is taking a while — try again manually", false);
         runButton.disabled = false;
         return;
       }
-      const dots = ".".repeat((attempts % 3) + 1);
-      lastRunStatusNode.textContent = `Syncing Jira data${dots}`;
       _pollTimer = setTimeout(async () => {
         const p = active();
         if (!p) { runButton.disabled = false; return; }
@@ -1294,20 +1297,17 @@
     async function refreshDashboard() {
       if (!jiraConnected) return;
       const p = active();
-      if (!p) { lastRunStatusNode.textContent = "No project selected."; return; }
+      if (!p) return;
 
       clearTimeout(_pollTimer);
       runButton.disabled = true;
-      setRunChip("pending", "Loading…");
-      lastRunStatusNode.textContent = "Syncing with Jira…";
+      setDataStatus(null, true);
       syncBannerNode.className = "sync-banner";
 
       try {
         const res = await fetch(`${SERVER_BASE}/latest?project=${encodeURIComponent(p.label)}`);
 
         if (res.status === 404) {
-          setRunChip("pending", "Syncing…");
-          showBanner("No snapshot found — syncing Jira data…", true);
           await _postSync();
           _pollLatest();
           return;
@@ -1318,19 +1318,11 @@
         if (!body.ok) throw new Error(body.error || "Server error");
 
         updateDashboard(body.snapshot.metrics);
-        updateDataAge(body.snapshot.timestamp);
+        setDataStatus(body.snapshot.timestamp, false);
         await loadHistory();
-
-        const t = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-        setRunChip("success", "Loaded");
-        lastRunStatusNode.textContent = t + " — data loaded";
-        showBanner("Refreshed at " + t, true);
-        setTimeout(() => setRunChip("idle", ""), 3000);
       } catch (e) {
-        setRunChip("error", "Failed");
-        const t = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-        lastRunStatusNode.textContent = t + " — " + e.message;
-        showBanner("Sync error: " + e.message, false);
+        setDataStatus(null, false);
+        showBanner("Error: " + e.message, false);
       } finally {
         runButton.disabled = false;
       }
@@ -1347,22 +1339,25 @@
         if (!body.ok || !Array.isArray(body.snapshots)) return;
         drawChart(body.snapshots);
         drawThroughputChart(body.snapshots);
-      } catch (_) {}
-    }
 
-    // ── Data age ──────────────────────────────────────────────
-    function updateDataAge(timestamp) {
-      const el = document.getElementById("data-age-status");
-      if (!el) return;
-      if (!timestamp) { el.textContent = ""; return; }
-      const diff = Date.now() - new Date(timestamp).getTime();
-      const mins = Math.floor(diff / 60000);
-      if (mins < 1)        el.textContent = "Updated just now";
-      else if (mins < 60)  el.textContent = `Updated ${mins}m ago`;
-      else {
-        const hrs = Math.floor(mins / 60);
-        el.textContent = hrs < 24 ? `Updated ${hrs}h ago` : `Updated ${Math.floor(hrs / 24)}d ago`;
-      }
+        // Update KPI cards with period-aggregated metrics
+        const snaps = body.snapshots;
+        if (snaps.length === 0) return;
+        const last = snaps[snaps.length - 1].metrics;
+        const avg  = k => snaps.reduce((s, x) => s + (x.metrics[k] ?? 0), 0) / snaps.length;
+        updateDashboard({
+          cycleTimeDays:         +avg("cycleTimeDays").toFixed(1),
+          timeToMarketDays:      +avg("timeToMarketDays").toFixed(1),
+          flowEfficiencyPercent: +avg("flowEfficiencyPercent").toFixed(1),
+          throughput:            snaps.reduce((s, x) => s + (x.metrics.throughput ?? 0), 0),
+          predictabilityPercent: last.predictabilityPercent ?? 0,
+          inProgressCount:       last.inProgressCount       ?? 0,
+          backlogSize:           last.backlogSize            ?? 0,
+          reopenedCount:         last.reopenedCount          ?? 0,
+          wipRatio:              last.wipRatio               ?? 0,
+          backlogAgingDays:      last.backlogAgingDays       ?? 0,
+        });
+      } catch (_) {}
     }
 
     // ── Demo data ─────────────────────────────────────────────
@@ -1396,11 +1391,9 @@
           const isLast = i === demoSnapshots.length - 1;
           updateDashboard({ ...snap.metrics, analysis: isLast ? analysis : "" });
           if (isLast) {
-            updateDataAge(snap.timestamp);
+            setDataStatus(snap.timestamp, false);
             drawChart(demoSnapshots);
             drawThroughputChart(demoSnapshots);
-            showBanner("Demo data loaded — 5 snapshots simulated", true);
-            lastRunStatusNode.textContent = "Demo mode — no real Jira connection";
           }
         }, i * 300);
       });
