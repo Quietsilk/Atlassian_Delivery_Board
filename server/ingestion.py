@@ -1,6 +1,7 @@
 """Ingestion pipeline: fetch_jira → calculate_metrics → save_snapshot.
 
-Throughput = count of issues resolved between previous and current snapshot.
+Flow metrics use the interval [prev_snapshot_ts, now] so they are
+independent of sync frequency (Step 10).
 """
 
 import json
@@ -10,7 +11,10 @@ import urllib.error
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 
-from server.metrics import calculate_metrics, _map_issue, _parse_dt, DONE
+from server.metrics import (
+    calculate_metrics, calculate_flow_metrics,
+    _map_issue, _parse_dt, DONE,
+)
 from server.storage import save_snapshot, get_latest
 
 
@@ -72,58 +76,47 @@ def fetch_jira(base_url, email, api_token, jql):
     return all_issues
 
 
-def _count_resolved_since(issues, since_ts):
-    """Count issues resolved after since_ts (ISO string or None)."""
+# ── Step 2: interval-based completed extraction ──────────────────────────────
+
+def _get_completed_in_interval(mapped, since_ts):
+    """Return mapped issues resolved strictly after since_ts.
+
+    Replaces _count_resolved_since — returns items, not a count,
+    so the same list can feed calculate_flow_metrics (Step 5/7).
+    """
     if not since_ts:
-        return 0
-    count = 0
-    for issue in issues:
-        fields = issue.get("fields") or {}
-        # Use resolutiondate or last DONE transition from changelog
-        resolved = fields.get("resolutiondate")
-        if not resolved:
-            histories = issue.get("changelog", {}).get("histories", [])
-            transitions = sorted(
-                [
-                    {"date": h["created"], "to": i.get("toString", "")}
-                    for h in histories
-                    for i in h.get("items", [])
-                    if i.get("field") == "status"
-                ],
-                key=lambda t: t["date"]
-            )
-            last_done = next((t for t in reversed(transitions) if t["to"].lower() in DONE), None)
-            resolved = last_done["date"] if last_done else None
-        if resolved:
+        return []
+    result = []
+    for m in mapped:
+        if m["resolved_at"]:
             try:
-                if _parse_dt(resolved) > _parse_dt(since_ts):
-                    count += 1
+                if _parse_dt(m["resolved_at"]) > _parse_dt(since_ts):
+                    result.append(m)
             except Exception:
                 pass
-    return count
+    return result
 
 
-def _calc_predictability(issues):
-    """Predictability % over a rolling 30-day window.
+# ── Step 8: predictability (kept as approximation) ──────────────────────────
+
+def _calc_predictability(mapped):
+    """Predictability % over a rolling 30-day window (approximation).
 
     committed = started before period_end AND not finished before period_start
     completed = resolved inside the 30-day window
-    predictability = completed / committed * 100
     """
     period_end   = datetime.now(timezone.utc)
     period_start = period_end - timedelta(days=30)
 
-    committed = []
+    committed           = []
     completed_in_period = []
-    for issue in issues:
-        m = _map_issue(issue)
+    for m in mapped:
         if not m["started_at"]:
             continue
         try:
             started_dt = _parse_dt(m["started_at"])
         except Exception:
             continue
-        # Committed: started before period ends AND not resolved before period starts
         resolved_before_period = False
         if m["resolved_at"]:
             try:
@@ -132,7 +125,6 @@ def _calc_predictability(issues):
                 pass
         if started_dt < period_end and not resolved_before_period:
             committed.append(m)
-        # Completed in period: resolved within window
         if m["resolved_at"]:
             try:
                 resolved_dt = _parse_dt(m["resolved_at"])
@@ -146,30 +138,58 @@ def _calc_predictability(issues):
     return round(len(completed_in_period) / len(committed) * 100, 1)
 
 
+# ── Main pipeline ────────────────────────────────────────────────────────────
+
 def run_ingestion(project_key, base_url, email, api_token, jql, db_path="snapshots.db"):
     """Full ingestion pipeline for one project.
 
     1. Fetch issues from Jira
-    2. Calculate metrics (throughput=0 placeholder)
-    3. Compute throughput = issues resolved since previous snapshot
-    4. Save snapshot to SQLite
+    2. Map issues once (Step 1 — mapping optimization)
+    3. Structural metrics: backlog / inProgress / reopened / aging
+    4. Interval extraction: issues completed since previous snapshot (Step 2–3)
+    5. Flow metrics from interval: P50/P85 cycle time + TTM (Step 5–7)
+    6. Throughput normalization: throughputPerDay (Step 4)
+    7. Predictability (approximation, Step 8)
+    8. wipRatio removed (Step 8)
     """
     print(f"[ingestion] {project_key}: fetching Jira…")
     issues = fetch_jira(base_url, email, api_token, jql)
 
-    metrics = calculate_metrics(issues)
+    # Step 1 — compute mapped once, reuse everywhere
+    mapped = [_map_issue(issue) for issue in issues]
 
-    # Throughput = delta: resolved since last snapshot timestamp
-    prev = get_latest(project_key, db_path)
+    # Structural metrics (backlog, inProgress, reopened, aging)
+    metrics = calculate_metrics(issues, mapped=mapped)
+
+    # Previous snapshot for interval boundary
+    prev     = get_latest(project_key, db_path)
     since_ts = prev["timestamp"] if prev else None
-    metrics["throughput"] = _count_resolved_since(issues, since_ts)
 
-    # WIP Ratio = inProgressCount / throughput (0 if throughput == 0)
-    tp = metrics["throughput"]
-    metrics["wipRatio"] = round(metrics["inProgressCount"] / tp, 2) if tp > 0 else 0
+    # Step 2–3: interval-based completed list
+    completed_interval = _get_completed_in_interval(mapped, since_ts)
+    metrics["throughput"] = len(completed_interval)
 
-    # Predictability = completed-in-30d / committed-in-30d (%)
-    metrics["predictabilityPercent"] = _calc_predictability(issues)
+    # Step 4: throughput per day (normalized, sync-frequency independent)
+    if since_ts and metrics["throughput"] > 0:
+        try:
+            delta_days = (
+                datetime.now(timezone.utc) - _parse_dt(since_ts)
+            ).total_seconds() / 86400
+            metrics["throughputPerDay"] = round(metrics["throughput"] / delta_days, 2) if delta_days > 0 else 0
+        except Exception:
+            metrics["throughputPerDay"] = 0
+    else:
+        metrics["throughputPerDay"] = 0
+
+    # Step 5–7: flow metrics from interval (same window for all three)
+    # Fall back to all completed issues on first sync (no prev snapshot)
+    flow_source = completed_interval if completed_interval else [m for m in mapped if m["resolved_at"]]
+    metrics.update(calculate_flow_metrics(flow_source))
+
+    # Step 8: predictability (marked approximation — rolling 30d window)
+    metrics["predictabilityPercent"] = _calc_predictability(mapped)
+
+    # Step 8: wipRatio deprecated — not saved
 
     ts = save_snapshot(project_key, metrics, db_path)
     print(f"[ingestion] {project_key}: snapshot saved at {ts} — {metrics}")
