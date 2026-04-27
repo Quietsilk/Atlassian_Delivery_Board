@@ -41,6 +41,7 @@ Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses 
 - Параллельно запрашивает `GET /latest` и `GET /history`
 - 6 KPI-карточек (3×2 сетка): Cycle Time · Time to Market · Flow Efficiency / Reopened · WIP · Backlog Aging
 - AI-блок сразу под KPI; period picker и графики удалены (UI Simplification MVP)
+- Кнопка "⚡ Load demo data" закреплена в сайдбаре (всегда доступна)
 
 ---
 
@@ -147,3 +148,6 @@ python3 -m unittest discover -s tests -v
 16. **KPI Refinement (апрель 2026):**
     - 6 KPI-карточек в сетке 3×2: Cycle Time · Time to Market · Flow Efficiency · Reopened · WIP · Backlog Aging
     - Throughput и Backlog удалены из UI (данные остаются в снапшотах)
+17. **UX polish (апрель 2026):**
+    - Demo-кнопка перенесена в сайдбар — доступна всегда, не только в empty state
+    - server_app.py и test_server.py удалены (legacy pipeline выпилен полностью)
