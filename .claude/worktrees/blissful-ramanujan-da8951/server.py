@@ -3,18 +3,15 @@
 
 POST http://localhost:5678/webhook/sync-report
 Body: { baseUrl, email, apiToken, jql }
-Returns: { ok, dashboard: { cycleTimeDays, throughput, throughputPeriodLabel, timeToMarketDays, reopenedCount, flowEfficiencyPercent, analysis } }
+Returns: { ok, dashboard: { predictabilityPercent, cycleTimeDays, throughput, leadTimeDays, analysis } }
 """
 
 import json
 import base64
 import os
-import time
 import urllib.request
 import urllib.parse
-import urllib.error
 import http.server
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 
 PORT = 5678
@@ -27,11 +24,7 @@ DONE    = {"done", "closed", "resolved", "выполнено", "complete"}
 # ── Metrics ────────────────────────────────────────────────────────────────────
 
 def _parse_dt(s):
-    s = s.replace("Z", "+00:00")
-    # Python 3.9 fromisoformat requires +HH:MM, not +HHMM
-    if len(s) > 5 and s[-5] in ("+", "-") and ":" not in s[-5:]:
-        s = s[:-2] + ":" + s[-2:]
-    return datetime.fromisoformat(s)
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
 def calculate_metrics(issues, cutoff=None):
@@ -48,10 +41,8 @@ def calculate_metrics(issues, cutoff=None):
             key=lambda t: t["date"]
         )
 
+        started   = next((t for t in transitions if t["to"].lower() in STARTED), None)
         last_done = next((t for t in reversed(transitions) if t["to"].lower() in DONE), None)
-        started   = next((t for t in reversed(transitions)
-                          if t["to"].lower() in STARTED
-                          and (not last_done or t["date"] <= last_done["date"])), None)
         status    = (issue.get("fields") or {}).get("status", {}).get("name", "")
         is_done   = status.lower() in DONE
         resolved  = None
@@ -93,18 +84,15 @@ def calculate_metrics(issues, cutoff=None):
                     print(f"  [warn] avg_days: cannot parse {item.get(a)!r} / {item.get(b)!r} → {e}")
         return round(sum(ds) / len(ds), 1) if ds else 0
 
-    cycle = avg_days(completed, "started_at", "resolved_at")
-    lead  = avg_days(completed, "created_at", "resolved_at")
-    flow_efficiency = round(min(cycle / lead * 100, 100.0), 1) if lead > 0 else 0
-
     return {
-        "cycleTimeDays":         cycle,
-        "timeToMarketDays":      lead,
+        "cycleTimeDays":         avg_days(completed, "started_at", "resolved_at"),
+        "leadTimeDays":          avg_days(completed, "created_at", "resolved_at"),
         "throughput":            len(completed),
-        "flowEfficiencyPercent": flow_efficiency,
+        "predictabilityPercent": round(len(completed) / len(mapped) * 100, 1) if mapped else 0,
         "backlogSize":           len(backlog),
         "inProgressCount":       len(in_progress),
-        "reopenedCount":         sum(1 for i in completed if i["reopened"]),
+        "completedCount":        len(completed),
+        "reopenedCount":         sum(1 for i in mapped if i["reopened"]),
     }
 
 
@@ -131,46 +119,39 @@ def fetch_jira(base_url, email, api_token, jql):
     auth = base64.b64encode(f"{email}:{api_token}".encode()).decode()
 
     # ── Paginate through all issues ───────────────────────────────
-    # /search/jql uses cursor pagination (nextPageToken), not offset (startAt)
-    # fieldsByKeys:true required to get key + named fields in response
-    all_issues     = []
-    next_page_token = None
+    all_issues = []
+    start_at   = 0
     while True:
-        body = {
-            "jql": jql, "maxResults": PAGE_SIZE,
-            "fieldsByKeys": True,
-            "fields": ["summary", "status", "created", "resolutiondate"],
-        }
-        if next_page_token:
-            body["nextPageToken"] = next_page_token
-        data = jira_request(f"{base_url}/rest/api/3/search/jql", auth, body)
+        data   = jira_request(
+            f"{base_url}/rest/api/3/search/jql",
+            auth,
+            {"jql": jql, "startAt": start_at, "maxResults": PAGE_SIZE,
+             "fields": ["summary", "status", "created", "resolutiondate"]},
+        )
         page = data.get("issues", [])
         all_issues.extend(page)
-        print(f"  Fetched {len(all_issues)} issues so far")
-        next_page_token = data.get("nextPageToken")
-        if data.get("isLast", True) or not next_page_token or len(page) < PAGE_SIZE:
+        print(f"  Fetched {len(all_issues)} issues so far (page startAt={start_at})")
+        if data.get("isLast", True) or len(page) < PAGE_SIZE:
             break
+        start_at += len(page)
 
-    # ── Fetch changelog for all issues ────────────────────────────
-    # Needed for Done-without-resolutiondate (BUG-1) and tasks
-    # returned from In Progress to Backlog (BUG-4).
-    needs_changelog = [i["key"] for i in all_issues]
-    print(f"  Fetching changelogs for {len(needs_changelog)} issues (parallel)…")
-
-    def fetch_changelog(key):
+    # ── Fetch changelog for resolved + actively in-progress issues ─
+    # Backlog items (never started) don't need changelog.
+    needs_changelog = [
+        i["key"] for i in all_issues
+        if i.get("fields", {}).get("resolutiondate")
+        or i.get("fields", {}).get("status", {}).get("name", "").lower() in STARTED
+    ]
+    changelogs = {}
+    for key in needs_changelog:
         try:
             cl = jira_request(
                 f"{base_url}/rest/api/3/issue/{key}/changelog?maxResults=100",
                 auth,
             )
-            return key, cl.get("values", [])
+            changelogs[key] = cl.get("values", [])
         except Exception:
-            return key, []
-
-    changelogs = {}
-    with ThreadPoolExecutor(max_workers=10) as pool:
-        for key, values in pool.map(fetch_changelog, needs_changelog):
-            changelogs[key] = values
+            changelogs[key] = []
 
     for issue in all_issues:
         issue["changelog"] = {"histories": changelogs.get(issue["key"], [])}
@@ -183,9 +164,9 @@ def call_openai(metrics, api_key, period_label="all time"):
     prompt = (
         f"Delivery metrics ({period_label}):\n"
         f"- Cycle Time: {m['cycleTimeDays']}d\n"
-        f"- Time to Market: {m['timeToMarketDays']}d\n"
+        f"- Lead Time: {m['leadTimeDays']}d\n"
         f"- Throughput: {m['throughput']} issues\n"
-        f"- Flow Efficiency: {m['flowEfficiencyPercent']}% (cycle/lead time ratio — higher is better)\n"
+        f"- Predictability: {m['predictabilityPercent']}%\n"
         f"- Backlog: {m['backlogSize']} | In Progress: {m['inProgressCount']} | Reopened: {m['reopenedCount']}\n\n"
         "Identify risks, explain causes, suggest 3 specific actions. No generic advice.\n\n"
         "Return:\nSummary: 1-2 sentences\nRisks:\n- ...\nActions:\n- ..."
@@ -201,33 +182,13 @@ def call_openai(metrics, api_key, period_label="all time"):
         data=body,
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
     )
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(req, timeout=60) as r:
-                data = json.loads(r.read())
-            return (
-                data.get("output_text")
-                or (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
-                or "AI analysis unavailable."
-            )
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                body = e.read().decode()
-                err_code = ""
-                try:
-                    err_code = json.loads(body).get("error", {}).get("code", "")
-                except Exception:
-                    pass
-                if err_code == "insufficient_quota":
-                    raise RuntimeError("OpenAI quota exceeded — add credits at platform.openai.com/settings/billing")
-                if attempt < 2:
-                    retry_after = e.headers.get("Retry-After") or e.headers.get("x-ratelimit-reset-requests")
-                    wait = int(retry_after) if retry_after and str(retry_after).isdigit() else 30 * (attempt + 1)
-                    wait = min(wait, 90)
-                    print(f"  OpenAI 429 — retrying in {wait}s (attempt {attempt + 1}/3)…")
-                    time.sleep(wait)
-                    continue
-            raise
+    with urllib.request.urlopen(req, timeout=60) as r:
+        data = json.loads(r.read())
+    return (
+        data.get("output_text")
+        or (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+        or "AI analysis unavailable."
+    )
 
 
 def _split_telegram(text, max_len=4096):
@@ -326,49 +287,45 @@ class Handler(http.server.BaseHTTPRequestHandler):
         metrics = calculate_metrics(data.get("issues", []), cutoff)
         print(f"Metrics: {metrics}")
 
-        analysis  = ""
-        ai_error  = ""
+        analysis = ""
         if openai_key:
             print("Calling OpenAI…")
             try:
                 analysis = call_openai(metrics, api_key=openai_key, period_label=period_label)
             except Exception as e:
-                ai_error = str(e)
+                analysis = f"AI analysis unavailable: {e}"
                 print(f"OpenAI error: {e}")
 
         if tg_token and tg_chat:
-            icon       = "🔴" if metrics["throughput"] == 0 else ("🟡" if metrics["reopenedCount"] > 0 else "🟢")
-            date       = datetime.now().strftime("%-d %b %Y")
-            title      = project_name if project_name else "Delivery Report"
+            icon    = "🟢" if metrics["predictabilityPercent"] >= 80 else ("🟡" if metrics["predictabilityPercent"] >= 60 else "🔴")
+            date    = datetime.now().strftime("%-d %b %Y")
+            title   = project_name if project_name else "Delivery Report"
             period_str = {"7d": "7 дней", "30d": "30 дней", "90d": "90 дней"}.get(period, "всё время")
+            reopened_line = f"⚠️ Reopened: {metrics['reopenedCount']}\n" if metrics["reopenedCount"] else ""
             tg_text = "\n".join(filter(None, [
                 f"📊 {title} — {date}",
                 f"Период: {period_str}",
                 "",
                 "━━━ Метрики ━━━",
-                f"✅ Завершено: {metrics['throughput']}   🔄 В работе: {metrics['inProgressCount']}   📋 Бэклог: {metrics['backlogSize']}",
+                f"✅ Завершено: {metrics['completedCount']}   🔄 В работе: {metrics['inProgressCount']}   📋 Бэклог: {metrics['backlogSize']}",
                 f"⚠️ Переоткрыто: {metrics['reopenedCount']}" if metrics["reopenedCount"] else None,
-                f"⚡ Flow Efficiency: {metrics['flowEfficiencyPercent']}%",
-                f"⏱ Cycle Time: {metrics['cycleTimeDays']}д   📅 Time to Market: {metrics['timeToMarketDays']}д   🚀 Throughput: {metrics['throughput']} за {period_str}",
+                f"{icon} Предсказуемость: {metrics['predictabilityPercent']}%",
+                f"⏱ Cycle Time: {metrics['cycleTimeDays']}д   📅 Lead Time: {metrics['leadTimeDays']}д   🚀 Throughput: {metrics['throughput']}",
                 "",
                 "━━━ AI-анализ ━━━",
                 analysis or "—",
             ]))
             send_telegram(tg_text, tg_token, tg_chat)
 
-        throughput_label = period if period != "all" else "all"
         return {
             "ok": True,
             "dashboard": {
+                "predictabilityPercent": metrics["predictabilityPercent"],
                 "cycleTimeDays":         metrics["cycleTimeDays"],
                 "throughput":            metrics["throughput"],
-                "throughputPeriodLabel": throughput_label,
-                "timeToMarketDays":      metrics["timeToMarketDays"],
-                "reopenedCount":         metrics["reopenedCount"],
-                "flowEfficiencyPercent": metrics["flowEfficiencyPercent"],
+                "leadTimeDays":          metrics["leadTimeDays"],
                 "analysis":              analysis,
                 "aiEnabled":             bool(openai_key),
-                "aiError":               ai_error,
             },
         }
 
