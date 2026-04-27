@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 """AI Delivery Analyst — main entry point.
 
-Serves the dashboard HTML and routes HTTP requests:
-
-New API (persistent analytics):
-  GET  /latest?project=KEY
-  GET  /history?project=KEY&period=7d|30d|90d
-  POST /sync   { project, baseUrl, email, apiToken, jql }
-
-Legacy (kept for backward compatibility, deprecated):
-  POST /webhook/sync-report  → delegates to server_app._handle()
+Routes:
+  GET  /               → dashboard HTML
+  GET  /latest         → latest snapshot
+  GET  /history        → snapshot history
+  POST /sync           → trigger ingestion
 
 Background scheduler: SYNC_INTERVAL_SECONDS (default 3600).
-Configured projects: PROJECTS env var (JSON array) or empty by default.
+Configured projects: PROJECTS env var (JSON array).
 """
 
 import json
@@ -61,8 +57,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.path == "/sync":
             from server.api import handle_post_sync
             handle_post_sync(self, DB_PATH, {})
-        elif self.path == "/webhook/sync-report":
-            self._legacy_webhook()
         else:
             self.send_response(404)
             self.end_headers()
@@ -78,18 +72,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Pragma",          "no-cache")
         self.end_headers()
         self.wfile.write(body)
-
-    def _legacy_webhook(self):
-        """DEPRECATED: delegates to server_app._handle() for backward compat."""
-        import server_app
-        length = int(self.headers.get("Content-Length", 0))
-        try:
-            body   = json.loads(self.rfile.read(length))
-            result = server_app.Handler._handle(self, body)
-            self._json(200, result)
-        except Exception as e:
-            print(f"[legacy] error: {e}")
-            self._json(500, {"ok": False, "error": str(e)})
 
     def _json(self, code, data):
         body = json.dumps(data).encode()

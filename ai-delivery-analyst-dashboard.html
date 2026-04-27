@@ -905,9 +905,11 @@
       // AI section
       const hintsEl   = document.getElementById("ai-hints");
       const summaryEl = document.getElementById("ai-summary-text");
+      const aiTabBar  = document.querySelector("#ai-section .ai-tab-bar");
       const noTokenMsg = `<span class="ai-no-token">OpenAI API key not configured. Add <code>OPENAI_API_KEY</code> to your <code>.env</code> file to enable AI analysis.</span>`;
 
       if (d.analysis) {
+        if (aiTabBar) aiTabBar.classList.remove("hidden");
         const parsed = parseAnalysis(d.analysis);
         if (hintsEl) hintsEl.classList.add("hidden");
         summaryEl.textContent = parsed.summary || d.analysis;
@@ -929,18 +931,17 @@
           actionsPlaceholder.classList.add("hidden");
         }
       } else if (d.aiError) {
+        if (aiTabBar) aiTabBar.classList.add("hidden");
         if (hintsEl) hintsEl.classList.add("hidden");
-        summaryEl.innerHTML = noTokenMsg;
+        summaryEl.innerHTML = "AI unavailable: " + d.aiError;
         summaryEl.className = "";
-        document.getElementById("risks-placeholder").textContent   = "AI unavailable: " + d.aiError;
-        document.getElementById("actions-placeholder").textContent = "AI unavailable: " + d.aiError;
       } else if (d.aiEnabled === false) {
+        if (aiTabBar) aiTabBar.classList.add("hidden");
         if (hintsEl) hintsEl.classList.add("hidden");
         summaryEl.innerHTML = noTokenMsg;
         summaryEl.className = "";
-        document.getElementById("risks-placeholder").innerHTML   = noTokenMsg;
-        document.getElementById("actions-placeholder").innerHTML = noTokenMsg;
       } else {
+        if (aiTabBar) aiTabBar.classList.remove("hidden");
         if (hintsEl) hintsEl.classList.remove("hidden");
         summaryEl.textContent = "Sync to get AI-generated insights.";
         summaryEl.className = "muted-text";

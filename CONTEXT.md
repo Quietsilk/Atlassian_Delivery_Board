@@ -23,7 +23,6 @@ Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses 
 - `GET /latest?project=KEY` → последний снапшот из SQLite
 - `GET /history?project=KEY&period=7d|30d|90d` → история снапшотов
 - `POST /sync` → запускает `run_ingestion` в фоновом потоке → `{ok, queued}`
-- `POST /webhook/sync-report` → legacy, делегирует в `server_app.py`
 
 **`server/`** — пакет с бизнес-логикой:
 
@@ -83,7 +82,7 @@ DONE    = {"done", "closed", "resolved", "выполнено", "complete"}
 
 ## Тесты
 
-120 тестов в 5 файлах, stdlib unittest, zero deps:
+77 тестов в 4 файлах, stdlib unittest, zero deps:
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -91,8 +90,7 @@ python3 -m unittest discover -s tests -v
 
 | Файл | Тестов |
 |---|---|
-| `tests/test_server.py` | 87 (legacy) |
-| `tests/test_metrics.py` | 15 |
+| `tests/test_metrics.py` | 44 |
 | `tests/test_storage.py` | 13 |
 | `tests/test_ingestion.py` | 12 |
 | `tests/test_api.py` | 8 |
@@ -101,10 +99,9 @@ python3 -m unittest discover -s tests -v
 
 ## Известные ограничения
 
-- STARTED/DONE статусы захардкожены в `server_app.py` (не конфигурируются через UI)
+- STARTED/DONE статусы захардкожены в `server/metrics.py` (не конфигурируются через UI)
 - Один JQL на проект (multi-source не реализован)
 - SQLite не масштабируется горизонтально (single-writer)
-- Legacy `/webhook/sync-report` блокирует HTTP-поток синхронно (медленно на больших проектах)
 
 ---
 
@@ -118,7 +115,7 @@ python3 -m unittest discover -s tests -v
 6. localStorage-персистентность
 7. Case-insensitive статусы (BUG-S01)
 8. Smart Telegram chunking (BUG-S04)
-9. Regression suite (33 → 61 → 87 тестов)
+9. Regression suite (33 → 61 → 87 тестов — legacy, удалён вместе с server_app.py)
 10. UX overhaul: KPI-акценты, collapsible sidebar, period bar, AI/Risks иерархия
 11. Flow Efficiency (5-я KPI), Time to Market rename, Throughput delta
 12. **Архитектурный рефакторинг (апрель 2026):**

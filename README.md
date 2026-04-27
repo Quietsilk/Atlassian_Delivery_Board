@@ -50,21 +50,19 @@ Jira credentials вводятся в дашборде и хранятся в loc
 ```
 ai-delivery-analyst/
 ├── server.py                          # Тонкий HTTP-роутер
-├── server_app.py                      # Legacy pipeline (backward compat)
 ├── server/
 │   ├── __init__.py
 │   ├── metrics.py                     # calculate_metrics(issues) — чистая функция
 │   ├── storage.py                     # SQLite CRUD (init, save, get_latest, get_history)
-│   ├── ingestion.py                   # fetch + metrics + throughput delta + save
+│   ├── ingestion.py                   # fetch + metrics + save
 │   ├── api.py                         # HTTP handlers (GET /latest, GET /history, POST /sync)
 │   └── scheduler.py                   # Фоновый daemon-поток для автосинка
 ├── ai-delivery-analyst-dashboard.html # UI (single file, read-only)
 ├── tests/
-│   ├── test_server.py                 # 87 regression тестов (legacy)
 │   ├── test_metrics.py                # 15 тестов
 │   ├── test_storage.py                # 13 тестов
-│   ├── test_ingestion.py              # 8 тестов
-│   └── test_api.py                    # 8 тестов (108 итого)
+│   ├── test_ingestion.py              # 12 тестов
+│   └── test_api.py                    # 8 тестов (48 итого)
 ├── docs/
 │   ├── architecture.md
 │   ├── backlog.md
@@ -84,7 +82,6 @@ ai-delivery-analyst/
 | `GET` | `/latest?project=KEY` | Последний снапшот проекта |
 | `GET` | `/history?project=KEY&period=7d\|30d\|90d` | История снапшотов |
 | `POST` | `/sync` | Запустить ингест в фоне → `{ok, queued}` |
-| `POST` | `/webhook/sync-report` | Legacy endpoint (deprecated) |
 
 **GET /latest** — пример ответа:
 ```json
@@ -164,14 +161,13 @@ ai-delivery-analyst/
 python3 -m unittest discover -s tests -v
 ```
 
-120 тестов, zero external dependencies:
+77 тестов, zero external dependencies:
 
 | Файл | Тестов | Покрытие |
 |---|---|---|
-| `test_server.py` | 87 | Legacy pipeline |
-| `test_metrics.py` | 15 | `calculate_metrics`, `calculate_flow_metrics`, `_percentile`, `_parse_dt` |
+| `test_metrics.py` | 44 | `calculate_metrics`, `calculate_flow_metrics`, `_percentile`, `_parse_dt` |
 | `test_storage.py` | 13 | SQLite CRUD, иммутабельность, фильтрация по периоду |
-| `test_ingestion.py` | 12 | Throughput interval/cumulative, completedCount, flow metrics interval |
+| `test_ingestion.py` | 12 | completedCount, flow metrics interval |
 | `test_api.py` | 8 | HTTP handlers, 400/404/202 статусы |
 
 ---
