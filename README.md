@@ -8,7 +8,7 @@
 
 1. Забирает задачи из Jira по JQL (cursor-based пагинация)
 2. Загружает changelog каждой задачи параллельно (10 потоков)
-3. Рассчитывает delivery-метрики: Cycle Time, Time to Market, Flow Efficiency, Throughput, Reopened
+3. Рассчитывает delivery-метрики: Cycle Time, Time to Market, Flow Efficiency, Reopened, WIP, Backlog Aging
 4. Сохраняет снапшот в SQLite (иммутабельно — только INSERT)
 5. Анализирует метрики через OpenAI → Summary, Risks, Actions (опционально)
 6. Дашборд читает снапшоты через REST API (read-only UI)
@@ -33,13 +33,26 @@ python3 server.py
 
 Jira credentials вводятся в дашборде и хранятся в localStorage браузера.
 
+### React-дашборд (ветка react-redesign)
+
+```bash
+git checkout react-redesign
+cd dashboard
+npm install
+npm run dev
+# → http://localhost:5173
+```
+
+Требует запущенного `python3 server.py` на порту 5678 для API.
+
 ---
 
 ## Стек
 
 - **Python 3.9+** — stdlib-only, zero dependencies
 - **SQLite** — персистентное хранение снапшотов через `server/storage.py`
-- **HTML/CSS/JS** — однофайловый дашборд, read-only UI
+- **HTML/CSS/JS** — однофайловый дашборд `main` ветки, read-only UI
+- **React 18 + Vite** — новый дашборд (`react-redesign` ветка, `dashboard/`)
 - **Jira Cloud REST API** — `/rest/api/3/search/jql` + `/rest/api/3/issue/{key}/changelog`
 - **OpenAI Responses API** — модель `o4-mini`, опционально
 
@@ -57,12 +70,27 @@ ai-delivery-analyst/
 │   ├── ingestion.py                   # fetch + metrics + save
 │   ├── api.py                         # HTTP handlers (GET /latest, GET /history, POST /sync)
 │   └── scheduler.py                   # Фоновый daemon-поток для автосинка
-├── ai-delivery-analyst-dashboard.html # UI (single file, read-only)
+├── ai-delivery-analyst-dashboard.html # UI (single file, main ветка)
+├── dashboard/                         # React+Vite дашборд (react-redesign ветка)
+│   ├── src/
+│   │   ├── App.jsx                    # Корневой компонент: layout, sync, tweaks
+│   │   ├── api.js                     # fetchLatest, fetchHistory, postSync
+│   │   ├── demo.js                    # DEMO_HISTORY, DEMO_ANALYSIS
+│   │   ├── components/
+│   │   │   ├── KpiCard.jsx            # KPI-карточка: sparkline, delta, статус-бар
+│   │   │   ├── AIPanel.jsx            # AI Insights: summary/risks/actions tabs
+│   │   │   ├── Sidebar.jsx            # Jira creds, JQL, demo-кнопка
+│   │   │   └── Sparkline.jsx          # SVG-спарклайн
+│   │   └── hooks/
+│   │       ├── useCredentials.js      # Jira creds → localStorage
+│   │       └── useProjects.js         # Multi-project tabs → localStorage
+│   ├── package.json
+│   └── vite.config.js
 ├── tests/
-│   ├── test_metrics.py                # 15 тестов
+│   ├── test_metrics.py                # 44 теста
 │   ├── test_storage.py                # 13 тестов
 │   ├── test_ingestion.py              # 12 тестов
-│   └── test_api.py                    # 8 тестов (48 итого)
+│   └── test_api.py                    # 8 тестов (77 итого)
 ├── docs/
 │   ├── architecture.md
 │   ├── backlog.md
@@ -78,9 +106,9 @@ ai-delivery-analyst/
 
 | Метод | Путь | Описание |
 |---|---|---|
-| `GET` | `/` | Дашборд HTML |
+| `GET` | `/` | Дашборд HTML (main ветка) |
 | `GET` | `/latest?project=KEY` | Последний снапшот проекта |
-| `GET` | `/history?project=KEY&period=7d\|30d\|90d` | История снапшотов |
+| `GET` | `/history?project=KEY` | История снапшотов |
 | `POST` | `/sync` | Запустить ингест в фоне → `{ok, queued}` |
 
 **GET /latest** — пример ответа:
@@ -90,18 +118,20 @@ ai-delivery-analyst/
   "snapshot": {
     "timestamp": "2026-04-26T10:00:00+00:00",
     "metrics": {
-      "cycleTimeP50": 5.0,
+      "cycleTime": 5.0,
       "cycleTimeP85": 17.8,
-      "timeToMarketP50": 12.0,
+      "timeToMarket": 12.0,
       "timeToMarketP85": 62.2,
-      "flowEfficiencyPercent": 41.7,
-      "throughput": 0,
+      "flowEfficiency": 41.7,
       "completedCount": 147,
-      "backlogSize": 56,
-      "inProgressCount": 9,
-      "reopenedCount": 2,
-      "backlogAgingDays": 208.3,
-      "predictabilityPercent": 59.1
+      "wip": 9,
+      "reopenRate": 4.2,
+      "backlogAging": 28.3
+    },
+    "analysis": {
+      "summary": "...",
+      "risks": ["..."],
+      "actions": ["..."]
     }
   }
 }
@@ -128,8 +158,6 @@ ai-delivery-analyst/
 | `SYNC_INTERVAL_SECONDS` | Интервал фонового синка | `3600` |
 | `PROJECTS` | JSON-массив проектов для планировщика | `[]` |
 | `OPENAI_API_KEY` | AI-анализ (опционально) | — |
-| `TELEGRAM_BOT_TOKEN` | Telegram (опционально, legacy) | — |
-| `TELEGRAM_CHAT_ID` | Telegram (опционально, legacy) | — |
 
 **Пример PROJECTS:**
 ```json
@@ -146,11 +174,11 @@ ai-delivery-analyst/
 
 | Метрика | Определение | Хорошо | Плохо |
 |---|---|---|---|
-| **Cycle Time P50/P85** | Медиана/85-й перцентиль: последний старт → Done | P50 ≤ 5d | P50 ≥ 10d |
-| **Time to Market P50/P85** | Медиана/85-й перцентиль: создание → Done | P50 ≤ 10d | P50 ≥ 20d |
-| **Flow Efficiency (proxy)** | cycleTimeP50 / timeToMarketP50 × 100%, кап 100% | ≥ 40% | ≤ 15% |
-| **Reopened** | Задачи, вернувшиеся из Done хотя бы раз | = 0 | ≥ 3 |
-| **WIP** | Задачи в статусе In Progress | ≤ 5 | ≥ 15 |
+| **Cycle Time** | Медиана: последний старт → Done | ≤ 3d | ≥ 7d |
+| **Time to Market** | Медиана: создание → Done | ≤ 7d | ≥ 14d |
+| **Flow Efficiency** | cycleTime / timeToMarket × 100% | ≥ 40% | ≤ 20% |
+| **Reopened Rate** | Задачи из Done / всего закрытых, % | ≤ 5% | ≥ 15% |
+| **WIP** | Задачи в статусе In Progress | ≤ 10 | ≥ 20 |
 | **Backlog Aging** | Среднее кол-во дней в бэклоге | ≤ 14d | ≥ 30d |
 
 ---
@@ -176,12 +204,9 @@ python3 -m unittest discover -s tests -v
 
 1. **UI read-only** — браузер только читает снапшоты, никогда не считает метрики
 2. **Иммутабельные снапшоты** — только INSERT в SQLite, никогда UPDATE/DELETE
-3. **`throughput` = интервальный счётчик** — кол-во resolved с `timestamp` предыдущего снапшота
-4. **`completedCount` = кумулятивный** — всего завершённых задач на момент синка; дельта между снапшотами = throughput за период
-5. **`throughputPerDay` не хранится** — вычисляется фронтом как `ΔcompletedCount / дней_периода`
-6. **Flow metrics раздельно** — `calculate_metrics` возвращает только структурные метрики; `calculate_flow_metrics(completed_items)` — P50/P85 flow-метрики
-7. **Period фильтр** — влияет и на KPI-карточки, и на графики; агрегация выполняется на фронте из снапшотов периода
-8. **`calculate_metrics` без period** — чистая функция, нет параметров cutoff/period
+3. **`completedCount` = кумулятивный** — всего завершённых задач на момент синка
+4. **Flow metrics раздельно** — `calculate_metrics` возвращает структурные метрики; `calculate_flow_metrics(completed_items)` — P50/P85 flow-метрики
+5. **`calculate_metrics` без period** — чистая функция, нет параметров cutoff/period
 
 ---
 
