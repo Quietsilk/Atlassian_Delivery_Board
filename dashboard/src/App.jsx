@@ -7,6 +7,11 @@ import { useProjects } from "./hooks/useProjects";
 import { fetchLatest, fetchHistory, postSync } from "./api";
 import { DEMO_HISTORY, DEMO_ANALYSIS } from "./demo";
 
+/* ─── constants ───────────────────────────────────────────────────────────── */
+
+const POLL_MAX_ATTEMPTS = 20;   // max polls before giving up
+const POLL_INTERVAL_MS  = 3000; // ms between polls  → total timeout = 60 s
+
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 
 function round1(n) { return Math.round(n * 10) / 10; }
@@ -249,7 +254,7 @@ export default function App() {
         } catch {
           // Keep polling through transient backend/network errors.
         }
-        if (++attempts < 10) { pollRef.current = setTimeout(poll, 3000); }
+        if (++attempts < POLL_MAX_ATTEMPTS) { pollRef.current = setTimeout(poll, POLL_INTERVAL_MS); }
         else {
           setSyncState("error");
           setSyncError("Sync did not produce a new snapshot");
