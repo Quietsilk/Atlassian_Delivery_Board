@@ -32,7 +32,7 @@ function onBlur(e) {
 }
 
 /* ── Sidebar ────────────────────────────────────────────────────────────────── */
-export default function Sidebar({ creds, onConnect, activeProject, onJqlChange, onDemo }) {
+export default function Sidebar({ creds, onConnect, onDemo }) {
   const [showToken, setShowToken] = useState(false);
 
   const connected = creds.connected;
@@ -138,29 +138,6 @@ export default function Sidebar({ creds, onConnect, activeProject, onJqlChange, 
 
         {/* ── Divider ─────────────────────────────────────── */}
         <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "0 16px" }} />
-
-        {/* ── Active Query ─────────────────────────────────── */}
-        {activeProject && (
-          <>
-            <div style={{ padding: "18px 16px 16px" }}>
-              <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.22)", marginBottom: 12 }}>
-                Active Query
-              </div>
-              <Field label="JQL">
-                <input
-                  type="text"
-                  value={activeProject.jql || ""}
-                  onChange={e => onJqlChange(e.target.value)}
-                  placeholder='project = "KEY" ORDER BY updated DESC'
-                  style={{ ...baseInput, fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem" }}
-                  onFocus={onFocus} onBlur={onBlur}
-                />
-              </Field>
-              <p style={{ marginTop: 6, fontSize: "0.67rem", color: "rgba(255,255,255,0.2)" }}>{activeProject.label}</p>
-            </div>
-            <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "0 16px" }} />
-          </>
-        )}
 
         {/* ── Demo ─────────────────────────────────────────── */}
         <div style={{ padding: "16px 16px", marginTop: "auto" }}>

@@ -47,8 +47,11 @@ export function useProjects() {
       save(next);
       return next;
     });
-    setActiveId(prev => prev === id ? (projects.find(p => p.id !== id)?.id || null) : prev);
-  }, [projects, setActiveId]);
+    const nextId = activeId === id
+      ? (projects.find(p => p.id !== id)?.id || null)
+      : activeId;
+    setActiveId(nextId);
+  }, [projects, activeId, setActiveId]);
 
   const updateJql = useCallback((id, jql) => {
     setProjects(prev => {
