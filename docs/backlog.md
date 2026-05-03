@@ -3,9 +3,7 @@
 ## В работе / ближайшее
 
 - [ ] Конфигурация STARTED/DONE статусов через UI (сейчас — хардкод в `server/metrics.py`)
-- [ ] Wire React-дашборд к реальному API: проверить поле-маппинг между `metrics_json` в SQLite и `buildKpis()` в `App.jsx`
 - [ ] `npm run build` → раздача `dashboard/dist/` через `server.py` (единый процесс)
-- [ ] Переключение проектов в React-дашборде сбрасывает snapshots/analysis при смене activeId
 
 ## Метрики и аналитика
 
@@ -30,6 +28,9 @@
 ## Готово ✅
 
 - [x] **React+Vite дашборд** (май 2026): `dashboard/` на ветке `react-redesign` — KpiCard, AIPanel, Sidebar, Sparkline, TweaksPanel, useCredentials, useProjects
+- [x] React API mapping: `src/api.js` нормализует backend `metrics_json` в UI-поля для `buildKpis()`
+- [x] Переключение проектов в React-дашборде сбрасывает snapshots/analysis при смене activeId
+- [x] Sync flow: React завершает синк только по новому snapshot timestamp; backend не сохраняет пустой Jira-result
 - [x] Full UI/UX redesign: 6 KPI-карточек 3×2 с sparklines, delta %, P85, статус-барами и AI-панелью
 - [x] Demo-кнопка в сайдбаре — всегда видна, не зависит от состояния данных
 - [x] Throughput — убран из дашборда (не рассчитывается без исторических данных)

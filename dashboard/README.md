@@ -1,16 +1,50 @@
-# React + Vite
+# AI Delivery Analyst Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React/Vite dashboard for the `react-redesign` branch.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm run dev
+```
 
-## React Compiler
+The dashboard runs on Vite and reads the backend at `http://localhost:5678`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Sync is considered complete only when `/latest` returns a snapshot with a new `timestamp`. AI analysis is optional and does not block completion.
 
-## Expanding the ESLint configuration
+The sidebar is closed by default on page load.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Data Contract
+
+Backend snapshots are returned as:
+
+```json
+{
+  "timestamp": "2026-04-26T10:00:00+00:00",
+  "metrics": {
+    "cycleTimeP50": 5.0,
+    "cycleTimeP85": 17.8,
+    "timeToMarketP50": 12.0,
+    "timeToMarketP85": 62.2,
+    "flowEfficiencyPercent": 41.7,
+    "reopenedCount": 2,
+    "inProgressCount": 9,
+    "backlogAgingDays": 28.3
+  }
+}
+```
+
+`src/api.js` normalizes those backend fields for the React UI:
+
+| Backend field | UI field |
+|---|---|
+| `cycleTimeP50` | `cycleTime` |
+| `timeToMarketP50` | `timeToMarket` |
+| `flowEfficiencyPercent` | `flowEfficiency` |
+| `reopenedCount` | `reopened` |
+| `inProgressCount` | `wip` |
+| `backlogAgingDays` | `backlogAging` |
+
+The UI displays 6 KPI cards: Cycle Time, Time to Market, Flow Efficiency, Reopened, WIP, Backlog Aging.
+
+KPI values are based on the latest snapshot. History is used for deltas and sparklines.
