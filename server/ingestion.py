@@ -186,3 +186,57 @@ def run_ingestion(project_key, base_url, email, api_token, jql, db_path="snapsho
     ts = save_snapshot(project_key, metrics, db_path)
     print(f"[ingestion] {project_key}: snapshot saved at {ts} — {metrics}")
     return metrics
+
+
+def run_ingestion_with_adapter(project_key, source, config, db_path="snapshots.db"):
+    """Full ingestion pipeline using any registered adapter.
+
+    Parameters
+    ----------
+    project_key : str
+        Unique project identifier used as the storage key.
+    source : str
+        One of: "jira", "linear", "asana", "clickup".
+    config : dict
+        Adapter-specific configuration keys (see build_adapter docstring).
+    db_path : str
+        SQLite database path for snapshot storage.
+
+    The pipeline is identical to run_ingestion() but delegates fetch+normalise
+    to the appropriate Adapter subclass, so all adapters share the same metrics
+    calculation and snapshot storage logic.
+    """
+    from server.adapters import build_adapter
+
+    print(f"[ingestion] {project_key}: fetching via {source} adapter…")
+    adapter = build_adapter(source, config)
+    issues  = adapter.fetch_and_normalize()
+
+    if not issues:
+        raise ValueError(f"{source} adapter returned no issues; snapshot was not saved")
+
+    # Step 1 — compute mapped once, reuse everywhere
+    mapped = [_map_issue(issue) for issue in issues]
+
+    # Structural metrics (backlog, inProgress, reopened, aging)
+    metrics = calculate_metrics(issues, mapped=mapped)
+
+    # Previous snapshot for interval boundary (flow metrics only)
+    prev     = get_latest(project_key, db_path)
+    since_ts = prev["timestamp"] if prev else None
+
+    # Step 2–3: interval-based completed list
+    completed_interval = _get_completed_in_interval(mapped, since_ts)
+    metrics["throughput"] = len(completed_interval)
+
+    # Step 5–7: flow metrics from interval (same window for all three)
+    completed_all = [m for m in mapped if m["resolved_at"]]
+    flow_source   = completed_interval if completed_interval else completed_all
+    metrics.update(calculate_flow_metrics(flow_source))
+
+    # Step 8: predictability (rolling 30d window approximation)
+    metrics["predictabilityPercent"] = _calc_predictability(mapped)
+
+    ts = save_snapshot(project_key, metrics, db_path)
+    print(f"[ingestion] {project_key}: snapshot saved at {ts} — {metrics}")
+    return metrics
