@@ -188,7 +188,7 @@ function StatusPill({ state }) {
 
 export default function App() {
   const creds = useCredentials();
-  const { projects, activeId, setActiveId, active, addProject, removeProject, updateJql } = useProjects();
+  const { projects, activeId, setActiveId, active, addProject, removeProject } = useProjects();
 
   const [snapshots,  setSnapshots]  = useState([]);
   const [analysis,   setAnalysis]   = useState(null);
@@ -306,8 +306,6 @@ export default function App() {
         <Sidebar
           creds={creds}
           onConnect={() => creds.connect()}
-          activeProject={active}
-          onJqlChange={jql => active && updateJql(active.id, jql)}
           onDemo={handleDemo}
         />
       )}

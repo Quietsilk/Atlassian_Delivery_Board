@@ -57,29 +57,76 @@ def handle_get_history(handler, db_path):
 def handle_post_sync(handler, db_path, jira_credentials):
     """POST /sync — triggers ingestion asynchronously.
 
-    Body (JSON): { project, baseUrl, email, apiToken, jql }
+    Jira body  (JSON): { project, baseUrl, email, apiToken, jql }
+    Linear body       : { project, source:"linear",  apiKey, teamId [, filter_] }
+    Asana body        : { project, source:"asana",   accessToken, projectGid }
+    ClickUp body      : { project, source:"clickup", apiKey, listId }
+
     Returns immediately with { ok: true, queued: true }.
     Does NOT return metrics — caller must poll /latest.
     """
     length = int(handler.headers.get("Content-Length", 0))
     body = json.loads(handler.rfile.read(length)) if length else {}
 
-    project   = body.get("project", "").strip()
-    base_url  = body.get("baseUrl",  jira_credentials.get("base_url",  "")).rstrip("/")
-    email     = body.get("email",    jira_credentials.get("email",     ""))
-    api_token = body.get("apiToken", jira_credentials.get("api_token", ""))
-    jql       = body.get("jql",      "").strip()
+    project = body.get("project", "").strip()
+    source  = body.get("source",  "jira").lower().strip()
 
-    if not all([project, base_url, email, api_token, jql]):
-        _json_response(handler, 400, {"ok": False, "error": "project, baseUrl, email, apiToken, jql required"})
+    if not project:
+        _json_response(handler, 400, {"ok": False, "error": "project is required"})
         return
 
+    # ── Build adapter config per source ─────────────────────────────────────
+    if source == "jira":
+        base_url  = body.get("baseUrl",  jira_credentials.get("base_url",  "")).rstrip("/")
+        email     = body.get("email",    jira_credentials.get("email",     ""))
+        api_token = body.get("apiToken", jira_credentials.get("api_token", ""))
+        jql       = body.get("jql", "").strip()
+        if not all([base_url, email, api_token, jql]):
+            _json_response(handler, 400, {"ok": False,
+                "error": "jira requires: baseUrl, email, apiToken, jql"})
+            return
+        config = {"base_url": base_url, "email": email, "api_token": api_token, "jql": jql}
+
+    elif source == "linear":
+        api_key = body.get("apiKey", "").strip()
+        team_id = body.get("teamId", "").strip()
+        if not all([api_key, team_id]):
+            _json_response(handler, 400, {"ok": False,
+                "error": "linear requires: apiKey, teamId"})
+            return
+        config = {"api_key": api_key, "team_id": team_id,
+                  "filter_": body.get("filter_", {})}
+
+    elif source == "asana":
+        access_token = body.get("accessToken", "").strip()
+        project_gid  = body.get("projectGid",  "").strip()
+        if not all([access_token, project_gid]):
+            _json_response(handler, 400, {"ok": False,
+                "error": "asana requires: accessToken, projectGid"})
+            return
+        config = {"access_token": access_token, "project_gid": project_gid}
+
+    elif source == "clickup":
+        api_key = body.get("apiKey", "").strip()
+        list_id = body.get("listId", "").strip()
+        if not all([api_key, list_id]):
+            _json_response(handler, 400, {"ok": False,
+                "error": "clickup requires: apiKey, listId"})
+            return
+        config = {"api_key": api_key, "list_id": list_id}
+
+    else:
+        _json_response(handler, 400, {"ok": False,
+            "error": f"unknown source {source!r}; supported: jira, linear, asana, clickup"})
+        return
+
+    # ── Launch background ingestion thread ───────────────────────────────────
     def _run():
-        from server.ingestion import run_ingestion
+        from server.ingestion import run_ingestion_with_adapter
         try:
-            run_ingestion(project, base_url, email, api_token, jql, db_path)
+            run_ingestion_with_adapter(project, source, config, db_path)
         except Exception as e:
-            print(f"[api] sync error for {project}: {e}")
+            print(f"[api] sync error for {project} ({source}): {e}")
 
     threading.Thread(target=_run, daemon=True).start()
     _json_response(handler, 202, {"ok": True, "queued": True})
