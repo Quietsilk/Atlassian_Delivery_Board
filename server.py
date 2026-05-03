@@ -2,10 +2,15 @@
 """AI Delivery Analyst — main entry point.
 
 Routes:
-  GET  /               → dashboard HTML
+  GET  /               → React dashboard (dashboard/dist/index.html if built,
+                         otherwise redirect to http://localhost:5173 dev server)
   GET  /latest         → latest snapshot
   GET  /history        → snapshot history
   POST /sync           → trigger ingestion
+
+Dashboard (React + Vite):
+  Dev:  cd dashboard && npm run dev   → http://localhost:5173
+  Prod: cd dashboard && npm run build → dist/ served by this server at GET /
 
 Background scheduler: SYNC_INTERVAL_SECONDS (default 3600).
 Configured projects: PROJECTS env var (JSON array).
@@ -62,16 +67,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
 
     def _serve_html(self):
-        html_path = os.path.join(os.path.dirname(__file__), "ai-delivery-analyst-dashboard.html")
-        with open(html_path, "rb") as f:
-            body = f.read()
-        self.send_response(200)
-        self.send_header("Content-Type",    "text/html; charset=utf-8")
-        self.send_header("Content-Length",  str(len(body)))
-        self.send_header("Cache-Control",   "no-store, no-cache, must-revalidate")
-        self.send_header("Pragma",          "no-cache")
-        self.end_headers()
-        self.wfile.write(body)
+        """Serve React dashboard.
+
+        Production: serves dashboard/dist/index.html (after npm run build).
+        Development: redirects to Vite dev server on port 5173.
+        """
+        dist_path = os.path.join(os.path.dirname(__file__), "dashboard", "dist", "index.html")
+        if os.path.exists(dist_path):
+            with open(dist_path, "rb") as f:
+                body = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type",   "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control",  "no-store, no-cache, must-revalidate")
+            self.send_header("Pragma",         "no-cache")
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            # No production build — redirect to Vite dev server
+            self.send_response(302)
+            self.send_header("Location", "http://localhost:5173")
+            self.end_headers()
 
     def _json(self, code, data):
         body = json.dumps(data).encode()
