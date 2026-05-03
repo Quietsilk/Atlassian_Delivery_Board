@@ -117,21 +117,7 @@ Jira Raw Issue
 
 ## Frontend — два варианта
 
-### main ветка: `ai-delivery-analyst-dashboard.html`
-
-Однофайловый, без сборки, без фреймворков. Read-only UI.
-
-**Ключевые функции:**
-
-| Функция | Что делает |
-|---|---|
-| `refreshDashboard()` | GET /latest → updateDashboard + loadHistory; при 404 — auto-trigger POST /sync + polling |
-| `loadHistory()` | GET /history → рисует SVG-спарклайны |
-| `_postSync()` | POST /sync — запускает фоновый ингест |
-| `_pollLatest(attempts)` | Поллинг GET /latest каждые 3s (до 20 попыток = ~60s) |
-| `switchProject(id)` | Переключает таб → сбрасывает prevKpi → вызывает refreshDashboard |
-
-### react-redesign ветка: `dashboard/` (React 19 + Vite)
+### `dashboard/` (React 18 + Vite)
 
 Компонентный React-дашборд, запускается на порту 5173.
 

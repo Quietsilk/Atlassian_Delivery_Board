@@ -10,7 +10,7 @@ https://github.com/Quietsilk/AI-Delivery-Analyst
 
 ## Стек
 
-Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses API (o4-mini) · Vanilla JS/HTML дашборд
+Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses API (o4-mini) · React 18 + Vite (dashboard/)
 
 ---
 
@@ -19,9 +19,9 @@ Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses 
 Три слоя:
 
 **`server.py`** — тонкий HTTP-роутер:
-- `GET /` → отдаёт `ai-delivery-analyst-dashboard.html`
+- `GET /` → `dashboard/dist/index.html` если собран; иначе redirect → `localhost:5173`
 - `GET /latest?project=KEY` → последний снапшот из SQLite
-- `GET /history?project=KEY&period=7d|30d|90d` → история снапшотов
+- `GET /history?project=KEY` → история снапшотов
 - `POST /sync` → запускает `run_ingestion` в фоновом потоке → `{ok, queued}`
 
 **`server/`** — пакет с бизнес-логикой:
@@ -34,14 +34,17 @@ Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses 
 | `api.py` | `handle_get_latest`, `handle_get_history`, `handle_post_sync` |
 | `scheduler.py` | `start_scheduler(projects, db_path, interval)` |
 
-**`ai-delivery-analyst-dashboard.html`** — read-only браузерный UI:
-- Вводит Jira credentials (хранит в localStorage)
-- Управляет проектными табами, автоматически переключает данные при смене таба
-- При `GET /latest → 404` автоматически запускает `POST /sync` + поллит каждые 3s
-- Параллельно запрашивает `GET /latest` и `GET /history`
-- 6 KPI-карточек (3×2 сетка): Cycle Time · Time to Market · Flow Efficiency / Reopened · WIP · Backlog Aging
-- AI-блок сразу под KPI; period picker и графики удалены (UI Simplification MVP)
-- Кнопка "⚡ Load demo data" закреплена в сайдбаре (всегда доступна)
+**`dashboard/`** — React 18 + Vite дашборд:
+- Dev: `cd dashboard && npm run dev` → `http://localhost:5173`
+- Prod: `cd dashboard && npm run build` → `dist/` раздаётся через `server.py GET /`
+- Jira credentials → localStorage (`ada:baseUrl`, `ada:email`, `ada:token`)
+- Multi-project табы → localStorage (`ada:projects-v2`, `ada:activeId`)
+- 6 KPI-карточек (3×2 сетка): Cycle Time · Time to Market · Flow Efficiency · Reopened · WIP · Backlog Aging
+- Sparklines, delta %, P85, статус-бары (good/warn/bad), AI Insights panel
+- Demo-кнопка в сайдбаре (всегда доступна без синка)
+- Компоненты: `KpiCard`, `AIPanel`, `Sidebar`, `Sparkline`, `TweaksPanel`
+- Хуки: `useCredentials`, `useProjects`
+- Дизайн-токены: `src/tokens.js`
 
 ---
 

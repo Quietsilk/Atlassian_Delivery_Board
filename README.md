@@ -35,17 +35,17 @@ python3 server.py
 
 Jira credentials вводятся в дашборде и хранятся в localStorage браузера.
 
-### React-дашборд (ветка react-redesign)
+### Дашборд (React + Vite)
 
 ```bash
-git checkout react-redesign
-cd dashboard
-npm install
-npm run dev
-# → http://localhost:5173
-```
+# Dev-режим
+cd dashboard && npm install && npm run dev
+# → http://localhost:5173  (требует запущенного server.py на :5678)
 
-Требует запущенного `python3 server.py` на порту 5678 для API.
+# Production build — раздаётся через server.py GET /
+cd dashboard && npm run build
+# → dashboard/dist/  →  http://localhost:5678
+```
 
 ---
 
@@ -53,8 +53,7 @@ npm run dev
 
 - **Python 3.9+** — stdlib-only, zero dependencies
 - **SQLite** — персистентное хранение снапшотов через `server/storage.py`
-- **HTML/CSS/JS** — однофайловый дашборд `main` ветки, read-only UI
-- **React 19 + Vite** — новый дашборд (`react-redesign` ветка, `dashboard/`)
+- **React 18 + Vite** — дашборд (`dashboard/`)
 - **Jira Cloud REST API** — `/rest/api/3/search/jql` + `/rest/api/3/issue/{key}/changelog`
 - **OpenAI Responses API** — модель `o4-mini`, опционально
 
@@ -72,8 +71,7 @@ ai-delivery-analyst/
 │   ├── ingestion.py                   # fetch + metrics + save
 │   ├── api.py                         # HTTP handlers (GET /latest, GET /history, POST /sync)
 │   └── scheduler.py                   # Фоновый daemon-поток для автосинка
-├── ai-delivery-analyst-dashboard.html # UI (single file, main ветка)
-├── dashboard/                         # React+Vite дашборд (react-redesign ветка)
+├── dashboard/                         # React 18 + Vite дашборд
 │   ├── src/
 │   │   ├── App.jsx                    # Корневой компонент: layout, sync, tweaks
 │   │   ├── api.js                     # fetchLatest, fetchHistory, postSync
@@ -108,7 +106,7 @@ ai-delivery-analyst/
 
 | Метод | Путь | Описание |
 |---|---|---|
-| `GET` | `/` | Дашборд HTML (main ветка) |
+| `GET` | `/` | React дашборд (`dashboard/dist/`) или redirect → `:5173` |
 | `GET` | `/latest?project=KEY` | Последний снапшот проекта |
 | `GET` | `/history?project=KEY` | История снапшотов |
 | `POST` | `/sync` | Запустить ингест в фоне → `{ok, queued}` |
