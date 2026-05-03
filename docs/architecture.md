@@ -3,20 +3,20 @@
 ## Обзор
 
 ```
-Browser (dashboard.html — read-only UI)
+Browser (UI — read-only)
     │
     ├── GET  /latest?project=KEY       ← читает последний снапшот
-    ├── GET  /history?project=KEY&period=30d  ← читает историю
+    ├── GET  /history?project=KEY      ← читает историю
     └── POST /sync  { project, creds, jql }  ← запускает ингест в фоне
             │
             ▼
-server.py  (тонкий HTTP-роутер)
+server.py  (тонкий HTTP-роутер, порт 5678)
             │
             ├── server/api.py          ← handle_get_latest, handle_get_history, handle_post_sync
             │
             ├── server/ingestion.py    ← fetch_jira → calculate_metrics → save_snapshot
             │       │
-            │       ├── server_app.fetch_jira()
+            │       ├── fetch_jira()
             │       │       ├── POST /rest/api/3/search/jql  (пагинация, PAGE_SIZE=50)
             │       │       └── GET  /rest/api/3/issue/{key}/changelog  (параллельно, 10 потоков)
             │       │
@@ -24,7 +24,6 @@ server.py  (тонкий HTTP-роутер)
             │               ├── Cycle Time        (последний started_at → resolved_at)
             │               ├── Time to Market    (created_at → resolved_at)
             │               ├── Flow Efficiency   (cycleTime / timeToMarket × 100, cap 100%)
-            │               ├── Throughput        (выставляется в ingestion, не в metrics)
             │               └── Backlog / WIP / Reopened
             │
             ├── server/storage.py      ← SQLite CRUD
@@ -44,11 +43,11 @@ server.py  (тонкий HTTP-роутер)
 **Инвариант 2 — Иммутабельные снапшоты.**
 Каждый запуск ingestion создаёт новую строку в SQLite. Никаких UPDATE/DELETE.
 
-**Инвариант 3 — Throughput = дельта снапшотов.**
-`throughput` = количество задач, resolved с момента предыдущего снапшота. Вычисляется в `ingestion.py`, не в `metrics.py`.
+**Инвариант 3 — `completedCount` кумулятивный.**
+Хранится нарастающим итогом. Throughput за период = `ΔcompletedCount`.
 
 **Инвариант 4 — Period без пересчёта.**
-`GET /history?period=30d` фильтрует строки SQLite по полю `timestamp`. Метрики не пересчитываются.
+`GET /history` фильтрует строки SQLite по полю `timestamp`. Метрики не пересчитываются.
 
 **Инвариант 5 — `calculate_metrics` без `period`.**
 Функция `calculate_metrics(issues)` не принимает `cutoff`/`period` в сигнатуре.
@@ -62,7 +61,7 @@ CREATE TABLE snapshots (
     id           INTEGER PRIMARY KEY,
     project_key  TEXT NOT NULL,
     timestamp    TEXT NOT NULL,   -- ISO 8601
-    metrics_json TEXT NOT NULL    -- JSON: cycleTimeDays, throughput, …
+    metrics_json TEXT NOT NULL    -- JSON: cycleTime, wip, reopenRate, …
 );
 ```
 
@@ -76,7 +75,7 @@ CREATE TABLE snapshots (
 |---|---|---|
 | `metrics.py` | `calculate_metrics(issues)` | Чистая функция, нет side-эффектов |
 | `storage.py` | `init_db`, `save_snapshot`, `get_latest`, `get_history`, `get_previous_snapshot` | SQLite CRUD |
-| `ingestion.py` | `run_ingestion(project_key, base_url, email, api_token, jql, db_path)` | Полный pipeline: fetch → metrics → throughput delta → save |
+| `ingestion.py` | `run_ingestion(project_key, base_url, email, api_token, jql, db_path)` | Полный pipeline: fetch → metrics → save |
 | `api.py` | `handle_get_latest`, `handle_get_history`, `handle_post_sync` | HTTP handlers |
 | `scheduler.py` | `start_scheduler(projects, db_path, interval)` | Daemon-поток |
 
@@ -98,22 +97,23 @@ Jira Raw Issue
             │
             ▼
     Metrics dict
-            cycleTimeDays, timeToMarketDays, flowEfficiencyPercent,
-            throughput (выставляется ingestion), backlogSize,
-            inProgressCount, reopenedCount
+            cycleTime, cycleTimeP85, timeToMarket, timeToMarketP85,
+            flowEfficiency, wip, reopenRate, backlogAging, completedCount
             │
             ▼
     SQLite snapshot
             project_key, timestamp, metrics_json
             │
             ▼  GET /latest или GET /history
-    Browser (dashboard.html)
-            updateDashboard(metrics) + drawChart(snapshots)
+    Browser (UI)
+            KpiCard × 6 + AIPanel + Sparklines
 ```
 
 ---
 
-## Frontend (dashboard.html)
+## Frontend — два варианта
+
+### main ветка: `ai-delivery-analyst-dashboard.html`
 
 Однофайловый, без сборки, без фреймворков. Read-only UI.
 
@@ -122,48 +122,53 @@ Jira Raw Issue
 | Функция | Что делает |
 |---|---|
 | `refreshDashboard()` | GET /latest → updateDashboard + loadHistory; при 404 — auto-trigger POST /sync + polling |
-| `loadHistory()` | GET /history → drawChart + drawThroughputChart |
+| `loadHistory()` | GET /history → рисует SVG-спарклайны |
 | `_postSync()` | POST /sync — запускает фоновый ингест |
 | `_pollLatest(attempts)` | Поллинг GET /latest каждые 3s (до 20 попыток = ~60s) |
-| `updateDataAge(ts)` | Показывает "Updated Xm ago" в статус-строке |
 | `switchProject(id)` | Переключает таб → сбрасывает prevKpi → вызывает refreshDashboard |
-| `drawChart(snapshots)` | Рисует SVG-тренд Cycle Time из массива `{timestamp, metrics}` |
-| `drawThroughputChart(snapshots)` | Рисует SVG-тренд Throughput |
 
-**LocalStorage-ключи:**
+### react-redesign ветка: `dashboard/` (React 18 + Vite)
+
+Компонентный React-дашборд, запускается на порту 5173.
+
+**Компоненты:**
+
+| Компонент | Назначение |
+|---|---|
+| `App.jsx` | Root: layout, sync-flow с поллингом, tweaks-состояние |
+| `KpiCard.jsx` | KPI-карточка: status stripe, sparkline, большое значение, delta %, P85, прогресс-бар |
+| `AIPanel.jsx` | Summary / Risks / Actions tabs; glowing dot при наличии analysis |
+| `Sidebar.jsx` | Jira credentials, JQL, `⚡ Load demo data` — всегда в сайдбаре |
+| `Sparkline.jsx` | SVG polyline, цвет = зелёный если улучшение, серый иначе |
+| `TweaksPanel` | Inline в App.jsx: kpiStyle (rich/minimal), density (comfortable/compact), aiTop |
+
+**Хуки:**
+
+| Хук | Назначение |
+|---|---|
+| `useCredentials` | Jira URL/email/token → localStorage (`ada:baseUrl`, `ada:email`, `ada:token`) |
+| `useProjects` | Multi-project tabs → localStorage (`ada:projects-v2`) |
+
+**LocalStorage-ключи (React-дашборд):**
 
 | Ключ | Содержимое |
 |---|---|
 | `ada:baseUrl` | Jira URL |
 | `ada:email` | Jira email |
 | `ada:token` | Jira API token |
-| `ada:projects` | JSON: массив проектных табов |
-| `ada:activeId` | ID активного проекта |
-| `ada:period` | Активный period-фильтр |
-| `ada:sidebarCollapsed` | Булево: состояние сайдбара |
+| `ada:projects-v2` | JSON: массив `{id, label, jql}` |
 
-`ada:runHistory` **удалён** — история хранится в SQLite, читается через API.
-
----
-
-## Auto-sync flow
+**Sync flow:**
 
 ```
-refreshDashboard()
+handleSync()
     │
-    GET /latest?project=KEY
+    POST /sync
     │
-    ├── 200 → updateDashboard(metrics) + loadHistory()
+    poll каждые 3s: GET /history + GET /latest
     │
-    └── 404 → POST /sync (тихо)
-                │
-                _pollLatest(attempts=0)
-                │
-                каждые 3s: GET /latest
-                │
-                ├── 200 → refreshDashboard()  ← данные готовы
-                └── 404 → _pollLatest(attempts+1)  ← ждём ещё
-                           (до 20 попыток = ~60s, затем timeout)
+    ├── analysis ready → setSyncState("done")
+    └── 10 попыток × 3s = 30s timeout → setSyncState("done")
 ```
 
 ---
@@ -176,9 +181,3 @@ DONE    = {"done", "closed", "resolved", "выполнено", "complete"}
 ```
 
 Все сравнения case-insensitive (`.lower()`). Changelog запрашивается для всех задач.
-
----
-
-## Legacy
-
-`server_app.py` (переименован из старого `server.py`) — сохранён для обратной совместимости. Эндпоинт `POST /webhook/sync-report` делегирует сюда. Не удалять — используется в legacy-интеграциях.
