@@ -27,17 +27,20 @@ export default function AIPanel({ analysis, prominent }) {
             AI Insights
           </span>
         </div>
-        <div style={{ display: "flex", gap: 2 }}>
-          {TABS.map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              padding: "5px 12px", border: "none", borderRadius: 6,
-              background: tab === t ? "rgba(79,124,255,0.15)" : "transparent",
-              color: tab === t ? "#4f7cff" : "rgba(255,255,255,0.35)",
-              fontSize: "0.73rem", fontWeight: 600, cursor: "pointer",
-              letterSpacing: "0.02em", transition: "all 0.15s", textTransform: "capitalize",
-            }}>{t}</button>
-          ))}
-        </div>
+        {/* Tab bar — only shown when analysis is available */}
+        {analysis && (
+          <div style={{ display: "flex", gap: 2 }}>
+            {TABS.map(t => (
+              <button key={t} onClick={() => setTab(t)} style={{
+                padding: "5px 12px", border: "none", borderRadius: 6,
+                background: tab === t ? "rgba(79,124,255,0.15)" : "transparent",
+                color: tab === t ? "#4f7cff" : "rgba(255,255,255,0.35)",
+                fontSize: "0.73rem", fontWeight: 600, cursor: "pointer",
+                letterSpacing: "0.02em", transition: "all 0.15s", textTransform: "capitalize",
+              }}>{t}</button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Content */}

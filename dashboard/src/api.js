@@ -1,19 +1,38 @@
 const BASE = "http://localhost:5678";
 
+/**
+ * Safely parse analysis — backend may return:
+ *  - already-parsed object { summary, risks, actions }
+ *  - JSON string (raw OpenAI output)
+ *  - null / undefined
+ */
+function parseAnalysis(raw) {
+  if (!raw) return null;
+  if (typeof raw === "object" && raw.summary) return raw;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.summary) return parsed;
+    } catch {}
+  }
+  return null;
+}
+
 function normalizeSnapshot(snapshot) {
   if (!snapshot) return null;
   const metrics = snapshot.metrics || snapshot;
+  const rawAnalysis = metrics.analysis ?? snapshot.analysis ?? null;
   return {
     timestamp: snapshot.timestamp || null,
-    cycleTime: metrics.cycleTimeP50 ?? metrics.cycleTimeDays ?? metrics.cycleTime ?? 0,
-    cycleTimeP85: metrics.cycleTimeP85 ?? 0,
-    timeToMarket: metrics.timeToMarketP50 ?? metrics.timeToMarketDays ?? metrics.timeToMarket ?? 0,
+    cycleTime:     metrics.cycleTimeP50     ?? metrics.cycleTimeDays    ?? metrics.cycleTime    ?? 0,
+    cycleTimeP85:  metrics.cycleTimeP85     ?? 0,
+    timeToMarket:  metrics.timeToMarketP50  ?? metrics.timeToMarketDays ?? metrics.timeToMarket ?? 0,
     timeToMarketP85: metrics.timeToMarketP85 ?? 0,
     flowEfficiency: metrics.flowEfficiencyPercent ?? metrics.flowEfficiency ?? 0,
-    reopened: metrics.reopenedCount ?? metrics.reopened ?? 0,
-    wip: metrics.inProgressCount ?? metrics.wip ?? 0,
+    reopened:   metrics.reopenedCount ?? metrics.reopened    ?? 0,
+    wip:        metrics.inProgressCount ?? metrics.wip        ?? 0,
     backlogAging: metrics.backlogAgingDays ?? metrics.backlogAging ?? 0,
-    analysis: metrics.analysis ?? snapshot.analysis ?? null,
+    analysis: parseAnalysis(rawAnalysis),
   };
 }
 
