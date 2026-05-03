@@ -14,6 +14,8 @@
 6. Дашборд читает снапшоты через REST API (read-only UI)
 7. Фоновый планировщик автоматически синхронизирует проекты по расписанию
 
+Если Jira-запрос возвращает 0 задач, ingestion не сохраняет новый снапшот. Это защищает дашборд от ложных all-zero данных при ошибочном JQL, credentials или пустой выборке.
+
 ---
 
 ## Quick start
@@ -52,7 +54,7 @@ npm run dev
 - **Python 3.9+** — stdlib-only, zero dependencies
 - **SQLite** — персистентное хранение снапшотов через `server/storage.py`
 - **HTML/CSS/JS** — однофайловый дашборд `main` ветки, read-only UI
-- **React 18 + Vite** — новый дашборд (`react-redesign` ветка, `dashboard/`)
+- **React 19 + Vite** — новый дашборд (`react-redesign` ветка, `dashboard/`)
 - **Jira Cloud REST API** — `/rest/api/3/search/jql` + `/rest/api/3/issue/{key}/changelog`
 - **OpenAI Responses API** — модель `o4-mini`, опционально
 
@@ -118,20 +120,18 @@ ai-delivery-analyst/
   "snapshot": {
     "timestamp": "2026-04-26T10:00:00+00:00",
     "metrics": {
-      "cycleTime": 5.0,
+      "cycleTimeP50": 5.0,
       "cycleTimeP85": 17.8,
-      "timeToMarket": 12.0,
+      "timeToMarketP50": 12.0,
       "timeToMarketP85": 62.2,
-      "flowEfficiency": 41.7,
+      "flowEfficiencyPercent": 41.7,
       "completedCount": 147,
-      "wip": 9,
-      "reopenRate": 4.2,
-      "backlogAging": 28.3
-    },
-    "analysis": {
-      "summary": "...",
-      "risks": ["..."],
-      "actions": ["..."]
+      "throughput": 3,
+      "inProgressCount": 9,
+      "reopenedCount": 2,
+      "backlogSize": 56,
+      "backlogAgingDays": 28.3,
+      "predictabilityPercent": 59.1
     }
   }
 }
@@ -147,6 +147,8 @@ ai-delivery-analyst/
   "jql": "project = KEY ORDER BY updated DESC"
 }
 ```
+
+`POST /sync` возвращает только `{ok, queued}`. UI считает синк успешным после появления нового snapshot `timestamp` в `/latest`; AI-анализ опционален и не является условием успешного синка.
 
 ---
 
@@ -174,11 +176,11 @@ ai-delivery-analyst/
 
 | Метрика | Определение | Хорошо | Плохо |
 |---|---|---|---|
-| **Cycle Time** | Медиана: последний старт → Done | ≤ 3d | ≥ 7d |
-| **Time to Market** | Медиана: создание → Done | ≤ 7d | ≥ 14d |
-| **Flow Efficiency** | cycleTime / timeToMarket × 100% | ≥ 40% | ≤ 20% |
-| **Reopened Rate** | Задачи из Done / всего закрытых, % | ≤ 5% | ≥ 15% |
-| **WIP** | Задачи в статусе In Progress | ≤ 10 | ≥ 20 |
+| **Cycle Time** | P50/P85: последний старт → Done | P50 ≤ 5d | P50 ≥ 10d |
+| **Time to Market** | P50/P85: создание → Done | P50 ≤ 10d | P50 ≥ 20d |
+| **Flow Efficiency** | cycleTimeP50 / timeToMarketP50 × 100%, cap 100% | ≥ 40% | ≤ 15% |
+| **Reopened** | Задачи, вернувшиеся из Done хотя бы раз | = 0 | ≥ 3 |
+| **WIP** | Задачи в статусе In Progress | ≤ 5 | ≥ 15 |
 | **Backlog Aging** | Среднее кол-во дней в бэклоге | ≤ 14d | ≥ 30d |
 
 ---
@@ -206,7 +208,8 @@ python3 -m unittest discover -s tests -v
 2. **Иммутабельные снапшоты** — только INSERT в SQLite, никогда UPDATE/DELETE
 3. **`completedCount` = кумулятивный** — всего завершённых задач на момент синка
 4. **Flow metrics раздельно** — `calculate_metrics` возвращает структурные метрики; `calculate_flow_metrics(completed_items)` — P50/P85 flow-метрики
-5. **`calculate_metrics` без period** — чистая функция, нет параметров cutoff/period
+5. **Пустой Jira-result не сохраняется** — если JQL вернул 0 задач, новый snapshot не создаётся
+6. **`calculate_metrics` без period** — чистая функция, нет параметров cutoff/period
 
 ---
 

@@ -124,6 +124,12 @@ class TestRunIngestion(unittest.TestCase):
         result = get_latest("PROJ", self.db)
         self.assertIsNotNone(result)
 
+    def test_empty_jira_result_does_not_save_snapshot(self):
+        with self._mock_fetch([]):
+            with self.assertRaises(ValueError):
+                run_ingestion("PROJ", "https://j.test", "u", "t", "project=X", self.db)
+        self.assertIsNone(get_latest("PROJ", self.db))
+
     def test_metrics_contain_required_keys(self):
         with self._mock_fetch([DONE_ISSUE]):
             m = run_ingestion("PROJ", "https://j.test", "u", "t", "project=X", self.db)

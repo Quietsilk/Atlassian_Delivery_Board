@@ -6,7 +6,12 @@ function load() {
   try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; }
 }
 function save(v) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(v)); } catch {}
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(v));
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 export function useProjects() {

@@ -11,6 +11,15 @@ import { DEMO_HISTORY, DEMO_ANALYSIS } from "./demo";
 
 function round1(n) { return Math.round(n * 10) / 10; }
 
+function mergeHistoryWithLatest(history, latest) {
+  const result = [...(history || [])];
+  if (!latest) return result;
+  const lastIndex = result.findIndex(s => s.timestamp === latest.timestamp);
+  if (lastIndex >= 0) result[lastIndex] = latest;
+  else result.push(latest);
+  return result;
+}
+
 function buildKpis(snaps, rich) {
   if (!snaps || snaps.length === 0) return null;
   const last = snaps[snaps.length - 1];
@@ -66,16 +75,16 @@ function buildKpis(snaps, rich) {
       tooltip: "% of total lead time the item was actively worked on",
     },
     {
-      label: "Reopened Rate",
-      sublabel: "Reopened / Closed",
-      value: round1(last.reopenRate ?? 0),
-      unit: "%",
-      delta: delta(last.reopenRate, prev?.reopenRate, true),
-      status: last.reopenRate == null ? "neutral" : last.reopenRate <= 5 ? "good" : last.reopenRate <= 15 ? "warn" : "bad",
-      history: hist("reopenRate"),
+      label: "Reopened",
+      sublabel: "Reopened issues",
+      value: last.reopened ?? 0,
+      unit: null,
+      delta: delta(last.reopened, prev?.reopened, true),
+      status: last.reopened == null ? "neutral" : last.reopened <= 0 ? "good" : last.reopened < 3 ? "warn" : "bad",
+      history: hist("reopened"),
       lowerBetter: true,
-      barMax: 30,
-      tooltip: "Percentage of completed issues that were reopened",
+      barMax: 10,
+      tooltip: "Number of completed issues that were reopened at least once",
     },
     {
       label: "WIP",
@@ -180,47 +189,77 @@ export default function App() {
   const [analysis,   setAnalysis]   = useState(null);
   const [syncState,  setSyncState]  = useState("idle"); // idle | syncing | done | error | demo
   const [syncError,  setSyncError]  = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tweaksOpen,  setTweaksOpen]  = useState(false);
   const [newLabel,    setNewLabel]    = useState("");
   const [tweaks, setTweaks] = useState({ kpiStyle: "rich", density: "comfortable", aiTop: false });
 
   const pollRef = useRef(null);
+  const activeProjectKey = active?.label || null;
+
+  const resetBoard = useCallback(() => {
+    setSnapshots([]);
+    setAnalysis(null);
+    setSyncState("idle");
+    setSyncError(null);
+  }, []);
 
   /* load data when active project changes */
   useEffect(() => {
-    if (!active) { setSnapshots([]); setAnalysis(null); setSyncState("idle"); return; }
-    fetchHistory(active.id)
-      .then(h => { if (h?.length) { setSnapshots(h); setSyncState("done"); } })
-      .catch(() => {});
-    fetchLatest(active.id)
-      .then(d => { if (d?.analysis) setAnalysis(d.analysis); })
-      .catch(() => {});
-  }, [active?.id]);
+    if (!activeProjectKey) return;
+    let cancelled = false;
+    Promise.all([fetchHistory(activeProjectKey), fetchLatest(activeProjectKey)])
+      .then(([history, latest]) => {
+        if (cancelled) return;
+        const merged = mergeHistoryWithLatest(history, latest);
+        setSnapshots(merged);
+        setAnalysis(latest?.analysis || null);
+        if (merged.length) setSyncState("done");
+      })
+      .catch(() => {
+        // Missing snapshots are a normal pre-sync state.
+      });
+    return () => { cancelled = true; };
+  }, [activeProjectKey]);
 
   /* sync */
   const handleSync = useCallback(async () => {
     if (!active || !creds.connected) return;
+    const previousTimestamp = snapshots.at(-1)?.timestamp || null;
+    clearTimeout(pollRef.current);
     setSyncState("syncing"); setSyncError(null);
     try {
-      await postSync({ project: active.id, baseUrl: creds.baseUrl, email: creds.email, apiToken: creds.apiToken, jql: active.jql });
+      await postSync({ project: active.label, baseUrl: creds.baseUrl, email: creds.email, apiToken: creds.apiToken, jql: active.jql });
       /* poll for results */
       let attempts = 0;
       const poll = async () => {
         try {
-          const h = await fetchHistory(active.id);
-          const d = await fetchLatest(active.id);
-          if (h?.length) { setSnapshots(h); }
-          if (d?.analysis) { setAnalysis(d.analysis); setSyncState("done"); return; }
-        } catch {}
+          const [history, latest] = await Promise.all([
+            fetchHistory(active.label),
+            fetchLatest(active.label),
+          ]);
+          const merged = mergeHistoryWithLatest(history, latest);
+          const latestTimestamp = latest?.timestamp || merged.at(-1)?.timestamp || null;
+          if (latestTimestamp && latestTimestamp !== previousTimestamp) {
+            setSnapshots(merged);
+            setAnalysis(latest?.analysis || null);
+            setSyncState("done");
+            return;
+          }
+        } catch {
+          // Keep polling through transient backend/network errors.
+        }
         if (++attempts < 10) { pollRef.current = setTimeout(poll, 3000); }
-        else { setSyncState("done"); }
+        else {
+          setSyncState("error");
+          setSyncError("Sync did not produce a new snapshot");
+        }
       };
       poll();
     } catch (e) {
       setSyncState("error"); setSyncError(e.message);
     }
-  }, [active, creds]);
+  }, [active, creds, snapshots]);
 
   useEffect(() => () => clearTimeout(pollRef.current), []);
 
@@ -236,9 +275,10 @@ export default function App() {
     const label = newLabel.trim();
     if (!label) return;
     const jql = `project = "${label.toUpperCase().replace(/\s+/g, "-")}" ORDER BY updated DESC`;
+    resetBoard();
     addProject(label, jql);
     setNewLabel("");
-  }, [newLabel, addProject]);
+  }, [newLabel, addProject, resetBoard]);
 
   const rich    = tweaks.kpiStyle === "rich";
   const compact = tweaks.density  === "compact";
@@ -257,14 +297,15 @@ export default function App() {
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
       `}</style>
 
-      <Sidebar
-        open={sidebarOpen}
-        creds={creds}
-        onConnect={() => creds.connect()}
-        activeProject={active}
-        onJqlChange={jql => active && updateJql(active.id, jql)}
-        onDemo={handleDemo}
-      />
+      {sidebarOpen && (
+        <Sidebar
+          creds={creds}
+          onConnect={() => creds.connect()}
+          activeProject={active}
+          onJqlChange={jql => active && updateJql(active.id, jql)}
+          onDemo={handleDemo}
+        />
+      )}
 
       {/* Main */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -272,7 +313,12 @@ export default function App() {
         {/* App bar */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 14px", height: 48, borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0, position: "relative" }}>
           {/* Hamburger */}
-          <button onClick={() => setSidebarOpen(v => !v)} style={{ width: 30, height: 30, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 7, background: "transparent", color: "rgba(255,255,255,0.45)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <button
+            aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            onClick={() => setSidebarOpen(v => !v)}
+            style={{ width: 30, height: 30, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 7, background: "transparent", color: "rgba(255,255,255,0.45)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect y="2" width="14" height="1.5" rx="1" fill="currentColor"/><rect y="6.25" width="14" height="1.5" rx="1" fill="currentColor"/><rect y="10.5" width="14" height="1.5" rx="1" fill="currentColor"/></svg>
           </button>
 
@@ -284,13 +330,13 @@ export default function App() {
           {/* Project tabs */}
           <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, overflow: "hidden", marginLeft: 6 }}>
             {projects.map(p => (
-              <button key={p.id} onClick={() => setActiveId(p.id)} style={{
+              <button key={p.id} onClick={() => { resetBoard(); setActiveId(p.id); }} style={{
                 padding: "4px 10px", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap",
                 background: p.id === activeId ? "rgba(79,124,255,0.15)" : "transparent",
                 color: p.id === activeId ? "#4f7cff" : "rgba(255,255,255,0.4)",
               }}>{p.label}
                 {p.id === activeId && (
-                  <span onClick={e => { e.stopPropagation(); removeProject(p.id); }} style={{ marginLeft: 5, opacity: 0.4, fontSize: "0.7rem" }}>✕</span>
+                  <span onClick={e => { e.stopPropagation(); resetBoard(); removeProject(p.id); }} style={{ marginLeft: 5, opacity: 0.4, fontSize: "0.7rem" }}>✕</span>
                 )}
               </button>
             ))}

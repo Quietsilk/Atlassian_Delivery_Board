@@ -46,10 +46,13 @@ server.py  (тонкий HTTP-роутер, порт 5678)
 **Инвариант 3 — `completedCount` кумулятивный.**
 Хранится нарастающим итогом. Throughput за период = `ΔcompletedCount`.
 
-**Инвариант 4 — Period без пересчёта.**
+**Инвариант 4 — Пустой Jira-result не сохраняется.**
+Если Jira-запрос возвращает 0 задач, ingestion завершается ошибкой без INSERT. Это предотвращает ложные all-zero снапшоты.
+
+**Инвариант 5 — Period без пересчёта.**
 `GET /history` фильтрует строки SQLite по полю `timestamp`. Метрики не пересчитываются.
 
-**Инвариант 5 — `calculate_metrics` без `period`.**
+**Инвариант 6 — `calculate_metrics` без `period`.**
 Функция `calculate_metrics(issues)` не принимает `cutoff`/`period` в сигнатуре.
 
 ---
@@ -61,7 +64,7 @@ CREATE TABLE snapshots (
     id           INTEGER PRIMARY KEY,
     project_key  TEXT NOT NULL,
     timestamp    TEXT NOT NULL,   -- ISO 8601
-    metrics_json TEXT NOT NULL    -- JSON: cycleTime, wip, reopenRate, …
+    metrics_json TEXT NOT NULL    -- JSON: cycleTimeP50, inProgressCount, reopenedCount, …
 );
 ```
 
@@ -97,8 +100,9 @@ Jira Raw Issue
             │
             ▼
     Metrics dict
-            cycleTime, cycleTimeP85, timeToMarket, timeToMarketP85,
-            flowEfficiency, wip, reopenRate, backlogAging, completedCount
+            cycleTimeP50, cycleTimeP85, timeToMarketP50, timeToMarketP85,
+            flowEfficiencyPercent, inProgressCount, reopenedCount,
+            backlogAgingDays, completedCount, throughput
             │
             ▼
     SQLite snapshot
@@ -106,7 +110,7 @@ Jira Raw Issue
             │
             ▼  GET /latest или GET /history
     Browser (UI)
-            KpiCard × 6 + AIPanel + Sparklines
+            KpiCard × 6 + AIPanel
 ```
 
 ---
@@ -127,7 +131,7 @@ Jira Raw Issue
 | `_pollLatest(attempts)` | Поллинг GET /latest каждые 3s (до 20 попыток = ~60s) |
 | `switchProject(id)` | Переключает таб → сбрасывает prevKpi → вызывает refreshDashboard |
 
-### react-redesign ветка: `dashboard/` (React 18 + Vite)
+### react-redesign ветка: `dashboard/` (React 19 + Vite)
 
 Компонентный React-дашборд, запускается на порту 5173.
 
@@ -136,7 +140,7 @@ Jira Raw Issue
 | Компонент | Назначение |
 |---|---|
 | `App.jsx` | Root: layout, sync-flow с поллингом, tweaks-состояние |
-| `KpiCard.jsx` | KPI-карточка: status stripe, sparkline, большое значение, delta %, P85, прогресс-бар |
+| `KpiCard.jsx` | KPI-карточка: status stripe, большое значение, delta, P85, прогресс-бар |
 | `AIPanel.jsx` | Summary / Risks / Actions tabs; glowing dot при наличии analysis |
 | `Sidebar.jsx` | Jira credentials, JQL, `⚡ Load demo data` — всегда в сайдбаре |
 | `Sparkline.jsx` | SVG polyline, цвет = зелёный если улучшение, серый иначе |
@@ -167,8 +171,8 @@ handleSync()
     │
     poll каждые 3s: GET /history + GET /latest
     │
-    ├── analysis ready → setSyncState("done")
-    └── 10 попыток × 3s = 30s timeout → setSyncState("done")
+    ├── новый snapshot timestamp → setSyncState("done")
+    └── 10 попыток × 3s = 30s timeout → setSyncState("error")
 ```
 
 ---

@@ -154,6 +154,8 @@ def run_ingestion(project_key, base_url, email, api_token, jql, db_path="snapsho
     """
     print(f"[ingestion] {project_key}: fetching Jira…")
     issues = fetch_jira(base_url, email, api_token, jql)
+    if not issues:
+        raise ValueError("Jira query returned no issues; snapshot was not saved")
 
     # Step 1 — compute mapped once, reuse everywhere
     mapped = [_map_issue(issue) for issue in issues]
