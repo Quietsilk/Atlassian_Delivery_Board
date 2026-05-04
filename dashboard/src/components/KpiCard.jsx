@@ -1,19 +1,21 @@
 import { useState } from "react";
-import { color, font, radius, transition, statusColors } from "../tokens";
+import { font, radius, transition, getStatusColors } from "../tokens";
+import { useT } from "../context/ThemeContext";
 import Sparkline from "./Sparkline";
 
-function StatusBar({ value, max, clr }) {
+function StatusBar({ value, max, clr, borderSub }) {
   const pct = Math.min(100, (value / max) * 100);
   return (
-    <div style={{ height: 3, background: color.border.subtle, borderRadius: 2, overflow: "hidden", marginTop: 2 }}>
+    <div style={{ height: 3, background: borderSub, borderRadius: 2, overflow: "hidden", marginTop: 2 }}>
       <div style={{ height: "100%", width: `${pct}%`, background: clr, borderRadius: 2, transition: transition.kpiBar }} />
     </div>
   );
 }
 
 export default function KpiCard({ label, sublabel, value, unit, p85, delta, status = "neutral", history, lowerBetter, barMax, rich, compact, tooltip }) {
+  const T   = useT();
+  const sc  = getStatusColors(T, status);
   const [hovered, setHovered] = useState(false);
-  const sc  = statusColors(status);
   const pad = compact ? "12px 14px" : "16px 18px";
   const num = compact ? font.size.kpiSm : font.size.kpiLg;
 
@@ -23,15 +25,17 @@ export default function KpiCard({ label, sublabel, value, unit, p85, delta, stat
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? color.surface.cardHover : color.surface.card,
-        border: `1px solid ${hovered ? color.border.strong : sc.border}`,
+        background: hovered ? T.bgCardHov : T.bgCard,
+        border: `1px solid ${hovered ? T.borderHi : sc.border}`,
         borderRadius: radius.card, padding: pad,
         display: "flex", flexDirection: "column", gap: 6,
-        cursor: "default", transition: `border-color ${transition.normal}, background ${transition.normal}`,
+        cursor: "default",
+        transition: `border-color ${transition.normal}, background ${transition.normal}`,
         position: "relative", overflow: "hidden",
+        boxShadow: T.cardShadow,
       }}
     >
-      {/* Status stripe — 2px top accent, colour only here */}
+      {/* Status stripe */}
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0, height: 2,
         background: sc.stripe,
@@ -44,7 +48,7 @@ export default function KpiCard({ label, sublabel, value, unit, p85, delta, stat
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontSize: font.size.sm, fontWeight: font.weight.semibold,
-            color: color.text.label, textTransform: "uppercase",
+            color: T.textLabel, textTransform: "uppercase",
             letterSpacing: font.tracking.wider,
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>
@@ -52,7 +56,7 @@ export default function KpiCard({ label, sublabel, value, unit, p85, delta, stat
           </div>
           {sublabel && (
             <div style={{
-              fontSize: font.size.xs, color: color.text.sublabel,
+              fontSize: font.size.xs, color: T.textFaint,
               marginTop: 1, fontFamily: font.family.mono,
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>
@@ -67,20 +71,20 @@ export default function KpiCard({ label, sublabel, value, unit, p85, delta, stat
       <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: "auto" }}>
         <span style={{
           fontSize: num, fontWeight: font.weight.extrabold,
-          color: "#fff", letterSpacing: font.tracking.tight,
+          color: T.text, letterSpacing: font.tracking.tight,
           fontFeatureSettings: '"tnum"', lineHeight: 1,
         }}>
           {value}
         </span>
         {unit && (
-          <span style={{ fontSize: "0.9rem", fontWeight: font.weight.semibold, color: color.text.label, marginBottom: 1 }}>
+          <span style={{ fontSize: "0.9rem", fontWeight: font.weight.semibold, color: T.textLabel, marginBottom: 1 }}>
             {unit}
           </span>
         )}
         {delta && (
           <span style={{
             fontSize: font.size.sm, fontWeight: font.weight.semibold,
-            color: delta.good ? color.good.fg : color.bad.fg,
+            color: delta.good ? T.good : T.bad,
             marginLeft: 4, marginBottom: 2,
           }}>
             {delta.text}
@@ -92,11 +96,11 @@ export default function KpiCard({ label, sublabel, value, unit, p85, delta, stat
       {rich && (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {p85 && (
-            <div style={{ fontSize: "0.68rem", color: color.text.sublabel, fontFamily: font.family.mono }}>
+            <div style={{ fontSize: "0.68rem", color: T.textFaint, fontFamily: font.family.mono }}>
               P85 {p85}
             </div>
           )}
-          {barMax && <StatusBar value={parseFloat(value) || 0} max={barMax} clr={sc.fg} />}
+          {barMax && <StatusBar value={parseFloat(value) || 0} max={barMax} clr={sc.fg} borderSub={T.borderSub} />}
         </div>
       )}
     </div>
