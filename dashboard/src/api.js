@@ -23,16 +23,18 @@ function normalizeSnapshot(snapshot) {
   const metrics = snapshot.metrics || snapshot;
   const rawAnalysis = metrics.analysis ?? snapshot.analysis ?? null;
   return {
-    timestamp: snapshot.timestamp || null,
-    cycleTime:     metrics.cycleTimeP50     ?? metrics.cycleTimeDays    ?? metrics.cycleTime    ?? 0,
-    cycleTimeP85:  metrics.cycleTimeP85     ?? 0,
-    timeToMarket:  metrics.timeToMarketP50  ?? metrics.timeToMarketDays ?? metrics.timeToMarket ?? 0,
-    timeToMarketP85: metrics.timeToMarketP85 ?? 0,
-    flowEfficiency: metrics.flowEfficiencyPercent ?? metrics.flowEfficiency ?? 0,
-    reopened:   metrics.reopenedCount ?? metrics.reopened    ?? 0,
-    wip:        metrics.inProgressCount ?? metrics.wip        ?? 0,
-    backlogAging: metrics.backlogAgingDays ?? metrics.backlogAging ?? 0,
-    analysis: parseAnalysis(rawAnalysis),
+    timestamp:       snapshot.timestamp || null,
+    cycleTime:       metrics.cycleTimeP50        ?? metrics.cycleTimeDays    ?? metrics.cycleTime    ?? 0,
+    cycleTimeP85:    metrics.cycleTimeP85         ?? 0,
+    timeToMarket:    metrics.timeToMarketP50      ?? metrics.timeToMarketDays ?? metrics.timeToMarket ?? 0,
+    timeToMarketP85: metrics.timeToMarketP85      ?? 0,
+    flowEfficiency:  metrics.flowEfficiencyPercent ?? metrics.flowEfficiency  ?? 0,
+    reopened:        metrics.reopenedCount         ?? metrics.reopened        ?? 0,
+    completedCount:  metrics.completedCount        ?? 0,
+    wip:             metrics.inProgressCount       ?? metrics.wip             ?? 0,
+    backlogAging:    metrics.backlogAgingDays       ?? metrics.backlogAging    ?? 0,
+    wipItems:        metrics.wipItems              ?? [],
+    analysis:        parseAnalysis(rawAnalysis),
   };
 }
 
@@ -52,12 +54,40 @@ export async function fetchHistory(project) {
   return (body.snapshots || []).map(normalizeSnapshot).filter(Boolean);
 }
 
-export async function postSync({ project, baseUrl, email, apiToken, jql }) {
+/**
+ * POST /sync — source-aware.
+ *
+ * @param {string} project  - project key / label
+ * @param {string} source   - "jira" | "linear" | "asana" | "clickup"
+ * @param {object} creds    - saved credentials for the active source (from useCredentials)
+ * @param {string} [jql]    - optional JQL override (Jira only)
+ */
+export async function postSync({ project, source = "jira", creds = {}, jql }) {
+  const body = { project, source };
+
+  if (source === "jira") {
+    body.baseUrl  = creds.baseUrl;
+    body.email    = creds.email;
+    body.apiToken = creds.apiToken;
+    // Auto-generate JQL from project label if not provided
+    body.jql      = jql || `project = "${project.toUpperCase().replace(/\s+/g, "-")}" ORDER BY updated DESC`;
+  } else if (source === "linear") {
+    body.apiKey = creds.apiKey;
+    body.teamId = creds.teamId || "";
+  } else if (source === "asana") {
+    body.accessToken = creds.accessToken;
+    body.projectGid  = creds.workspaceId; // field id in Sidebar is workspaceId
+  } else if (source === "clickup") {
+    body.apiKey = creds.apiToken; // Sidebar field id is apiToken, backend expects apiKey
+    body.teamId = creds.teamId   || "";
+    body.listId = creds.listId   || "";
+  }
+
   const res = await fetch(`${BASE}/sync`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project, baseUrl, email, apiToken, jql }),
+    body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error("Sync failed");
+  if (!res.ok) throw new Error("Sync failed: " + res.status);
   return res.json();
 }
