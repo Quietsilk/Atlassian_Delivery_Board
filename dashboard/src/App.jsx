@@ -123,38 +123,6 @@ function StaleBanner({ timestamp, onSync, T }) {
   );
 }
 
-/* ─── TweaksPanel ─────────────────────────────────────────────────────────── */
-
-function TweaksPanel({ tweaks, setTweaks, onClose, T }) {
-  const row = (label, children) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-      <span style={{ fontSize: font.size.base, color: T.textSec }}>{label}</span>
-      <div style={{ display: "flex", gap: 4 }}>{children}</div>
-    </div>
-  );
-  const btn = (active, label, onClick) => (
-    <button onClick={onClick} style={{
-      padding: "4px 10px",
-      border: `1px solid ${active ? T.brandFocus : T.border}`,
-      borderRadius: radius.sm,
-      background: active ? T.brandBg : "transparent",
-      color: active ? T.brand : T.textLabel,
-      fontSize: font.size.sm, cursor: "pointer",
-    }}>{label}</button>
-  );
-  return (
-    <div style={{ position: "absolute", top: 44, right: 12, zIndex: 100, background: T.bgOverlay, border: `1px solid ${T.border}`, borderRadius: radius.card, padding: "14px 16px", minWidth: 240, display: "flex", flexDirection: "column", gap: 12, boxShadow: T.overlayShadow }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: font.size.xs, fontWeight: font.weight.bold, letterSpacing: font.tracking.wider, textTransform: "uppercase", color: T.textMuted }}>Display</span>
-        <button onClick={onClose} style={{ border: "none", background: "none", color: T.textMuted, cursor: "pointer", fontSize: "0.9rem" }}>✕</button>
-      </div>
-      {row("Cards",      [btn(tweaks.kpiStyle === "rich",        "Rich",        () => setTweaks(t => ({ ...t, kpiStyle: "rich" }))),        btn(tweaks.kpiStyle === "minimal",     "Minimal",     () => setTweaks(t => ({ ...t, kpiStyle: "minimal" })))])}
-      {row("Density",    [btn(tweaks.density  === "comfortable", "Comfortable", () => setTweaks(t => ({ ...t, density: "comfortable" }))),   btn(tweaks.density  === "compact",     "Compact",     () => setTweaks(t => ({ ...t, density: "compact" })))])}
-      {row("AI Position",[btn(tweaks.aiTop,                     "Top",         () => setTweaks(t => ({ ...t, aiTop: true }))),               btn(!tweaks.aiTop,                     "Bottom",      () => setTweaks(t => ({ ...t, aiTop: false })))])}
-    </div>
-  );
-}
-
 /* ─── StatusPill ──────────────────────────────────────────────────────────── */
 
 function StatusPill({ state, T }) {
@@ -213,9 +181,10 @@ export default function App() {
   const [syncState,   setSyncState]   = useState("idle");
   const [syncError,   setSyncError]   = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [tweaksOpen,  setTweaksOpen]  = useState(false);
   const [newLabel,    setNewLabel]    = useState("");
-  const [tweaks,      setTweaks]      = useState({ kpiStyle: "rich", density: "comfortable", aiTop: false });
+
+  const rich    = true;
+  const compact = false;
 
   const pollRef        = useRef(null);
   const activeKey      = active?.label || null;
@@ -284,8 +253,6 @@ export default function App() {
     resetBoard(); addProject(label, jql); setNewLabel("");
   }, [newLabel, addProject, resetBoard]);
 
-  const rich    = tweaks.kpiStyle === "rich";
-  const compact = tweaks.density  === "compact";
   const kpis    = buildKpis(snapshots, rich);
   const hasData = kpis != null;
   const gap     = compact ? 14 : 20;
@@ -350,12 +317,7 @@ export default function App() {
                 ↻ Sync
               </button>
               <ThemeToggle mode={mode} onToggle={toggleTheme} T={T} />
-              <button onClick={() => setTweaksOpen(v => !v)} style={{ width: 28, height: 28, border: `1px solid ${T.border}`, borderRadius: radius.md, background: tweaksOpen ? T.bgCard : "transparent", color: T.textLabel, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="2" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 1v1.5M6.5 10.5V12M1 6.5h1.5M10.5 6.5H12M2.4 2.4l1.06 1.06M9.54 9.54l1.06 1.06M9.54 3.46L8.48 4.52M3.46 9.54l-1.06 1.06" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-              </button>
             </div>
-
-            {tweaksOpen && <TweaksPanel tweaks={tweaks} setTweaks={setTweaks} onClose={() => setTweaksOpen(false)} T={T} />}
           </div>
 
           {/* ── Body ──────────────────────────────────────────── */}
@@ -375,7 +337,7 @@ export default function App() {
               <StaleBanner timestamp={latestSnapshot?.timestamp} onSync={handleSync} T={T} />
             )}
 
-            {(active || hasData) && tweaks.aiTop && <AIPanel analysis={analysis} prominent={!!analysis} />}
+            {(active || hasData) && <AIPanel analysis={analysis} prominent={!!analysis} />}
 
             {(active || hasData) && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: compact ? 10 : 14 }}>
@@ -392,8 +354,6 @@ export default function App() {
             {(active || hasData) && wipItems.length > 0 && (
               <StaleIssuesPanel items={wipItems} threshold={5} />
             )}
-
-            {(active || hasData) && !tweaks.aiTop && <AIPanel analysis={analysis} prominent={!!analysis} />}
 
             {active && !hasData && syncState === "idle" && (
               <div style={{ padding: "12px 16px", borderRadius: 10, background: T.brandBg, border: `1px solid ${T.brandBdr}`, fontSize: "0.8rem", color: T.textMuted, lineHeight: 1.6 }}>
