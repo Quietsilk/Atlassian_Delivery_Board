@@ -12,23 +12,23 @@
 const dark = {
   mode: "dark",
 
-  bg:        "#111318",
-  bgBar:     "rgba(17,19,24,0.95)",
-  bgSidebar: "rgba(255,255,255,0.018)",
-  bgCard:    "rgba(255,255,255,0.03)",
-  bgCardHov: "rgba(255,255,255,0.042)",
+  bg:        "#13151b",
+  bgBar:     "rgba(19,21,27,0.95)",
+  bgSidebar: "rgba(0,0,0,0.20)",
+  bgCard:    "#1c1f28",
+  bgCardHov: "#1f2230",
   bgInput:   "rgba(0,0,0,0.25)",
-  bgOverlay: "#1a1d24",
+  bgOverlay: "#1c1f28",
 
-  border:    "rgba(255,255,255,0.09)",
-  borderHi:  "rgba(255,255,255,0.14)",
-  borderSub: "rgba(255,255,255,0.06)",
+  border:    "rgba(255,255,255,0.11)",
+  borderHi:  "rgba(255,255,255,0.18)",
+  borderSub: "rgba(255,255,255,0.07)",
 
   text:      "#dde1ea",
-  textSec:   "rgba(255,255,255,0.45)",
-  textMuted: "rgba(255,255,255,0.28)",
-  textFaint: "rgba(255,255,255,0.18)",
-  textLabel: "rgba(255,255,255,0.40)",
+  textSec:   "rgba(255,255,255,0.55)",
+  textMuted: "rgba(255,255,255,0.42)",
+  textFaint: "rgba(255,255,255,0.30)",
+  textLabel: "rgba(255,255,255,0.50)",
 
   brand:      "#6b8cff",
   brandBg:    "rgba(107,140,255,0.08)",
@@ -52,7 +52,7 @@ const dark = {
   demoBg:  "rgba(167,139,250,0.07)",
   demoBdr: "rgba(167,139,250,0.22)",
 
-  cardShadow:    "none",
+  cardShadow:    "0 1px 4px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.25)",
   overlayShadow: "0 8px 32px rgba(0,0,0,0.45)",
 };
 
