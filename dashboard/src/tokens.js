@@ -1,177 +1,210 @@
 /**
- * AI Delivery Analyst — Design Tokens v2 (Calm)
- *
- * Single source of truth for colours, typography, spacing, radii and shadows.
- * Import into components instead of hardcoding magic strings.
+ * AI Delivery Analyst — Design Tokens v2
+ * Dark (Calm) + Light theme support.
  *
  * Usage:
- *   import { color, radius, font, statusColors } from "../tokens";
- *   style={{ background: color.surface.card, borderRadius: radius.card }}
- *
- * Colour philosophy (v2):
- * - Canvas warmer — #111318 instead of #0e1016
- * - Status colours muted — signal without shouting
- * - Cards monochrome by default; colour only in stripe, delta, badge
- * - Brand slate-blue instead of electric blue
+ *   import { getTokens, getStatusColors } from "../tokens";
+ *   const T = getTokens(mode);  // mode: "dark" | "light"
+ *   const sc = getStatusColors(T, status);  // { fg, bg, border, stripe }
  */
 
-/* ─── Colour palette ──────────────────────────────────────────────────────── */
+/* ─── Dark theme (Calm) ───────────────────────────────────────────────────── */
+const dark = {
+  mode: "dark",
+
+  bg:        "#111318",
+  bgBar:     "rgba(17,19,24,0.95)",
+  bgSidebar: "rgba(255,255,255,0.018)",
+  bgCard:    "rgba(255,255,255,0.03)",
+  bgCardHov: "rgba(255,255,255,0.042)",
+  bgInput:   "rgba(0,0,0,0.25)",
+  bgOverlay: "#1a1d24",
+
+  border:    "rgba(255,255,255,0.09)",
+  borderHi:  "rgba(255,255,255,0.14)",
+  borderSub: "rgba(255,255,255,0.06)",
+
+  text:      "#dde1ea",
+  textSec:   "rgba(255,255,255,0.45)",
+  textMuted: "rgba(255,255,255,0.28)",
+  textFaint: "rgba(255,255,255,0.18)",
+  textLabel: "rgba(255,255,255,0.40)",
+
+  brand:      "#6b8cff",
+  brandBg:    "rgba(107,140,255,0.08)",
+  brandBdr:   "rgba(107,140,255,0.30)",
+  brandFocus: "rgba(107,140,255,0.40)",
+  brandGlow:  "rgba(107,140,255,0.03)",
+
+  good:    "#4ade80",
+  goodBg:  "rgba(74,222,128,0.07)",
+  goodBdr: "rgba(74,222,128,0.18)",
+
+  warn:    "#fbbf24",
+  warnBg:  "rgba(251,191,36,0.07)",
+  warnBdr: "rgba(251,191,36,0.18)",
+
+  bad:    "#f87171",
+  badBg:  "rgba(248,113,113,0.07)",
+  badBdr: "rgba(248,113,113,0.18)",
+
+  demo:    "#a78bfa",
+  demoBg:  "rgba(167,139,250,0.07)",
+  demoBdr: "rgba(167,139,250,0.22)",
+
+  cardShadow:    "none",
+  overlayShadow: "0 8px 32px rgba(0,0,0,0.45)",
+};
+
+/* ─── Light theme ─────────────────────────────────────────────────────────── */
+const light = {
+  mode: "light",
+
+  bg:        "#f0f2f5",
+  bgBar:     "rgba(244,246,249,0.95)",
+  bgSidebar: "rgba(0,0,0,0.025)",
+  bgCard:    "#ffffff",
+  bgCardHov: "#f8f9fb",
+  bgInput:   "#ffffff",
+  bgOverlay: "#ffffff",
+
+  border:    "rgba(0,0,0,0.09)",
+  borderHi:  "rgba(0,0,0,0.15)",
+  borderSub: "rgba(0,0,0,0.06)",
+
+  text:      "#1a1d24",
+  textSec:   "rgba(0,0,0,0.55)",
+  textMuted: "rgba(0,0,0,0.40)",
+  textFaint: "rgba(0,0,0,0.28)",
+  textLabel: "rgba(0,0,0,0.45)",
+
+  brand:      "#4f6fe8",
+  brandBg:    "rgba(79,111,232,0.07)",
+  brandBdr:   "rgba(79,111,232,0.25)",
+  brandFocus: "rgba(79,111,232,0.35)",
+  brandGlow:  "rgba(79,111,232,0.04)",
+
+  good:    "#16a34a",
+  goodBg:  "rgba(22,163,74,0.07)",
+  goodBdr: "rgba(22,163,74,0.20)",
+
+  warn:    "#b45309",
+  warnBg:  "rgba(180,83,9,0.07)",
+  warnBdr: "rgba(180,83,9,0.20)",
+
+  bad:    "#dc2626",
+  badBg:  "rgba(220,38,38,0.07)",
+  badBdr: "rgba(220,38,38,0.20)",
+
+  demo:    "#7c3aed",
+  demoBg:  "rgba(124,58,237,0.07)",
+  demoBdr: "rgba(124,58,237,0.22)",
+
+  cardShadow:    "0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
+  overlayShadow: "0 8px 32px rgba(0,0,0,0.15)",
+};
+
+/* ─── Status helpers (mode-aware) ─────────────────────────────────────────── */
+
+/** getStatusColors(T, status) → { fg, bg, border, stripe } */
+export function getStatusColors(T, status) {
+  return {
+    good:    { fg: T.good,     bg: T.goodBg, border: T.goodBdr, stripe: T.good    },
+    warn:    { fg: T.warn,     bg: T.warnBg, border: T.warnBdr, stripe: T.warn    },
+    bad:     { fg: T.bad,      bg: T.badBg,  border: T.badBdr,  stripe: T.bad     },
+    neutral: { fg: T.textFaint, bg: "transparent", border: T.border, stripe: "transparent" },
+  }[status] ?? { fg: T.textMuted, bg: "transparent", border: T.border, stripe: "transparent" };
+}
+
+/* ─── Main export ─────────────────────────────────────────────────────────── */
+
+export function getTokens(mode) {
+  return mode === "light" ? light : dark;
+}
+
+/* ─── Backward-compat named exports (dark values) ────────────────────────── */
 
 export const color = {
-  /* Canvas — warmer, not pitch black */
-  bg: "#111318",
+  bg:      dark.bg,
   surface: {
-    sidebar:   "rgba(255,255,255,0.018)",
-    card:      "rgba(255,255,255,0.03)",
-    cardHover: "rgba(255,255,255,0.042)",
-    overlay:   "#1a1d24",
+    sidebar:   dark.bgSidebar,
+    card:      dark.bgCard,
+    cardHover: dark.bgCardHov,
+    overlay:   dark.bgOverlay,
   },
-
-  /* Borders — slightly more visible */
   border: {
-    subtle:  "rgba(255,255,255,0.06)",
-    default: "rgba(255,255,255,0.09)",
-    strong:  "rgba(255,255,255,0.14)",
+    subtle:  dark.borderSub,
+    default: dark.border,
+    strong:  dark.borderHi,
   },
-
-  /* Brand — slate-blue, less electric */
   brand: {
-    default: "#6b8cff",           // was #4f7cff
-    bg:      "rgba(107,140,255,0.08)",
-    bgHover: "rgba(107,140,255,0.14)",
-    border:  "rgba(107,140,255,0.30)",
-    focus:   "rgba(107,140,255,0.40)",
-    glow:    "rgba(107,140,255,0.03)",
+    default: dark.brand,
+    bg:      dark.brandBg,
+    bgHover: dark.brandBg,
+    border:  dark.brandBdr,
+    focus:   dark.brandFocus,
+    glow:    dark.brandGlow,
   },
-
-  /* Status — good */
   good: {
-    fg:         "#4ade80",        // was #22c55e — softer green
-    bg:         "transparent",   // no coloured card bg in v2
-    bgPill:     "rgba(74,222,128,0.07)",
-    border:     "rgba(74,222,128,0.18)",
-    borderPill: "rgba(74,222,128,0.12)",
-    stripe:     "#4ade80",
-    glow:       "rgba(74,222,128,0.55)",
+    fg:         dark.good,
+    bg:         dark.goodBg,
+    bgPill:     dark.goodBg,
+    border:     dark.goodBdr,
+    borderPill: dark.goodBdr,
+    stripe:     dark.good,
+    glow:       `${dark.good}55`,
   },
-
-  /* Status — warn */
   warn: {
-    fg:     "#fbbf24",            // was #f59e0b — lighter amber
-    bg:     "transparent",
-    bgPill: "rgba(251,191,36,0.07)",
-    border: "rgba(251,191,36,0.18)",
-    stripe: "#fbbf24",
+    fg:     dark.warn,
+    bg:     dark.warnBg,
+    bgPill: dark.warnBg,
+    border: dark.warnBdr,
+    stripe: dark.warn,
   },
-
-  /* Status — bad */
   bad: {
-    fg:     "#f87171",            // was #ef4444 — rose instead of red
-    bg:     "transparent",
-    bgPill: "rgba(248,113,113,0.07)",
-    border: "rgba(248,113,113,0.18)",
-    stripe: "#f87171",
+    fg:     dark.bad,
+    bg:     dark.badBg,
+    bgPill: dark.badBg,
+    border: dark.badBdr,
+    stripe: dark.bad,
   },
-
-  /* Status — neutral */
-  neutral: {
-    fg:     "rgba(255,255,255,0.18)",
-    bg:     "transparent",
-    border: "rgba(255,255,255,0.08)",
-    stripe: "transparent",
-  },
-
-  /* Status — demo (purple) */
   demo: {
-    fg:     "#a78bfa",
-    bg:     "rgba(167,139,250,0.07)",
-    border: "rgba(167,139,250,0.22)",
+    fg:     dark.demo,
+    bg:     dark.demoBg,
+    border: dark.demoBdr,
   },
-
-  /* Text — slightly quieter */
   text: {
-    primary:   "#dde1ea",         // was #e2e6ef
-    secondary: "rgba(255,255,255,0.45)",
-    muted:     "rgba(255,255,255,0.28)",
-    faint:     "rgba(255,255,255,0.18)",
-    label:     "rgba(255,255,255,0.40)",  // KPI card labels
-    sublabel:  "rgba(255,255,255,0.24)",  // KPI card sublabels
+    primary:   dark.text,
+    secondary: dark.textSec,
+    muted:     dark.textMuted,
+    faint:     dark.textFaint,
+    label:     dark.textLabel,
+    sublabel:  dark.textFaint,
   },
 };
 
-/* ─── Status helpers ──────────────────────────────────────────────────────── */
-
-/** Returns { fg, bg, border, stripe } for a given status string */
 export function statusColors(status) {
-  const s = color;
-  return {
-    good:    { fg: s.good.fg,    bg: s.good.bg,    border: s.good.border,    stripe: s.good.stripe    },
-    warn:    { fg: s.warn.fg,    bg: s.warn.bg,    border: s.warn.border,    stripe: s.warn.stripe    },
-    bad:     { fg: s.bad.fg,     bg: s.bad.bg,     border: s.bad.border,     stripe: s.bad.stripe     },
-    neutral: { fg: s.neutral.fg, bg: s.neutral.bg, border: s.neutral.border, stripe: s.neutral.stripe },
-  }[status] ?? { fg: s.text.muted, bg: "transparent", border: s.border.subtle, stripe: "transparent" };
+  return getStatusColors(dark, status);
 }
 
 /* ─── Typography ──────────────────────────────────────────────────────────── */
-
 export const font = {
-  family: {
-    sans: "'Inter', system-ui, sans-serif",
-    mono: "'IBM Plex Mono', monospace",
-  },
-  size: {
-    xxs:   "0.62rem",   // section labels
-    xs:    "0.67rem",   // field labels, sublabels
-    sm:    "0.72rem",   // secondary text, mono values
-    base:  "0.78rem",   // inputs, body text
-    md:    "0.82rem",   // risk/action items
-    lg:    "0.88rem",   // logo
-    kpiSm: "1.7rem",    // KPI value compact
-    kpiLg: "2.1rem",    // KPI value comfortable
-  },
-  weight: {
-    regular:   400,
-    medium:    500,
-    semibold:  600,
-    bold:      700,
-    extrabold: 800,
-  },
-  tracking: {
-    tight:  "-0.04em",
-    normal: "0",
-    wide:   "0.03em",
-    wider:  "0.07em",
-    widest: "0.10em",
-  },
+  family: { sans: "'Inter', system-ui, sans-serif", mono: "'IBM Plex Mono', monospace" },
+  size: { xxs:"0.62rem", xs:"0.67rem", sm:"0.72rem", base:"0.78rem", md:"0.82rem", lg:"0.88rem", kpiSm:"1.7rem", kpiLg:"2.1rem" },
+  weight: { regular:400, medium:500, semibold:600, bold:700, extrabold:800 },
+  tracking: { tight:"-0.04em", normal:"0", wide:"0.03em", wider:"0.07em", widest:"0.10em" },
 };
 
 /* ─── Spacing ─────────────────────────────────────────────────────────────── */
+export const space = { 1:2,2:4,3:6,4:8,5:10,6:12,7:14,8:16,9:18,10:20,12:24,14:28,16:32 };
 
-export const space = {
-  1:  2,  2:  4,  3:  6,  4:  8,
-  5: 10,  6: 12,  7: 14,  8: 16,
-  9: 18, 10: 20, 12: 24, 14: 28, 16: 32,
-};
+/* ─── Radii ───────────────────────────────────────────────────────────────── */
+export const radius = { sm:6, md:7, input:8, card:12, panel:14 };
 
-/* ─── Border radius ───────────────────────────────────────────────────────── */
-
-export const radius = {
-  sm:    6,
-  md:    7,
-  input: 8,
-  card:  12,
-  panel: 14,
-};
-
-/* ─── Elevation ───────────────────────────────────────────────────────────── */
-
-export const shadow = {
-  overlay: "0 8px 32px rgba(0,0,0,0.45)",
-  card:    "0 1px 3px rgba(0,0,0,0.3)",
-};
+/* ─── Shadows ─────────────────────────────────────────────────────────────── */
+export const shadow = { overlay: dark.overlayShadow, card: "0 1px 3px rgba(0,0,0,0.3)" };
 
 /* ─── Animation ───────────────────────────────────────────────────────────── */
-
 export const transition = {
   fast:    "0.15s ease",
   normal:  "0.20s ease",
@@ -180,11 +213,4 @@ export const transition = {
 };
 
 /* ─── Layout ──────────────────────────────────────────────────────────────── */
-
-export const layout = {
-  sidebarWidth:  264,
-  appBarHeight:   48,
-  kpiColumns:      3,
-  kpiGapComfy:    14,
-  kpiGapCompact:  10,
-};
+export const layout = { sidebarWidth:264, appBarHeight:48, kpiColumns:3, kpiGapComfy:14, kpiGapCompact:10 };

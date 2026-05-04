@@ -1,32 +1,23 @@
 import { useState } from "react";
+import { font, radius, transition } from "../tokens";
+import { useT } from "../context/ThemeContext";
 
-const C = {
-  red:      "#f87171", redBg:   "rgba(248,113,113,0.07)", redBorder:   "rgba(248,113,113,0.18)",
-  amber:    "#fbbf24", amberBg: "rgba(251,191,36,0.07)",  amberBorder: "rgba(251,191,36,0.18)",
-  blue:     "#6b8cff",
-  surface:  "rgba(255,255,255,0.03)",
-  border:   "rgba(255,255,255,0.09)",
-  text:     "#dde1ea",
-  muted:    "rgba(255,255,255,0.28)",
-  dim:      "rgba(255,255,255,0.18)",
-};
-
-function agingColor(days) {
-  if (days >= 14) return C.red;
-  if (days >= 7)  return C.amber;
-  return C.muted;
+function agingColor(T, days) {
+  if (days >= 14) return T.bad;
+  if (days >= 7)  return T.warn;
+  return T.textMuted;
 }
 
-function agingBg(days) {
-  if (days >= 14) return C.redBg;
-  if (days >= 7)  return C.amberBg;
+function agingBg(T, days) {
+  if (days >= 14) return T.badBg;
+  if (days >= 7)  return T.warnBg;
   return "transparent";
 }
 
-function agingBorder(days) {
-  if (days >= 14) return C.redBorder;
-  if (days >= 7)  return C.amberBorder;
-  return C.border;
+function agingBorder(T, days) {
+  if (days >= 14) return T.badBdr;
+  if (days >= 7)  return T.warnBdr;
+  return T.border;
 }
 
 function initials(name) {
@@ -35,20 +26,21 @@ function initials(name) {
 }
 
 export default function StaleIssuesPanel({ items = [], threshold = 5 }) {
+  const T = useT();
   const [open, setOpen] = useState(false);
 
   const stale   = items.filter(i => i.daysInProgress >= threshold);
   const blocked = items.filter(i => i.blockedReason);
   const sorted  = [...items].sort((a, b) => b.daysInProgress - a.daysInProgress);
-
   const hasBadge = stale.length > 0 || blocked.length > 0;
 
   return (
     <div style={{
-      background: C.surface,
-      border: `1px solid ${hasBadge ? C.amberBorder : C.border}`,
-      borderRadius: 14, overflow: "hidden",
-      transition: "border-color 0.2s",
+      background: T.bgCard,
+      border: `1px solid ${hasBadge ? T.warnBdr : T.border}`,
+      borderRadius: radius.panel, overflow: "hidden",
+      transition: `border-color ${transition.normal}`,
+      boxShadow: T.cardShadow,
     }}>
       <style>{`@keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
@@ -59,47 +51,47 @@ export default function StaleIssuesPanel({ items = [], threshold = 5 }) {
         padding: "14px 18px", gap: 12, fontFamily: "inherit",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: C.dim }}>
+          <span style={{ fontSize: font.size.sm, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: T.textFaint }}>
             Stale Issues
           </span>
           <div style={{ display: "flex", gap: 5 }}>
             {stale.length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 5, background: C.amberBg, border: `1px solid ${C.amberBorder}` }}>
-                <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.amber, display: "block" }} />
-                <span style={{ fontSize: "0.67rem", fontWeight: 700, color: C.amber }}>{stale.length} aging</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 5, background: T.warnBg, border: `1px solid ${T.warnBdr}` }}>
+                <span style={{ width: 4, height: 4, borderRadius: "50%", background: T.warn, display: "block" }} />
+                <span style={{ fontSize: font.size.xs, fontWeight: 700, color: T.warn }}>{stale.length} aging</span>
               </div>
             )}
             {blocked.length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 5, background: C.redBg, border: `1px solid ${C.redBorder}` }}>
-                <span style={{ fontSize: "0.67rem", fontWeight: 700, color: C.red }}>{blocked.length} blocked</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 5, background: T.badBg, border: `1px solid ${T.badBdr}` }}>
+                <span style={{ fontSize: font.size.xs, fontWeight: 700, color: T.bad }}>{blocked.length} blocked</span>
               </div>
             )}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: "0.7rem", color: C.dim }}>{items.length} tasks</span>
+          <span style={{ fontSize: "0.7rem", color: T.textFaint }}>{items.length} tasks</span>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-            style={{ transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s", flexShrink: 0 }}>
-            <path d="M3 5l4 4 4-4" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            style={{ transform: open ? "rotate(180deg)" : "rotate(0)", transition: `transform ${transition.normal}`, flexShrink: 0 }}>
+            <path d="M3 5l4 4 4-4" stroke={T.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
       </button>
 
       {/* ── Expanded list ────────────────────────────────────────── */}
       {open && (
-        <div style={{ borderTop: `1px solid ${C.border}`, animation: "fadeIn 0.2s ease" }}>
+        <div style={{ borderTop: `1px solid ${T.border}`, animation: `fadeIn ${transition.normal} ease` }}>
           {/* Legend */}
-          <div style={{ padding: "7px 18px", borderBottom: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", gap: 14 }}>
-            {[["≥14d", C.red, "critical"], ["≥7d", C.amber, "aging"], ["<7d", C.muted, "ok"]].map(([label, color, name]) => (
+          <div style={{ padding: "7px 18px", borderBottom: `1px solid ${T.borderSub}`, display: "flex", alignItems: "center", gap: 14 }}>
+            {[["≥14d", T.bad, "critical"], ["≥7d", T.warn, "aging"], ["<7d", T.textMuted, "ok"]].map(([label, clr, name]) => (
               <div key={name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <div style={{ width: 6, height: 6, borderRadius: "50%", background: color }} />
-                <span style={{ fontSize: "0.65rem", color: C.dim }}>{label} {name}</span>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: clr }} />
+                <span style={{ fontSize: "0.65rem", color: T.textFaint }}>{label} {name}</span>
               </div>
             ))}
           </div>
 
           {sorted.length === 0 && (
-            <div style={{ padding: "18px", textAlign: "center", fontSize: "0.8rem", color: C.dim }}>
+            <div style={{ padding: "18px", textAlign: "center", fontSize: "0.8rem", color: T.textFaint }}>
               No in-progress issues
             </div>
           )}
@@ -109,19 +101,19 @@ export default function StaleIssuesPanel({ items = [], threshold = 5 }) {
             <div key={item.key + i} style={{
               display: "flex", alignItems: "flex-start", gap: 12,
               padding: "10px 18px",
-              borderBottom: i < sorted.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-              background: item.daysInProgress >= 14 ? "rgba(239,68,68,0.025)"
-                        : item.daysInProgress >= 7  ? "rgba(245,158,11,0.025)"
+              borderBottom: i < sorted.length - 1 ? `1px solid ${T.borderSub}` : "none",
+              background: item.daysInProgress >= 14 ? T.badBg
+                        : item.daysInProgress >= 7  ? T.warnBg
                         : "transparent",
             }}>
               {/* Age pill */}
               <div style={{
                 flexShrink: 0, minWidth: 40,
-                padding: "3px 8px", borderRadius: 6, textAlign: "center", marginTop: 2,
-                background: agingBg(item.daysInProgress),
-                border: `1px solid ${agingBorder(item.daysInProgress)}`,
+                padding: "3px 8px", borderRadius: radius.sm, textAlign: "center", marginTop: 2,
+                background: agingBg(T, item.daysInProgress),
+                border: `1px solid ${agingBorder(T, item.daysInProgress)}`,
               }}>
-                <span style={{ fontSize: "0.72rem", fontWeight: 700, color: agingColor(item.daysInProgress), fontFamily: "'IBM Plex Mono', monospace" }}>
+                <span style={{ fontSize: font.size.sm, fontWeight: 700, color: agingColor(T, item.daysInProgress), fontFamily: font.family.mono }}>
                   {item.daysInProgress}d
                 </span>
               </div>
@@ -129,24 +121,24 @@ export default function StaleIssuesPanel({ items = [], threshold = 5 }) {
               {/* Key + title + blocker */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                  <span style={{ fontSize: "0.67rem", color: C.blue, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, flexShrink: 0 }}>
+                  <span style={{ fontSize: font.size.xs, color: T.brand, fontFamily: font.family.mono, fontWeight: 600, flexShrink: 0 }}>
                     {item.key}
                   </span>
-                  <span style={{ fontSize: "0.65rem", padding: "1px 6px", borderRadius: 4, background: "rgba(255,255,255,0.05)", color: C.dim, flexShrink: 0 }}>
+                  <span style={{ fontSize: "0.65rem", padding: "1px 6px", borderRadius: 4, background: T.borderSub, color: T.textFaint, flexShrink: 0 }}>
                     {item.status}
                   </span>
                 </div>
-                <div style={{ fontSize: "0.8rem", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: item.blockedReason ? 4 : 0 }}>
+                <div style={{ fontSize: "0.8rem", color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: item.blockedReason ? 4 : 0 }}>
                   {item.title || "—"}
                 </div>
                 {item.blockedReason && (
                   <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3 }}>
-                    <div style={{ width: 14, height: 14, borderRadius: 3, background: C.redBg, border: `1px solid ${C.redBorder}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ width: 14, height: 14, borderRadius: 3, background: T.badBg, border: `1px solid ${T.badBdr}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
-                        <path d="M3 1v2.5M3 4.5v.5" stroke={C.red} strokeWidth="1.2" strokeLinecap="round"/>
+                        <path d="M3 1v2.5M3 4.5v.5" stroke={T.bad} strokeWidth="1.2" strokeLinecap="round"/>
                       </svg>
                     </div>
-                    <span style={{ fontSize: "0.7rem", color: "rgba(239,68,68,0.7)", fontStyle: "italic" }}>
+                    <span style={{ fontSize: "0.7rem", color: T.bad, opacity: 0.75, fontStyle: "italic" }}>
                       {item.blockedReason}
                     </span>
                   </div>
@@ -156,10 +148,10 @@ export default function StaleIssuesPanel({ items = [], threshold = 5 }) {
               {/* Assignee avatar */}
               {item.assignee && (
                 <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: "rgba(79,124,255,0.12)", border: "1px solid rgba(79,124,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.58rem", fontWeight: 700, color: C.blue }}>
+                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: T.brandBg, border: `1px solid ${T.brandBdr}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.58rem", fontWeight: 700, color: T.brand }}>
                     {initials(item.assignee)}
                   </div>
-                  <span style={{ fontSize: "0.7rem", color: C.muted }}>
+                  <span style={{ fontSize: "0.7rem", color: T.textMuted }}>
                     {item.assignee.split(" ")[0]}
                   </span>
                 </div>

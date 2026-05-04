@@ -5,8 +5,11 @@ import AIPanel from "./components/AIPanel";
 import StaleIssuesPanel from "./components/StaleIssuesPanel";
 import { useCredentials } from "./hooks/useCredentials";
 import { useProjects } from "./hooks/useProjects";
+import { useTheme } from "./hooks/useTheme";
+import { ThemeContext } from "./context/ThemeContext";
 import { fetchLatest, fetchHistory, postSync } from "./api";
 import { DEMO_HISTORY, DEMO_ANALYSIS } from "./demo";
+import { font, radius, transition } from "./tokens";
 
 /* ─── constants ───────────────────────────────────────────────────────────── */
 
@@ -41,7 +44,6 @@ function buildKpis(snaps, rich) {
 
   const hist = (field) => snaps.map(s => s[field]).filter(v => v != null);
 
-  // ── Reopened Rate % ────────────────────────────────────────────────────────
   const rate     = (last.completedCount ?? 0) > 0 ? (last.reopened / last.completedCount) * 100 : 0;
   const prevRate = prev && (prev.completedCount ?? 0) > 0 ? (prev.reopened / prev.completedCount) * 100 : null;
   const rateHistory = snaps.map(s =>
@@ -54,84 +56,16 @@ function buildKpis(snaps, rich) {
   })() : null;
 
   return [
-    {
-      label: "Cycle Time",
-      sublabel: "In Progress → Done",
-      value: round1(last.cycleTime ?? 0),
-      unit: "d",
-      p85: last.cycleTimeP85 != null ? `${round1(last.cycleTimeP85)}d` : null,
-      delta: delta(last.cycleTime, prev?.cycleTime, true),
-      status: last.cycleTime == null ? "neutral" : last.cycleTime <= 3 ? "good" : last.cycleTime <= 7 ? "warn" : "bad",
-      history: hist("cycleTime"),
-      lowerBetter: true,
-      barMax: 14,
-      tooltip: "Median calendar days from 'In Progress' to 'Done'",
-    },
-    {
-      label: "Time to Market",
-      sublabel: "Created → Done",
-      value: round1(last.timeToMarket ?? 0),
-      unit: "d",
-      p85: last.timeToMarketP85 != null ? `${round1(last.timeToMarketP85)}d` : null,
-      delta: delta(last.timeToMarket, prev?.timeToMarket, true),
-      status: last.timeToMarket == null ? "neutral" : last.timeToMarket <= 7 ? "good" : last.timeToMarket <= 14 ? "warn" : "bad",
-      history: hist("timeToMarket"),
-      lowerBetter: true,
-      barMax: 28,
-      tooltip: "Median days from ticket creation to completion",
-    },
-    {
-      label: "Flow Efficiency",
-      sublabel: "Active / Total time",
-      value: round1(last.flowEfficiency ?? 0),
-      unit: "%",
-      delta: delta(last.flowEfficiency, prev?.flowEfficiency, false),
-      status: last.flowEfficiency == null ? "neutral" : last.flowEfficiency >= 40 ? "good" : last.flowEfficiency >= 20 ? "warn" : "bad",
-      history: hist("flowEfficiency"),
-      lowerBetter: false,
-      barMax: 100,
-      tooltip: "% of total lead time the item was actively worked on",
-    },
-    {
-      label: "Reopened Rate",
-      sublabel: `${last.reopened ?? 0} of ${last.completedCount ?? 0} completed`,
-      value: round1(rate),
-      unit: "%",
-      delta: rateDelta,
-      status: rate === 0 ? "good" : rate < 5 ? "warn" : "bad",
-      history: rateHistory,
-      lowerBetter: true,
-      barMax: 20,
-      tooltip: "% of completed issues that were reopened at least once",
-    },
-    {
-      label: "WIP",
-      sublabel: "In Progress now",
-      value: last.wip ?? 0,
-      unit: null,
-      delta: delta(last.wip, prev?.wip, true),
-      status: last.wip == null ? "neutral" : last.wip <= 10 ? "good" : last.wip <= 20 ? "warn" : "bad",
-      history: hist("wip"),
-      lowerBetter: true,
-      barMax: 30,
-      tooltip: "Number of issues currently In Progress",
-    },
-    {
-      label: "Backlog Aging",
-      sublabel: "Avg days untouched",
-      value: round1(last.backlogAging ?? 0),
-      unit: "d",
-      delta: delta(last.backlogAging, prev?.backlogAging, true),
-      status: last.backlogAging == null ? "neutral" : last.backlogAging <= 14 ? "good" : last.backlogAging <= 30 ? "warn" : "bad",
-      history: hist("backlogAging"),
-      lowerBetter: true,
-      barMax: 60,
-      tooltip: "Average days since backlog issues were last updated",
-    },
+    { label: "Cycle Time",      sublabel: "In Progress → Done",  value: round1(last.cycleTime ?? 0),      unit: "d",  p85: last.cycleTimeP85    != null ? `${round1(last.cycleTimeP85)}d`    : null, delta: delta(last.cycleTime,    prev?.cycleTime,    true),  status: last.cycleTime    == null ? "neutral" : last.cycleTime    <= 3  ? "good" : last.cycleTime    <= 7  ? "warn" : "bad", history: hist("cycleTime"),    lowerBetter: true,  barMax: 14,  tooltip: "Median calendar days from 'In Progress' to 'Done'" },
+    { label: "Time to Market",  sublabel: "Created → Done",      value: round1(last.timeToMarket ?? 0),   unit: "d",  p85: last.timeToMarketP85 != null ? `${round1(last.timeToMarketP85)}d` : null, delta: delta(last.timeToMarket, prev?.timeToMarket, true),  status: last.timeToMarket == null ? "neutral" : last.timeToMarket <= 7  ? "good" : last.timeToMarket <= 14 ? "warn" : "bad", history: hist("timeToMarket"), lowerBetter: true,  barMax: 28,  tooltip: "Median days from ticket creation to completion" },
+    { label: "Flow Efficiency", sublabel: "Active / Total time", value: round1(last.flowEfficiency ?? 0), unit: "%",  p85: null,                                                                        delta: delta(last.flowEfficiency, prev?.flowEfficiency, false), status: last.flowEfficiency == null ? "neutral" : last.flowEfficiency >= 40 ? "good" : last.flowEfficiency >= 20 ? "warn" : "bad", history: hist("flowEfficiency"), lowerBetter: false, barMax: 100, tooltip: "% of total lead time the item was actively worked on" },
+    { label: "Reopened Rate",   sublabel: `${last.reopened ?? 0} of ${last.completedCount ?? 0} completed`, value: round1(rate), unit: "%", p85: null, delta: rateDelta, status: rate === 0 ? "good" : rate < 5 ? "warn" : "bad", history: rateHistory, lowerBetter: true, barMax: 20, tooltip: "% of completed issues that were reopened at least once" },
+    { label: "WIP",             sublabel: "In Progress now",     value: last.wip ?? 0,                    unit: null, p85: null,                                                                        delta: delta(last.wip,          prev?.wip,          true),  status: last.wip          == null ? "neutral" : last.wip          <= 10 ? "good" : last.wip          <= 20 ? "warn" : "bad", history: hist("wip"),          lowerBetter: true,  barMax: 30,  tooltip: "Number of issues currently In Progress" },
+    { label: "Backlog Aging",   sublabel: "Avg days untouched",  value: round1(last.backlogAging ?? 0),   unit: "d",  p85: null,                                                                        delta: delta(last.backlogAging, prev?.backlogAging, true),  status: last.backlogAging == null ? "neutral" : last.backlogAging <= 14 ? "good" : last.backlogAging <= 30 ? "warn" : "bad", history: hist("backlogAging"), lowerBetter: true,  barMax: 60,  tooltip: "Average days since backlog issues were last updated" },
   ].map(k => ({ ...k, rich }));
 }
 
-/* ─── UpdatedAgo ──────────────────────────────────────────────────────────── */
+/* ─── Staleness helpers ───────────────────────────────────────────────────── */
 
 function staleLevel(isoTs) {
   if (!isoTs) return "none";
@@ -150,18 +84,15 @@ function formatAgo(isoTs) {
   return `${Math.floor(mins / 1440)}d ago`;
 }
 
-function UpdatedAgo({ timestamp }) {
-  const level     = staleLevel(timestamp);
-  const ago       = formatAgo(timestamp);
+/* ─── UpdatedAgo ──────────────────────────────────────────────────────────── */
+
+function UpdatedAgo({ timestamp, T }) {
+  const level = staleLevel(timestamp);
+  const ago   = formatAgo(timestamp);
   if (!ago) return null;
-  const staleColor = {
-    ok:    "rgba(255,255,255,0.35)",
-    amber: "#fbbf24",
-    red:   "#f87171",
-    none:  "rgba(255,255,255,0.18)",
-  }[level];
+  const staleColor = { ok: T.textSec, amber: T.warn, red: T.bad, none: T.textFaint }[level];
   return (
-    <span style={{ fontSize: "0.7rem", color: staleColor, fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", gap: 5, transition: "color 0.3s" }}>
+    <span style={{ fontSize: "0.7rem", color: staleColor, fontFamily: font.family.mono, display: "flex", alignItems: "center", gap: 5, transition: "color 0.3s" }}>
       {level !== "ok" && (
         <span style={{ width: 5, height: 5, borderRadius: "50%", background: staleColor, display: "inline-block", flexShrink: 0 }} />
       )}
@@ -172,20 +103,20 @@ function UpdatedAgo({ timestamp }) {
 
 /* ─── StaleBanner ─────────────────────────────────────────────────────────── */
 
-function StaleBanner({ timestamp, onSync }) {
+function StaleBanner({ timestamp, onSync, T }) {
   const level = staleLevel(timestamp);
   if (level === "ok" || level === "none") return null;
   const ago = formatAgo(timestamp);
   const cfg = level === "red"
-    ? { bg: "rgba(248,113,113,0.07)", border: "rgba(248,113,113,0.18)", color: "#f87171", icon: "!", text: `Data is ${ago} old — metrics may be stale` }
-    : { bg: "rgba(251,191,36,0.07)",  border: "rgba(251,191,36,0.18)",  color: "#fbbf24", icon: "⚠", text: `Data is ${ago} old — consider syncing` };
+    ? { bg: T.badBg,  border: T.badBdr,  fg: T.bad,  icon: "!", text: `Data is ${ago} old — metrics may be stale` }
+    : { bg: T.warnBg, border: T.warnBdr, fg: T.warn, icon: "⚠", text: `Data is ${ago} old — consider syncing` };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderRadius: 10, background: cfg.bg, border: `1px solid ${cfg.border}` }}>
-      <div style={{ width: 20, height: 20, borderRadius: 5, background: cfg.bg, border: `1px solid ${cfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", color: cfg.color, fontWeight: 700, flexShrink: 0 }}>
+      <div style={{ width: 20, height: 20, borderRadius: 5, background: cfg.bg, border: `1px solid ${cfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: font.size.xs, color: cfg.fg, fontWeight: font.weight.bold, flexShrink: 0 }}>
         {cfg.icon}
       </div>
-      <span style={{ fontSize: "0.8rem", color: cfg.color, flex: 1 }}>{cfg.text}</span>
-      <button type="button" onClick={onSync} style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 6, color: cfg.color, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", padding: "3px 10px", fontFamily: "inherit" }}>
+      <span style={{ fontSize: "0.8rem", color: cfg.fg, flex: 1 }}>{cfg.text}</span>
+      <button type="button" onClick={onSync} style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: radius.sm, color: cfg.fg, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", padding: "3px 10px", fontFamily: "inherit" }}>
         Sync now
       </button>
     </div>
@@ -194,59 +125,86 @@ function StaleBanner({ timestamp, onSync }) {
 
 /* ─── TweaksPanel ─────────────────────────────────────────────────────────── */
 
-function TweaksPanel({ tweaks, setTweaks, onClose }) {
+function TweaksPanel({ tweaks, setTweaks, onClose, T }) {
   const row = (label, children) => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-      <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)" }}>{label}</span>
+      <span style={{ fontSize: font.size.base, color: T.textSec }}>{label}</span>
       <div style={{ display: "flex", gap: 4 }}>{children}</div>
     </div>
   );
   const btn = (active, label, onClick) => (
     <button onClick={onClick} style={{
       padding: "4px 10px",
-      border: "1px solid " + (active ? "rgba(107,140,255,0.40)" : "rgba(255,255,255,0.1)"),
-      borderRadius: 6,
-      background: active ? "rgba(107,140,255,0.08)" : "transparent",
-      color: active ? "#6b8cff" : "rgba(255,255,255,0.4)",
-      fontSize: "0.73rem", cursor: "pointer",
+      border: `1px solid ${active ? T.brandFocus : T.border}`,
+      borderRadius: radius.sm,
+      background: active ? T.brandBg : "transparent",
+      color: active ? T.brand : T.textLabel,
+      fontSize: font.size.sm, cursor: "pointer",
     }}>{label}</button>
   );
   return (
-    <div style={{ position: "absolute", top: 44, right: 12, zIndex: 100, background: "#1a1d24", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "14px 16px", minWidth: 240, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.45)" }}>
+    <div style={{ position: "absolute", top: 44, right: 12, zIndex: 100, background: T.bgOverlay, border: `1px solid ${T.border}`, borderRadius: radius.card, padding: "14px 16px", minWidth: 240, display: "flex", flexDirection: "column", gap: 12, boxShadow: T.overlayShadow }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>Display</span>
-        <button onClick={onClose} style={{ border: "none", background: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "0.9rem" }}>✕</button>
+        <span style={{ fontSize: font.size.xs, fontWeight: font.weight.bold, letterSpacing: font.tracking.wider, textTransform: "uppercase", color: T.textMuted }}>Display</span>
+        <button onClick={onClose} style={{ border: "none", background: "none", color: T.textMuted, cursor: "pointer", fontSize: "0.9rem" }}>✕</button>
       </div>
-      {row("Cards",      [btn(tweaks.kpiStyle === "rich",        "Rich",         () => setTweaks(t => ({ ...t, kpiStyle: "rich" }))),        btn(tweaks.kpiStyle === "minimal",     "Minimal",     () => setTweaks(t => ({ ...t, kpiStyle: "minimal" })))])}
-      {row("Density",    [btn(tweaks.density  === "comfortable", "Comfortable",  () => setTweaks(t => ({ ...t, density: "comfortable" }))),   btn(tweaks.density  === "compact",     "Compact",     () => setTweaks(t => ({ ...t, density: "compact" })))])}
-      {row("AI Position",[btn(tweaks.aiTop,                     "Top",          () => setTweaks(t => ({ ...t, aiTop: true }))),               btn(!tweaks.aiTop,                     "Bottom",      () => setTweaks(t => ({ ...t, aiTop: false })))])}
+      {row("Cards",      [btn(tweaks.kpiStyle === "rich",        "Rich",        () => setTweaks(t => ({ ...t, kpiStyle: "rich" }))),        btn(tweaks.kpiStyle === "minimal",     "Minimal",     () => setTweaks(t => ({ ...t, kpiStyle: "minimal" })))])}
+      {row("Density",    [btn(tweaks.density  === "comfortable", "Comfortable", () => setTweaks(t => ({ ...t, density: "comfortable" }))),   btn(tweaks.density  === "compact",     "Compact",     () => setTweaks(t => ({ ...t, density: "compact" })))])}
+      {row("AI Position",[btn(tweaks.aiTop,                     "Top",         () => setTweaks(t => ({ ...t, aiTop: true }))),               btn(!tweaks.aiTop,                     "Bottom",      () => setTweaks(t => ({ ...t, aiTop: false })))])}
     </div>
   );
 }
 
 /* ─── StatusPill ──────────────────────────────────────────────────────────── */
 
-function StatusPill({ state }) {
+function StatusPill({ state, T }) {
   const cfg = {
-    idle:    { color: "rgba(255,255,255,0.25)", bg: "rgba(255,255,255,0.04)", label: "Idle" },
-    syncing: { color: "#fbbf24",               bg: "rgba(251,191,36,0.07)",  label: "Syncing…" },
-    done:    { color: "#4ade80",               bg: "rgba(74,222,128,0.07)",  label: "Up to date" },
-    error:   { color: "#f87171",               bg: "rgba(248,113,113,0.07)", label: "Error" },
-    demo:    { color: "#a78bfa",               bg: "rgba(167,139,250,0.07)", label: "Demo" },
-  }[state] ?? { color: "rgba(255,255,255,0.25)", bg: "transparent", label: state };
+    idle:    { fg: T.textMuted, bg: T.bgCard,  label: "Idle" },
+    syncing: { fg: T.warn,     bg: T.warnBg,  label: "Syncing…" },
+    done:    { fg: T.good,     bg: T.goodBg,  label: "Up to date" },
+    error:   { fg: T.bad,      bg: T.badBg,   label: "Error" },
+    demo:    { fg: T.demo,     bg: T.demoBg,  label: "Demo" },
+  }[state] ?? { fg: T.textMuted, bg: "transparent", label: state };
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: cfg.bg, border: `1px solid ${cfg.color}40` }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: cfg.bg, border: `1px solid ${cfg.fg}40` }}>
       {state === "syncing"
-        ? <div style={{ width: 6, height: 6, borderRadius: "50%", border: `1.5px solid ${cfg.color}`, borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />
-        : <div style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.color }} />}
-      <span style={{ fontSize: "0.7rem", fontWeight: 600, color: cfg.color }}>{cfg.label}</span>
+        ? <div style={{ width: 6, height: 6, borderRadius: "50%", border: `1.5px solid ${cfg.fg}`, borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />
+        : <div style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.fg }} />}
+      <span style={{ fontSize: font.size.xs, fontWeight: font.weight.semibold, color: cfg.fg }}>{cfg.label}</span>
     </div>
+  );
+}
+
+/* ─── ThemeToggle ─────────────────────────────────────────────────────────── */
+
+function ThemeToggle({ mode, onToggle, T }) {
+  return (
+    <button onClick={onToggle} title="Toggle theme" style={{
+      width: 28, height: 28, borderRadius: radius.md,
+      border: `1px solid ${T.border}`,
+      background: T.bgCard,
+      cursor: "pointer",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      transition: `all ${transition.fast}`, flexShrink: 0,
+    }}>
+      {mode === "dark" ? (
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+          <circle cx="7.5" cy="7.5" r="3" stroke={T.textMuted} strokeWidth="1.3"/>
+          <path d="M7.5 1v1.5M7.5 12.5V14M1 7.5h1.5M12.5 7.5H14M2.9 2.9l1.1 1.1M11 11l1.1 1.1M11 2.9L9.9 4M4 11l-1.1 1.1" stroke={T.textMuted} strokeWidth="1.3" strokeLinecap="round"/>
+        </svg>
+      ) : (
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+          <path d="M12.5 9.5A6 6 0 015.5 2.5a6 6 0 100 10 6 6 0 007-3z" stroke={T.textMuted} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+    </button>
   );
 }
 
 /* ─── App ──────────────────────────────────────────────────────────────────── */
 
 export default function App() {
+  const { mode, T, toggleTheme } = useTheme();
   const creds = useCredentials();
   const { projects, activeId, setActiveId, active, addProject, removeProject } = useProjects();
 
@@ -264,11 +222,16 @@ export default function App() {
   const latestSnapshot = snapshots.at(-1) || null;
   const wipItems       = latestSnapshot?.wipItems || [];
 
+  /* sync body background + data-theme attribute with theme */
+  useEffect(() => {
+    document.body.style.background = T.bg;
+    document.documentElement.dataset.theme = mode;
+  }, [T.bg, mode]);
+
   const resetBoard = useCallback(() => {
     setSnapshots([]); setAnalysis(null); setSyncState("idle"); setSyncError(null);
   }, []);
 
-  /* load data when active project changes */
   useEffect(() => {
     if (!activeKey) return;
     let cancelled = false;
@@ -284,19 +247,13 @@ export default function App() {
     return () => { cancelled = true; };
   }, [activeKey]);
 
-  /* sync — source-aware */
   const handleSync = useCallback(async () => {
     if (!active || !creds.connected) return;
     const previousTimestamp = snapshots.at(-1)?.timestamp || null;
     clearTimeout(pollRef.current);
     setSyncState("syncing"); setSyncError(null);
     try {
-      await postSync({
-        project: active.label,
-        source:  creds.source,
-        creds:   creds.currentCreds,
-        jql:     active.jql,
-      });
+      await postSync({ project: active.label, source: creds.source, creds: creds.currentCreds, jql: active.jql });
       let attempts = 0;
       const poll = async () => {
         try {
@@ -304,38 +261,27 @@ export default function App() {
           const merged = mergeHistoryWithLatest(history, latest);
           const latestTs = latest?.timestamp || merged.at(-1)?.timestamp || null;
           if (latestTs && latestTs !== previousTimestamp) {
-            setSnapshots(merged);
-            setAnalysis(latest?.analysis || null);
-            setSyncState("done");
-            return;
+            setSnapshots(merged); setAnalysis(latest?.analysis || null); setSyncState("done"); return;
           }
         } catch {}
         if (++attempts < POLL_MAX_ATTEMPTS) { pollRef.current = setTimeout(poll, POLL_INTERVAL_MS); }
         else { setSyncState("error"); setSyncError("Sync did not produce a new snapshot"); }
       };
       poll();
-    } catch (e) {
-      setSyncState("error"); setSyncError(e.message);
-    }
+    } catch (e) { setSyncState("error"); setSyncError(e.message); }
   }, [active, creds, snapshots]);
 
   useEffect(() => () => clearTimeout(pollRef.current), []);
 
-  /* demo */
   const handleDemo = useCallback(() => {
-    setSnapshots(DEMO_HISTORY);
-    setAnalysis(DEMO_ANALYSIS);
-    setSyncState("demo");
+    setSnapshots(DEMO_HISTORY); setAnalysis(DEMO_ANALYSIS); setSyncState("demo");
   }, []);
 
-  /* add project */
   const handleAddProject = useCallback(() => {
     const label = newLabel.trim();
     if (!label) return;
     const jql = `project = "${label.toUpperCase().replace(/\s+/g, "-")}" ORDER BY updated DESC`;
-    resetBoard();
-    addProject(label, jql);
-    setNewLabel("");
+    resetBoard(); addProject(label, jql); setNewLabel("");
   }, [newLabel, addProject, resetBoard]);
 
   const rich    = tweaks.kpiStyle === "rich";
@@ -345,126 +291,118 @@ export default function App() {
   const gap     = compact ? 14 : 20;
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#111318", color: "#dde1ea", fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #111318; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-      `}</style>
+    <ThemeContext.Provider value={T}>
+      <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: T.bg, color: T.text, fontFamily: font.family.sans, transition: `background ${transition.normal}, color ${transition.normal}` }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          @keyframes spin { to { transform: rotate(360deg); } }
+          [data-theme="dark"]  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); }
+          [data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
+          ::-webkit-scrollbar { width: 5px; height: 5px; }
+          ::-webkit-scrollbar-track { background: transparent; }
+        `}</style>
 
-      {sidebarOpen && <Sidebar creds={creds} onDemo={handleDemo} />}
+        {sidebarOpen && <Sidebar creds={creds} onDemo={handleDemo} />}
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {/* ── App bar ──────────────────────────────────────────── */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 14px", height: 48, borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0, position: "relative" }}>
-          {/* Hamburger */}
-          <button aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} onClick={() => setSidebarOpen(v => !v)}
-            style={{ width: 30, height: 30, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 7, background: "transparent", color: "rgba(255,255,255,0.45)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect y="2" width="14" height="1.5" rx="1" fill="currentColor"/><rect y="6.25" width="14" height="1.5" rx="1" fill="currentColor"/><rect y="10.5" width="14" height="1.5" rx="1" fill="currentColor"/></svg>
-          </button>
-
-          <span style={{ fontSize: "0.88rem", fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", whiteSpace: "nowrap" }}>
-            AI <span style={{ color: "#6b8cff" }}>Delivery</span> Analyst
-          </span>
-
-          {/* Project tabs */}
-          <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, overflow: "hidden", marginLeft: 6 }}>
-            {projects.map(p => (
-              <button key={p.id} onClick={() => { resetBoard(); setActiveId(p.id); }} style={{
-                padding: "4px 10px", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap",
-                background: p.id === activeId ? "rgba(107,140,255,0.08)" : "transparent",
-                color: p.id === activeId ? "#6b8cff" : "rgba(255,255,255,0.4)",
-              }}>
-                {p.label}
-                {p.id === activeId && (
-                  <span onClick={e => { e.stopPropagation(); resetBoard(); removeProject(p.id); }} style={{ marginLeft: 5, opacity: 0.4, fontSize: "0.7rem" }}>✕</span>
-                )}
-              </button>
-            ))}
-            <div style={{ display: "flex", gap: 4, marginLeft: 4 }}>
-              <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddProject()}
-                placeholder="Add project…" style={{ height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#dde1ea", padding: "0 8px", fontSize: "0.73rem", outline: "none", width: 110, fontFamily: "inherit" }} />
-              <button onClick={handleAddProject} style={{ height: 26, padding: "0 10px", border: "1px solid rgba(107,140,255,0.30)", borderRadius: 6, background: "rgba(107,140,255,0.08)", color: "#6b8cff", fontSize: "0.73rem", cursor: "pointer" }}>+</button>
-            </div>
-          </div>
-
-          {/* Right side */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-            <StatusPill state={syncState} />
-            <UpdatedAgo timestamp={latestSnapshot?.timestamp} />
-            {syncError && <span style={{ fontSize: "0.7rem", color: "#f87171", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{syncError}</span>}
-            <button onClick={handleSync} disabled={!active || !creds.connected || syncState === "syncing"}
-              style={{ height: 28, padding: "0 14px", border: "1px solid rgba(107,140,255,0.30)", borderRadius: 7, background: "rgba(107,140,255,0.08)", color: "#6b8cff", fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", opacity: (!active || !creds.connected) ? 0.4 : 1, transition: "opacity 0.15s" }}>
-              ↻ Sync
+          {/* ── App bar ────────────────────────────────────────── */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 14px", height: 48, borderBottom: `1px solid ${T.borderSub}`, flexShrink: 0, position: "relative", background: T.bgBar }}>
+            {/* Hamburger */}
+            <button aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} onClick={() => setSidebarOpen(v => !v)}
+              style={{ width: 30, height: 30, border: `1px solid ${T.border}`, borderRadius: radius.md, background: "transparent", color: T.textSec, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect y="2" width="14" height="1.5" rx="1" fill="currentColor"/><rect y="6.25" width="14" height="1.5" rx="1" fill="currentColor"/><rect y="10.5" width="14" height="1.5" rx="1" fill="currentColor"/></svg>
             </button>
-            <button onClick={() => setTweaksOpen(v => !v)} style={{ width: 28, height: 28, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 7, background: tweaksOpen ? "rgba(255,255,255,0.06)" : "transparent", color: "rgba(255,255,255,0.4)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="2" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 1v1.5M6.5 10.5V12M1 6.5h1.5M10.5 6.5H12M2.4 2.4l1.06 1.06M9.54 9.54l1.06 1.06M9.54 3.46L8.48 4.52M3.46 9.54l-1.06 1.06" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-            </button>
-          </div>
 
-          {tweaksOpen && <TweaksPanel tweaks={tweaks} setTweaks={setTweaks} onClose={() => setTweaksOpen(false)} />}
-        </div>
+            <span style={{ fontSize: font.size.lg, fontWeight: font.weight.extrabold, letterSpacing: font.tracking.tight, color: T.text, whiteSpace: "nowrap" }}>
+              AI <span style={{ color: T.brand }}>Delivery</span> Analyst
+            </span>
 
-        {/* ── Body ────────────────────────────────────────────── */}
-        <div style={{ flex: 1, overflow: "auto", padding: compact ? "14px 16px" : "20px 22px", display: "flex", flexDirection: "column", gap }}>
-
-          {/* Empty state */}
-          {!active && !hasData && (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "2.5rem", marginBottom: 12 }}>📊</div>
-                <p style={{ fontSize: "0.95rem", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>No project selected</p>
-                <p style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.22)" }}>Add a project above, or load demo data from the sidebar.</p>
+            {/* Project tabs */}
+            <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, overflow: "hidden", marginLeft: 6 }}>
+              {projects.map(p => (
+                <button key={p.id} onClick={() => { resetBoard(); setActiveId(p.id); }} style={{
+                  padding: "4px 10px", border: "none", borderRadius: radius.sm, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap",
+                  background: p.id === activeId ? T.brandBg : "transparent",
+                  color: p.id === activeId ? T.brand : T.textLabel,
+                }}>
+                  {p.label}
+                  {p.id === activeId && (
+                    <span onClick={e => { e.stopPropagation(); resetBoard(); removeProject(p.id); }} style={{ marginLeft: 5, opacity: 0.4, fontSize: "0.7rem" }}>✕</span>
+                  )}
+                </button>
+              ))}
+              <div style={{ display: "flex", gap: 4, marginLeft: 4 }}>
+                <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddProject()}
+                  placeholder="Add project…" style={{ height: 26, borderRadius: radius.sm, border: `1px solid ${T.border}`, background: T.bgCard, color: T.text, padding: "0 8px", fontSize: "0.73rem", outline: "none", width: 110, fontFamily: "inherit" }} />
+                <button onClick={handleAddProject} style={{ height: 26, padding: "0 10px", border: `1px solid ${T.brandBdr}`, borderRadius: radius.sm, background: T.brandBg, color: T.brand, fontSize: "0.73rem", cursor: "pointer" }}>+</button>
               </div>
             </div>
-          )}
 
-          {/* Stale data banner */}
-          {hasData && syncState !== "demo" && (
-            <StaleBanner timestamp={latestSnapshot?.timestamp} onSync={handleSync} />
-          )}
-
-          {/* AI panel top */}
-          {(active || hasData) && tweaks.aiTop && (
-            <AIPanel analysis={analysis} prominent={!!analysis} />
-          )}
-
-          {/* KPI grid */}
-          {(active || hasData) && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: compact ? 10 : 14 }}>
-              {(hasData ? kpis : Array(6).fill(null)).map((kpi, i) => (
-                kpi
-                  ? <KpiCard key={kpi.label} {...kpi} compact={compact} />
-                  : <div key={i} style={{ borderRadius: 12, background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.05)", padding: compact ? "12px 14px" : "16px 18px", minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <span style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.15)" }}>—</span>
-                    </div>
-              ))}
+            {/* Right side */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              <StatusPill state={syncState} T={T} />
+              <UpdatedAgo timestamp={latestSnapshot?.timestamp} T={T} />
+              {syncError && <span style={{ fontSize: "0.7rem", color: T.bad, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{syncError}</span>}
+              <button onClick={handleSync} disabled={!active || !creds.connected || syncState === "syncing"}
+                style={{ height: 28, padding: "0 14px", border: `1px solid ${T.brandBdr}`, borderRadius: radius.md, background: T.brandBg, color: T.brand, fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", opacity: (!active || !creds.connected) ? 0.4 : 1, transition: `opacity ${transition.fast}` }}>
+                ↻ Sync
+              </button>
+              <ThemeToggle mode={mode} onToggle={toggleTheme} T={T} />
+              <button onClick={() => setTweaksOpen(v => !v)} style={{ width: 28, height: 28, border: `1px solid ${T.border}`, borderRadius: radius.md, background: tweaksOpen ? T.bgCard : "transparent", color: T.textLabel, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="2" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 1v1.5M6.5 10.5V12M1 6.5h1.5M10.5 6.5H12M2.4 2.4l1.06 1.06M9.54 9.54l1.06 1.06M9.54 3.46L8.48 4.52M3.46 9.54l-1.06 1.06" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+              </button>
             </div>
-          )}
 
-          {/* Stale Issues Panel */}
-          {(active || hasData) && wipItems.length > 0 && (
-            <StaleIssuesPanel items={wipItems} threshold={5} />
-          )}
+            {tweaksOpen && <TweaksPanel tweaks={tweaks} setTweaks={setTweaks} onClose={() => setTweaksOpen(false)} T={T} />}
+          </div>
 
-          {/* AI panel bottom */}
-          {(active || hasData) && !tweaks.aiTop && (
-            <AIPanel analysis={analysis} prominent={!!analysis} />
-          )}
+          {/* ── Body ──────────────────────────────────────────── */}
+          <div style={{ flex: 1, overflow: "auto", padding: compact ? "14px 16px" : "20px 22px", display: "flex", flexDirection: "column", gap }}>
 
-          {/* No data hint */}
-          {active && !hasData && syncState === "idle" && (
-            <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(107,140,255,0.04)", border: "1px solid rgba(107,140,255,0.10)", fontSize: "0.8rem", color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
-              Open the sidebar, connect a source and click <strong style={{ color: "rgba(255,255,255,0.55)" }}>↻ Sync</strong> — or load demo data.
-            </div>
-          )}
+            {!active && !hasData && (
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "2.5rem", marginBottom: 12 }}>📊</div>
+                  <p style={{ fontSize: "0.95rem", color: T.textLabel, marginBottom: 6 }}>No project selected</p>
+                  <p style={{ fontSize: "0.8rem", color: T.textFaint }}>Add a project above, or load demo data from the sidebar.</p>
+                </div>
+              </div>
+            )}
+
+            {hasData && syncState !== "demo" && (
+              <StaleBanner timestamp={latestSnapshot?.timestamp} onSync={handleSync} T={T} />
+            )}
+
+            {(active || hasData) && tweaks.aiTop && <AIPanel analysis={analysis} prominent={!!analysis} />}
+
+            {(active || hasData) && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: compact ? 10 : 14 }}>
+                {(hasData ? kpis : Array(6).fill(null)).map((kpi, i) => (
+                  kpi
+                    ? <KpiCard key={kpi.label} {...kpi} compact={compact} />
+                    : <div key={i} style={{ borderRadius: radius.card, background: T.bgCard, border: `1px solid ${T.borderSub}`, padding: compact ? "12px 14px" : "16px 18px", minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ fontSize: "0.75rem", color: T.textFaint }}>—</span>
+                      </div>
+                ))}
+              </div>
+            )}
+
+            {(active || hasData) && wipItems.length > 0 && (
+              <StaleIssuesPanel items={wipItems} threshold={5} />
+            )}
+
+            {(active || hasData) && !tweaks.aiTop && <AIPanel analysis={analysis} prominent={!!analysis} />}
+
+            {active && !hasData && syncState === "idle" && (
+              <div style={{ padding: "12px 16px", borderRadius: 10, background: T.brandBg, border: `1px solid ${T.brandBdr}`, fontSize: "0.8rem", color: T.textMuted, lineHeight: 1.6 }}>
+                Open the sidebar, connect a source and click <strong style={{ color: T.textSec }}>↻ Sync</strong> — or load demo data.
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </ThemeContext.Provider>
   );
 }
