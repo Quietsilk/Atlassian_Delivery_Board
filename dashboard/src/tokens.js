@@ -1,95 +1,115 @@
 /**
- * AI Delivery Analyst — Design Tokens
+ * AI Delivery Analyst — Design Tokens v2 (Calm)
  *
  * Single source of truth for colours, typography, spacing, radii and shadows.
  * Import into components instead of hardcoding magic strings.
  *
  * Usage:
- *   import { color, radius, font } from "../tokens";
+ *   import { color, radius, font, statusColors } from "../tokens";
  *   style={{ background: color.surface.card, borderRadius: radius.card }}
+ *
+ * Colour philosophy (v2):
+ * - Canvas warmer — #111318 instead of #0e1016
+ * - Status colours muted — signal without shouting
+ * - Cards monochrome by default; colour only in stripe, delta, badge
+ * - Brand slate-blue instead of electric blue
  */
 
 /* ─── Colour palette ──────────────────────────────────────────────────────── */
 
 export const color = {
-  /* Canvas */
-  bg:      "#0e1016",   // root background
+  /* Canvas — warmer, not pitch black */
+  bg: "#111318",
   surface: {
-    sidebar: "rgba(255,255,255,0.016)",
-    card:    "rgba(255,255,255,0.025)",
-    cardHover: "rgba(255,255,255,0.035)",
-    overlay: "#16181f",  // tweaks panel, dropdowns
+    sidebar:   "rgba(255,255,255,0.018)",
+    card:      "rgba(255,255,255,0.03)",
+    cardHover: "rgba(255,255,255,0.042)",
+    overlay:   "#1a1d24",
   },
 
-  /* Borders */
+  /* Borders — slightly more visible */
   border: {
-    subtle:  "rgba(255,255,255,0.05)",
-    default: "rgba(255,255,255,0.08)",
-    strong:  "rgba(255,255,255,0.12)",
+    subtle:  "rgba(255,255,255,0.06)",
+    default: "rgba(255,255,255,0.09)",
+    strong:  "rgba(255,255,255,0.14)",
   },
 
-  /* Brand — blue accent */
+  /* Brand — slate-blue, less electric */
   brand: {
-    default: "#4f7cff",
-    bg:      "rgba(79,124,255,0.10)",
-    bgHover: "rgba(79,124,255,0.20)",
-    border:  "rgba(79,124,255,0.40)",
-    focus:   "rgba(79,124,255,0.50)",
-    glow:    "rgba(79,124,255,0.04)",  // input focus bg
+    default: "#6b8cff",           // was #4f7cff
+    bg:      "rgba(107,140,255,0.08)",
+    bgHover: "rgba(107,140,255,0.14)",
+    border:  "rgba(107,140,255,0.30)",
+    focus:   "rgba(107,140,255,0.40)",
+    glow:    "rgba(107,140,255,0.03)",
   },
 
   /* Status — good */
   good: {
-    fg:     "#22c55e",
-    bg:     "rgba(34,197,94,0.07)",
-    bgPill: "rgba(34,197,94,0.06)",
-    border: "rgba(34,197,94,0.22)",
-    borderPill: "rgba(34,197,94,0.12)",
-    glow:   "rgba(34,197,94,0.70)",
+    fg:         "#4ade80",        // was #22c55e — softer green
+    bg:         "transparent",   // no coloured card bg in v2
+    bgPill:     "rgba(74,222,128,0.07)",
+    border:     "rgba(74,222,128,0.18)",
+    borderPill: "rgba(74,222,128,0.12)",
+    stripe:     "#4ade80",
+    glow:       "rgba(74,222,128,0.55)",
   },
 
   /* Status — warn */
   warn: {
-    fg:     "#f59e0b",
-    bg:     "rgba(245,158,11,0.07)",
-    border: "rgba(245,158,11,0.25)",
+    fg:     "#fbbf24",            // was #f59e0b — lighter amber
+    bg:     "transparent",
+    bgPill: "rgba(251,191,36,0.07)",
+    border: "rgba(251,191,36,0.18)",
+    stripe: "#fbbf24",
   },
 
   /* Status — bad */
   bad: {
-    fg:     "#ef4444",
-    bg:     "rgba(239,68,68,0.07)",
-    border: "rgba(239,68,68,0.25)",
+    fg:     "#f87171",            // was #ef4444 — rose instead of red
+    bg:     "transparent",
+    bgPill: "rgba(248,113,113,0.07)",
+    border: "rgba(248,113,113,0.18)",
+    stripe: "#f87171",
+  },
+
+  /* Status — neutral */
+  neutral: {
+    fg:     "rgba(255,255,255,0.18)",
+    bg:     "transparent",
+    border: "rgba(255,255,255,0.08)",
+    stripe: "transparent",
   },
 
   /* Status — demo (purple) */
   demo: {
     fg:     "#a78bfa",
-    bg:     "rgba(167,139,250,0.08)",
-    border: "rgba(167,139,250,0.30)",
+    bg:     "rgba(167,139,250,0.07)",
+    border: "rgba(167,139,250,0.22)",
   },
 
-  /* Text */
+  /* Text — slightly quieter */
   text: {
-    primary:   "#e2e6ef",           // main content
-    secondary: "rgba(255,255,255,0.50)",
-    muted:     "rgba(255,255,255,0.30)",
-    faint:     "rgba(255,255,255,0.22)",
-    label:     "rgba(255,255,255,0.45)",  // KPI card labels
-    sublabel:  "rgba(255,255,255,0.28)",  // KPI card sublabels
+    primary:   "#dde1ea",         // was #e2e6ef
+    secondary: "rgba(255,255,255,0.45)",
+    muted:     "rgba(255,255,255,0.28)",
+    faint:     "rgba(255,255,255,0.18)",
+    label:     "rgba(255,255,255,0.40)",  // KPI card labels
+    sublabel:  "rgba(255,255,255,0.24)",  // KPI card sublabels
   },
 };
 
 /* ─── Status helpers ──────────────────────────────────────────────────────── */
 
-/** Returns { fg, bg, border } for a given status string */
+/** Returns { fg, bg, border, stripe } for a given status string */
 export function statusColors(status) {
+  const s = color;
   return {
-    good:    { fg: color.good.fg,    bg: color.good.bg,    border: color.good.border },
-    warn:    { fg: color.warn.fg,    bg: color.warn.bg,    border: color.warn.border },
-    bad:     { fg: color.bad.fg,     bg: color.bad.bg,     border: color.bad.border },
-    neutral: { fg: "rgba(255,255,255,0.15)", bg: "transparent", border: "rgba(255,255,255,0.07)" },
-  }[status] ?? { fg: color.text.muted, bg: "transparent", border: color.border.subtle };
+    good:    { fg: s.good.fg,    bg: s.good.bg,    border: s.good.border,    stripe: s.good.stripe    },
+    warn:    { fg: s.warn.fg,    bg: s.warn.bg,    border: s.warn.border,    stripe: s.warn.stripe    },
+    bad:     { fg: s.bad.fg,     bg: s.bad.bg,     border: s.bad.border,     stripe: s.bad.stripe     },
+    neutral: { fg: s.neutral.fg, bg: s.neutral.bg, border: s.neutral.border, stripe: s.neutral.stripe },
+  }[status] ?? { fg: s.text.muted, bg: "transparent", border: s.border.subtle, stripe: "transparent" };
 }
 
 /* ─── Typography ──────────────────────────────────────────────────────────── */
@@ -100,70 +120,61 @@ export const font = {
     mono: "'IBM Plex Mono', monospace",
   },
   size: {
-    xxs:  "0.62rem",   // section labels (JIRA CONNECTION)
-    xs:   "0.67rem",   // field labels, sublabels
-    sm:   "0.72rem",   // secondary text, mono values
-    base: "0.78rem",   // inputs, body text
-    md:   "0.82rem",   // risk/action items
-    lg:   "0.88rem",   // logo
-    kpiSm: "1.7rem",   // KPI value compact
-    kpiLg: "2.1rem",   // KPI value comfortable
+    xxs:   "0.62rem",   // section labels
+    xs:    "0.67rem",   // field labels, sublabels
+    sm:    "0.72rem",   // secondary text, mono values
+    base:  "0.78rem",   // inputs, body text
+    md:    "0.82rem",   // risk/action items
+    lg:    "0.88rem",   // logo
+    kpiSm: "1.7rem",    // KPI value compact
+    kpiLg: "2.1rem",    // KPI value comfortable
   },
   weight: {
-    regular:  400,
-    medium:   500,
-    semibold: 600,
-    bold:     700,
+    regular:   400,
+    medium:    500,
+    semibold:  600,
+    bold:      700,
     extrabold: 800,
   },
   tracking: {
-    tight:   "-0.04em",
-    normal:  "0",
-    wide:    "0.03em",
-    wider:   "0.07em",
-    widest:  "0.10em",  // section labels
+    tight:  "-0.04em",
+    normal: "0",
+    wide:   "0.03em",
+    wider:  "0.07em",
+    widest: "0.10em",
   },
 };
 
 /* ─── Spacing ─────────────────────────────────────────────────────────────── */
 
 export const space = {
-  1:  2,
-  2:  4,
-  3:  6,
-  4:  8,
-  5: 10,
-  6: 12,
-  7: 14,
-  8: 16,
-  9: 18,
- 10: 20,
- 12: 24,
- 14: 28,
- 16: 32,
+  1:  2,  2:  4,  3:  6,  4:  8,
+  5: 10,  6: 12,  7: 14,  8: 16,
+  9: 18, 10: 20, 12: 24, 14: 28, 16: 32,
 };
 
 /* ─── Border radius ───────────────────────────────────────────────────────── */
 
 export const radius = {
-  sm:     6,   // buttons in tweaks panel, small badges
-  md:     7,   // connect button, status pill
-  input:  8,   // form inputs
-  card:  12,   // KPI cards
-  panel: 14,   // AI panel, large cards
+  sm:    6,
+  md:    7,
+  input: 8,
+  card:  12,
+  panel: 14,
 };
 
-/* ─── Elevation / shadows ─────────────────────────────────────────────────── */
+/* ─── Elevation ───────────────────────────────────────────────────────────── */
 
 export const shadow = {
-  overlay: "0 8px 32px rgba(0,0,0,0.5)",  // tweaks panel
+  overlay: "0 8px 32px rgba(0,0,0,0.45)",
+  card:    "0 1px 3px rgba(0,0,0,0.3)",
 };
 
 /* ─── Animation ───────────────────────────────────────────────────────────── */
 
 export const transition = {
-  fast:   "0.15s ease",
-  normal: "0.20s ease",
+  fast:    "0.15s ease",
+  normal:  "0.20s ease",
   sidebar: "width 0.22s cubic-bezier(0.4,0,0.2,1)",
   kpiBar:  "width 0.60s ease",
 };
@@ -171,9 +182,9 @@ export const transition = {
 /* ─── Layout ──────────────────────────────────────────────────────────────── */
 
 export const layout = {
-  sidebarWidth: 264,   // px
-  appBarHeight:  48,   // px
-  kpiColumns:     3,   // grid columns
-  kpiGapComfy:   14,   // px gap comfortable
-  kpiGapCompact: 10,   // px gap compact
+  sidebarWidth:  264,
+  appBarHeight:   48,
+  kpiColumns:      3,
+  kpiGapComfy:    14,
+  kpiGapCompact:  10,
 };

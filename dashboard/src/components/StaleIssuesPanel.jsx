@@ -1,14 +1,14 @@
 import { useState } from "react";
 
 const C = {
-  red:      "#ef4444", redBg:   "rgba(239,68,68,0.08)",  redBorder:   "rgba(239,68,68,0.2)",
-  amber:    "#f59e0b", amberBg: "rgba(245,158,11,0.08)", amberBorder: "rgba(245,158,11,0.2)",
-  blue:     "#4f7cff",
-  surface:  "rgba(255,255,255,0.025)",
-  border:   "rgba(255,255,255,0.07)",
-  text:     "#e2e6ef",
-  muted:    "rgba(255,255,255,0.35)",
-  dim:      "rgba(255,255,255,0.22)",
+  red:      "#f87171", redBg:   "rgba(248,113,113,0.07)", redBorder:   "rgba(248,113,113,0.18)",
+  amber:    "#fbbf24", amberBg: "rgba(251,191,36,0.07)",  amberBorder: "rgba(251,191,36,0.18)",
+  blue:     "#6b8cff",
+  surface:  "rgba(255,255,255,0.03)",
+  border:   "rgba(255,255,255,0.09)",
+  text:     "#dde1ea",
+  muted:    "rgba(255,255,255,0.28)",
+  dim:      "rgba(255,255,255,0.18)",
 };
 
 function agingColor(days) {
