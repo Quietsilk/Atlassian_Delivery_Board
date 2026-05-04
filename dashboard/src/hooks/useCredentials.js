@@ -1,45 +1,59 @@
 import { useState, useCallback } from "react";
 
-const KEYS = { baseUrl: "ada:baseUrl", email: "ada:email", token: "ada:token" };
-const ls = (k, fb = "") => { try { return localStorage.getItem(k) || fb; } catch { return fb; } };
-const lsSet = (k, v) => {
-  try {
-    localStorage.setItem(k, v);
-  } catch {
-    return false;
-  }
-  return true;
-};
+// ── localStorage helpers ───────────────────────────────────────────────────────
+const LS_SOURCE = "ada:source";
+const LS_CREDS  = "ada:creds-v2"; // { jira:{...}, linear:{...}, asana:{...}, clickup:{...} }
 
-function validate(baseUrl, email, apiToken) {
-  if (!baseUrl || !email || !apiToken) return "Fill in URL, Email and API Token.";
-  if (!/^https:\/\/.+/i.test(baseUrl)) return "URL must start with https://";
-  if (!/^\S+@\S+\.\S+$/.test(email)) return "Enter a valid email.";
-  return "";
+const ls    = (k, fb = null) => { try { return localStorage.getItem(k) || fb; } catch { return fb; } };
+const lsSet = (k, v)         => { try { localStorage.setItem(k, v); }          catch {} };
+
+function loadSaved() {
+  try { return JSON.parse(localStorage.getItem(LS_CREDS)) || {}; } catch { return {}; }
 }
 
+// ── Required fields per source (optional fields excluded) ─────────────────────
+const REQUIRED = {
+  jira:    ["baseUrl", "email", "apiToken"],
+  linear:  ["apiKey"],
+  asana:   ["accessToken", "workspaceId"],
+  clickup: ["apiToken", "teamId"],
+};
+
+export function hasRequired(source, vals) {
+  return !!(vals && (REQUIRED[source] || []).every(k => vals[k]?.trim()));
+}
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
 export function useCredentials() {
-  const [baseUrl,   setBaseUrlRaw]   = useState(() => ls(KEYS.baseUrl));
-  const [email,     setEmailRaw]     = useState(() => ls(KEYS.email));
-  const [apiToken,  setApiTokenRaw]  = useState(() => ls(KEYS.token));
-  const [connected, setConnected]    = useState(() => !validate(ls(KEYS.baseUrl), ls(KEYS.email), ls(KEYS.token)));
-  const [connMsg,   setConnMsg]      = useState(() => {
-    const savedBaseUrl = ls(KEYS.baseUrl);
-    return validate(savedBaseUrl, ls(KEYS.email), ls(KEYS.token)) || "Connected to " + savedBaseUrl;
+  const [source,     setSourceState] = useState(() => ls(LS_SOURCE) || "jira");
+  const [savedCreds, setSavedCreds]  = useState(loadSaved);
+  const [connected,  setConnected]   = useState(() => {
+    const src  = ls(LS_SOURCE) || "jira";
+    return hasRequired(src, loadSaved()[src]);
   });
 
-  const set = (setter, lsKey) => (v) => { setter(v); lsSet(lsKey, v); setConnected(false); };
-  const setBaseUrl  = set(setBaseUrlRaw,  KEYS.baseUrl);
-  const setEmail    = set(setEmailRaw,    KEYS.email);
-  const setApiToken = set(setApiTokenRaw, KEYS.token);
+  /** Switch active source; restores connected state from previously saved creds. */
+  const setSource = useCallback((s) => {
+    setSourceState(s);
+    lsSet(LS_SOURCE, s);
+    setSavedCreds(prev => {
+      setConnected(hasRequired(s, prev[s]));
+      return prev;
+    });
+  }, []);
 
-  const connect = useCallback(() => {
-    const error = validate(baseUrl, email, apiToken);
-    if (error) { setConnMsg(error); return false; }
+  /** Save credentials for a source and mark as connected. */
+  const connect = useCallback((src, values) => {
+    setSavedCreds(prev => {
+      const next = { ...prev, [src]: values };
+      lsSet(LS_CREDS, JSON.stringify(next));
+      return next;
+    });
     setConnected(true);
-    setConnMsg("Connected to " + baseUrl);
-    return true;
-  }, [baseUrl, email, apiToken]);
+  }, []);
 
-  return { baseUrl, email, apiToken, connected, connMsg, setBaseUrl, setEmail, setApiToken, connect };
+  /** Saved credentials for the currently active source. */
+  const currentCreds = savedCreds[source] || {};
+
+  return { source, setSource, connected, connect, currentCreds };
 }

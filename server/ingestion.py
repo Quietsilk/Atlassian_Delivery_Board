@@ -45,7 +45,7 @@ def fetch_jira(base_url, email, api_token, jql):
         body = {
             "jql": jql, "maxResults": PAGE_SIZE,
             "fieldsByKeys": True,
-            "fields": ["summary", "status", "created", "resolutiondate"],
+            "fields": ["summary", "status", "created", "resolutiondate", "assignee"],
         }
         if next_page_token:
             body["nextPageToken"] = next_page_token
@@ -74,6 +74,52 @@ def fetch_jira(base_url, email, api_token, jql):
         issue["changelog"] = {"histories": changelogs.get(issue["key"], [])}
 
     return all_issues
+
+
+# ── WIP items ────────────────────────────────────────────────────────────────
+
+def _compute_wip_items(issues, mapped):
+    """Build a list of in-progress issue details for the StaleIssuesPanel.
+
+    Returns at most 20 items, sorted by daysInProgress descending.
+    Works with both Jira issues (have key/summary/assignee) and canonical
+    issues from other adapters (fallback to id / empty strings).
+    """
+    now = datetime.now(timezone.utc)
+    wip = []
+    for issue, m in zip(issues, mapped):
+        if not (m["started_at"] and not m["resolved_at"]):
+            continue
+        try:
+            started = _parse_dt(m["started_at"])
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            days = round((now - started).total_seconds() / 86400, 1)
+        except Exception:
+            days = 0
+
+        fields   = issue.get("fields") or {}
+        key      = issue.get("key") or issue.get("id") or "—"
+        title    = fields.get("summary") or fields.get("name") or ""
+        assignee_raw = fields.get("assignee") or {}
+        if isinstance(assignee_raw, dict):
+            assignee = (assignee_raw.get("displayName")
+                        or assignee_raw.get("name") or "")
+        else:
+            assignee = str(assignee_raw) if assignee_raw else ""
+        status = (fields.get("status") or {}).get("name") or "In Progress"
+
+        wip.append({
+            "key":             key,
+            "title":           title,
+            "assignee":        assignee,
+            "daysInProgress":  days,
+            "status":          status,
+            "blockedReason":   None,
+        })
+
+    wip.sort(key=lambda x: x["daysInProgress"], reverse=True)
+    return wip[:20]
 
 
 # ── Step 2: interval-based completed extraction ──────────────────────────────
@@ -183,6 +229,9 @@ def run_ingestion(project_key, base_url, email, api_token, jql, db_path="snapsho
 
     # Step 8: wipRatio deprecated — not saved
 
+    # WIP items for StaleIssuesPanel
+    metrics["wipItems"] = _compute_wip_items(issues, mapped)
+
     ts = save_snapshot(project_key, metrics, db_path)
     print(f"[ingestion] {project_key}: snapshot saved at {ts} — {metrics}")
     return metrics
@@ -236,6 +285,9 @@ def run_ingestion_with_adapter(project_key, source, config, db_path="snapshots.d
 
     # Step 8: predictability (rolling 30d window approximation)
     metrics["predictabilityPercent"] = _calc_predictability(mapped)
+
+    # WIP items for StaleIssuesPanel
+    metrics["wipItems"] = _compute_wip_items(issues, mapped)
 
     ts = save_snapshot(project_key, metrics, db_path)
     print(f"[ingestion] {project_key}: snapshot saved at {ts} — {metrics}")
