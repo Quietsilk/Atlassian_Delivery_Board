@@ -29,8 +29,8 @@ const SOURCES = {
       </svg>
     ),
     fields: [
-      { id: "apiKey", label: "API Key", type: "password", placeholder: "lin_api_••••••••••",          required: true },
-      { id: "teamId", label: "Team ID", type: "text",     placeholder: "Optional — blank = all teams", required: false },
+      { id: "apiKey", label: "API Key", type: "password", placeholder: "lin_api_••••••••••", required: true },
+      { id: "teamId", label: "Team ID", type: "text",     placeholder: "Your Linear Team ID",          required: true },
     ],
     hint: "Settings → API → Personal API keys → Create key",
     qualityNote: "Full history · P50/P85 · Flow Efficiency",
@@ -64,9 +64,9 @@ const SOURCES = {
       </svg>
     ),
     fields: [
-      { id: "apiToken", label: "API Token", type: "password", placeholder: "pk_••••••••••••••••", required: true },
-      { id: "teamId",   label: "Team ID",   type: "text",     placeholder: "Your ClickUp Team ID", required: true },
-      { id: "listId",   label: "List ID",   type: "text",     placeholder: "Optional — specific list", required: false },
+      { id: "apiToken", label: "API Token", type: "password", placeholder: "pk_••••••••••••••••",  required: true },
+      { id: "listId",   label: "List ID",   type: "text",     placeholder: "Your ClickUp List ID", required: true },
+      { id: "teamId",   label: "Team ID",   type: "text",     placeholder: "Optional — Team ID",   required: false },
     ],
     hint: "Settings → Apps → API → Generate token",
     qualityNote: "Custom statuses · partial history",
