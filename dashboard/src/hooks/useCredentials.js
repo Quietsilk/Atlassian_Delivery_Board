@@ -14,9 +14,9 @@ function loadSaved() {
 // ── Required fields per source (optional fields excluded) ─────────────────────
 const REQUIRED = {
   jira:    ["baseUrl", "email", "apiToken"],
-  linear:  ["apiKey"],
+  linear:  ["apiKey", "teamId"],
   asana:   ["accessToken", "workspaceId"],
-  clickup: ["apiToken", "teamId"],
+  clickup: ["apiToken", "listId"],
 };
 
 export function hasRequired(source, vals) {
