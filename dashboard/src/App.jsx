@@ -151,14 +151,19 @@ function formatAgo(isoTs) {
 }
 
 function UpdatedAgo({ timestamp }) {
-  const level = staleLevel(timestamp);
-  const ago   = formatAgo(timestamp);
+  const level     = staleLevel(timestamp);
+  const ago       = formatAgo(timestamp);
   if (!ago) return null;
-  const color = { ok: "rgba(255,255,255,0.35)", amber: "#f59e0b", red: "#ef4444", none: "rgba(255,255,255,0.22)" }[level];
+  const staleColor = {
+    ok:    "rgba(255,255,255,0.35)",
+    amber: "#fbbf24",
+    red:   "#f87171",
+    none:  "rgba(255,255,255,0.18)",
+  }[level];
   return (
-    <span style={{ fontSize: "0.7rem", color, fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", gap: 5, transition: "color 0.3s" }}>
+    <span style={{ fontSize: "0.7rem", color: staleColor, fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", gap: 5, transition: "color 0.3s" }}>
       {level !== "ok" && (
-        <span style={{ width: 5, height: 5, borderRadius: "50%", background: color, display: "inline-block", flexShrink: 0 }} />
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: staleColor, display: "inline-block", flexShrink: 0 }} />
       )}
       Updated {ago}
     </span>
@@ -172,8 +177,8 @@ function StaleBanner({ timestamp, onSync }) {
   if (level === "ok" || level === "none") return null;
   const ago = formatAgo(timestamp);
   const cfg = level === "red"
-    ? { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.2)", color: "#ef4444", icon: "!", text: `Data is ${ago} old — metrics may be stale` }
-    : { bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)", color: "#f59e0b", icon: "⚠", text: `Data is ${ago} old — consider syncing` };
+    ? { bg: "rgba(248,113,113,0.07)", border: "rgba(248,113,113,0.18)", color: "#f87171", icon: "!", text: `Data is ${ago} old — metrics may be stale` }
+    : { bg: "rgba(251,191,36,0.07)",  border: "rgba(251,191,36,0.18)",  color: "#fbbf24", icon: "⚠", text: `Data is ${ago} old — consider syncing` };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderRadius: 10, background: cfg.bg, border: `1px solid ${cfg.border}` }}>
       <div style={{ width: 20, height: 20, borderRadius: 5, background: cfg.bg, border: `1px solid ${cfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", color: cfg.color, fontWeight: 700, flexShrink: 0 }}>
@@ -198,20 +203,23 @@ function TweaksPanel({ tweaks, setTweaks, onClose }) {
   );
   const btn = (active, label, onClick) => (
     <button onClick={onClick} style={{
-      padding: "4px 10px", border: "1px solid " + (active ? "rgba(79,124,255,0.5)" : "rgba(255,255,255,0.1)"),
-      borderRadius: 6, background: active ? "rgba(79,124,255,0.15)" : "transparent",
-      color: active ? "#4f7cff" : "rgba(255,255,255,0.4)", fontSize: "0.73rem", cursor: "pointer",
+      padding: "4px 10px",
+      border: "1px solid " + (active ? "rgba(107,140,255,0.40)" : "rgba(255,255,255,0.1)"),
+      borderRadius: 6,
+      background: active ? "rgba(107,140,255,0.08)" : "transparent",
+      color: active ? "#6b8cff" : "rgba(255,255,255,0.4)",
+      fontSize: "0.73rem", cursor: "pointer",
     }}>{label}</button>
   );
   return (
-    <div style={{ position: "absolute", top: 44, right: 12, zIndex: 100, background: "#16181f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "14px 16px", minWidth: 240, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+    <div style={{ position: "absolute", top: 44, right: 12, zIndex: 100, background: "#1a1d24", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "14px 16px", minWidth: 240, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.45)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>Display</span>
         <button onClick={onClose} style={{ border: "none", background: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "0.9rem" }}>✕</button>
       </div>
-      {row("Cards",      [btn(tweaks.kpiStyle === "rich",    "Rich",        () => setTweaks(t => ({ ...t, kpiStyle: "rich" }))),    btn(tweaks.kpiStyle === "minimal", "Minimal",     () => setTweaks(t => ({ ...t, kpiStyle: "minimal" })))])}
-      {row("Density",    [btn(tweaks.density  === "comfortable", "Comfortable", () => setTweaks(t => ({ ...t, density: "comfortable" }))), btn(tweaks.density === "compact", "Compact", () => setTweaks(t => ({ ...t, density: "compact" })))])}
-      {row("AI Position",[btn(tweaks.aiTop,  "Top",    () => setTweaks(t => ({ ...t, aiTop: true }))),  btn(!tweaks.aiTop, "Bottom", () => setTweaks(t => ({ ...t, aiTop: false })))])}
+      {row("Cards",      [btn(tweaks.kpiStyle === "rich",        "Rich",         () => setTweaks(t => ({ ...t, kpiStyle: "rich" }))),        btn(tweaks.kpiStyle === "minimal",     "Minimal",     () => setTweaks(t => ({ ...t, kpiStyle: "minimal" })))])}
+      {row("Density",    [btn(tweaks.density  === "comfortable", "Comfortable",  () => setTweaks(t => ({ ...t, density: "comfortable" }))),   btn(tweaks.density  === "compact",     "Compact",     () => setTweaks(t => ({ ...t, density: "compact" })))])}
+      {row("AI Position",[btn(tweaks.aiTop,                     "Top",          () => setTweaks(t => ({ ...t, aiTop: true }))),               btn(!tweaks.aiTop,                     "Bottom",      () => setTweaks(t => ({ ...t, aiTop: false })))])}
     </div>
   );
 }
@@ -221,10 +229,10 @@ function TweaksPanel({ tweaks, setTweaks, onClose }) {
 function StatusPill({ state }) {
   const cfg = {
     idle:    { color: "rgba(255,255,255,0.25)", bg: "rgba(255,255,255,0.04)", label: "Idle" },
-    syncing: { color: "#f59e0b",                bg: "rgba(245,158,11,0.08)",  label: "Syncing…" },
-    done:    { color: "#22c55e",                bg: "rgba(34,197,94,0.08)",   label: "Up to date" },
-    error:   { color: "#ef4444",                bg: "rgba(239,68,68,0.08)",   label: "Error" },
-    demo:    { color: "#a78bfa",                bg: "rgba(167,139,250,0.08)", label: "Demo" },
+    syncing: { color: "#fbbf24",               bg: "rgba(251,191,36,0.07)",  label: "Syncing…" },
+    done:    { color: "#4ade80",               bg: "rgba(74,222,128,0.07)",  label: "Up to date" },
+    error:   { color: "#f87171",               bg: "rgba(248,113,113,0.07)", label: "Error" },
+    demo:    { color: "#a78bfa",               bg: "rgba(167,139,250,0.07)", label: "Demo" },
   }[state] ?? { color: "rgba(255,255,255,0.25)", bg: "transparent", label: state };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: cfg.bg, border: `1px solid ${cfg.color}40` }}>
@@ -337,11 +345,11 @@ export default function App() {
   const gap     = compact ? 14 : 20;
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#0e1016", color: "#e2e6ef", fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#111318", color: "#dde1ea", fontFamily: "'Inter', system-ui, sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0e1016; }
+        body { background: #111318; }
         @keyframes spin { to { transform: rotate(360deg); } }
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -361,7 +369,7 @@ export default function App() {
           </button>
 
           <span style={{ fontSize: "0.88rem", fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", whiteSpace: "nowrap" }}>
-            AI <span style={{ color: "#4f7cff" }}>Delivery</span> Analyst
+            AI <span style={{ color: "#6b8cff" }}>Delivery</span> Analyst
           </span>
 
           {/* Project tabs */}
@@ -369,8 +377,8 @@ export default function App() {
             {projects.map(p => (
               <button key={p.id} onClick={() => { resetBoard(); setActiveId(p.id); }} style={{
                 padding: "4px 10px", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap",
-                background: p.id === activeId ? "rgba(79,124,255,0.15)" : "transparent",
-                color: p.id === activeId ? "#4f7cff" : "rgba(255,255,255,0.4)",
+                background: p.id === activeId ? "rgba(107,140,255,0.08)" : "transparent",
+                color: p.id === activeId ? "#6b8cff" : "rgba(255,255,255,0.4)",
               }}>
                 {p.label}
                 {p.id === activeId && (
@@ -380,8 +388,8 @@ export default function App() {
             ))}
             <div style={{ display: "flex", gap: 4, marginLeft: 4 }}>
               <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddProject()}
-                placeholder="Add project…" style={{ height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#e2e6ef", padding: "0 8px", fontSize: "0.73rem", outline: "none", width: 110, fontFamily: "inherit" }} />
-              <button onClick={handleAddProject} style={{ height: 26, padding: "0 10px", border: "1px solid rgba(79,124,255,0.3)", borderRadius: 6, background: "rgba(79,124,255,0.08)", color: "rgba(79,124,255,0.8)", fontSize: "0.73rem", cursor: "pointer" }}>+</button>
+                placeholder="Add project…" style={{ height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#dde1ea", padding: "0 8px", fontSize: "0.73rem", outline: "none", width: 110, fontFamily: "inherit" }} />
+              <button onClick={handleAddProject} style={{ height: 26, padding: "0 10px", border: "1px solid rgba(107,140,255,0.30)", borderRadius: 6, background: "rgba(107,140,255,0.08)", color: "#6b8cff", fontSize: "0.73rem", cursor: "pointer" }}>+</button>
             </div>
           </div>
 
@@ -389,9 +397,9 @@ export default function App() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             <StatusPill state={syncState} />
             <UpdatedAgo timestamp={latestSnapshot?.timestamp} />
-            {syncError && <span style={{ fontSize: "0.7rem", color: "#ef4444", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{syncError}</span>}
+            {syncError && <span style={{ fontSize: "0.7rem", color: "#f87171", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{syncError}</span>}
             <button onClick={handleSync} disabled={!active || !creds.connected || syncState === "syncing"}
-              style={{ height: 28, padding: "0 14px", border: "1px solid rgba(79,124,255,0.35)", borderRadius: 7, background: "rgba(79,124,255,0.1)", color: "#4f7cff", fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", opacity: (!active || !creds.connected) ? 0.4 : 1, transition: "opacity 0.15s" }}>
+              style={{ height: 28, padding: "0 14px", border: "1px solid rgba(107,140,255,0.30)", borderRadius: 7, background: "rgba(107,140,255,0.08)", color: "#6b8cff", fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", opacity: (!active || !creds.connected) ? 0.4 : 1, transition: "opacity 0.15s" }}>
               ↻ Sync
             </button>
             <button onClick={() => setTweaksOpen(v => !v)} style={{ width: 28, height: 28, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 7, background: tweaksOpen ? "rgba(255,255,255,0.06)" : "transparent", color: "rgba(255,255,255,0.4)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -451,7 +459,7 @@ export default function App() {
 
           {/* No data hint */}
           {active && !hasData && syncState === "idle" && (
-            <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(79,124,255,0.04)", border: "1px solid rgba(79,124,255,0.12)", fontSize: "0.8rem", color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
+            <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(107,140,255,0.04)", border: "1px solid rgba(107,140,255,0.10)", fontSize: "0.8rem", color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
               Open the sidebar, connect a source and click <strong style={{ color: "rgba(255,255,255,0.55)" }}>↻ Sync</strong> — or load demo data.
             </div>
           )}
