@@ -1,84 +1,114 @@
 # Design System — AI Delivery Analyst
 
-Единственный источник правды для цветов, типографики, отступов и радиусов.  
-Файл: `src/tokens.js` — импортировать в компоненты, не дублировать строки.
+Единственный источник правды для цветов, типографики, отступов и анимаций.  
+Файл: `src/tokens.js`
+
+Поддерживаются две темы: **Dark (Calm)** и **Light**. Переключение — кнопка в шапке.
 
 ---
 
-## Цвета
+## Использование
+
+```js
+import { getStatusColors, font, radius, transition } from "../tokens";
+import { useT } from "../context/ThemeContext";
+
+const T = useT();  // тема-зависимые токены: цвета, тени
+const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
+```
+
+---
+
+## Цвета (тема-зависимые через `T`)
 
 ### Canvas
-| Токен | Значение | Применение |
-|---|---|---|
-| `color.bg` | `#0e1016` | root background |
-| `color.surface.sidebar` | `rgba(255,255,255,0.016)` | фон сайдбара |
-| `color.surface.card` | `rgba(255,255,255,0.025)` | KPI-карточки, AI-панель |
-| `color.surface.overlay` | `#16181f` | tweaks panel, dropdown |
 
-### Brand (blue)
-| Токен | Применение |
-|---|---|
-| `color.brand.default` `#4f7cff` | акцентный цвет, активные табы, AI-точка |
-| `color.brand.bg` | фон кнопки Connect, активного таба |
-| `color.brand.border` | рамка кнопки Connect |
-| `color.brand.focus` | border-color при :focus на инпутах |
-| `color.brand.glow` | background при :focus на инпутах |
-
-### Статусы KPI
-| Статус | fg | bg | Применение |
+| Токен | Dark | Light | Назначение |
 |---|---|---|---|
-| `good` | `#22c55e` | `rgba(34,197,94,0.07)` | Cycle Time ≤ 3d, Flow ≥ 40% … |
-| `warn` | `#f59e0b` | `rgba(245,158,11,0.07)` | промежуточные значения |
-| `bad`  | `#ef4444` | `rgba(239,68,68,0.07)`  | критические значения |
-| `neutral` | `rgba(255,255,255,0.15)` | `transparent` | нет данных |
-| `demo` | `#a78bfa` | `rgba(167,139,250,0.08)` | статус-пилюля Demo |
+| `T.bg` | `#13151b` | `#f0f2f5` | root background |
+| `T.bgBar` | `rgba(19,21,27,0.95)` | `rgba(244,246,249,0.95)` | app bar |
+| `T.bgCard` | `#1c1f28` | `#ffffff` | KPI-карточки, AI-панель |
+| `T.bgSidebar` | `rgba(0,0,0,0.20)` | `rgba(0,0,0,0.025)` | сайдбар |
 
-**Правило:** `statusColors(status)` возвращает `{ fg, bg, border }` — использовать вместо switch/if.
+### Brand
+
+| Токен | Dark | Light | Назначение |
+|---|---|---|---|
+| `T.brand` | `#6b8cff` | `#4f6fe8` | акцент: кнопки, активные табы, AI-точка |
+| `T.brandBg` | `rgba(107,140,255,0.08)` | `rgba(79,111,232,0.07)` | фон brand-элементов |
+| `T.brandBdr` | `rgba(107,140,255,0.30)` | `rgba(79,111,232,0.25)` | рамка brand-элементов |
+| `T.brandFocus` | `rgba(107,140,255,0.40)` | `rgba(79,111,232,0.35)` | border при :focus |
+| `T.brandGlow` | `rgba(107,140,255,0.03)` | `rgba(79,111,232,0.04)` | bg при :focus |
+
+### Статусы
+
+| Токен | Dark | Light | Назначение |
+|---|---|---|---|
+| `T.good` / `T.goodBg` / `T.goodBdr` | `#4ade80` | `#16a34a` | позитивный |
+| `T.warn` / `T.warnBg` / `T.warnBdr` | `#fbbf24` | `#b45309` | предупреждение |
+| `T.bad` / `T.badBg` / `T.badBdr` | `#f87171` | `#dc2626` | критический |
+| `T.demo` / `T.demoBg` / `T.demoBdr` | `#a78bfa` | `#7c3aed` | demo-данные |
+
+**Правило:** `getStatusColors(T, status)` → `{ fg, bg, border, stripe }` — не писать switch/if.
 
 ### Текст
-| Токен | Значение | Применение |
-|---|---|---|
-| `color.text.primary` | `#e2e6ef` | основной текст, значения KPI |
-| `color.text.secondary` | `rgba(255,255,255,0.50)` | хост в status pill |
-| `color.text.muted` | `rgba(255,255,255,0.30)` | field labels, show/hide кнопка |
-| `color.text.faint` | `rgba(255,255,255,0.22)` | section labels |
-| `color.text.label` | `rgba(255,255,255,0.45)` | заголовки KPI-карточек |
+
+| Токен | Dark | Light | Назначение |
+|---|---|---|---|
+| `T.text` | `#dde1ea` | `#1a1d24` | основной текст, KPI-значения |
+| `T.textSec` | `rgba(255,255,255,0.55)` | `rgba(0,0,0,0.55)` | вторичный текст |
+| `T.textMuted` | `rgba(255,255,255,0.42)` | `rgba(0,0,0,0.40)` | field labels |
+| `T.textFaint` | `rgba(255,255,255,0.30)` | `rgba(0,0,0,0.28)` | section labels, sparkline neutral |
+| `T.textLabel` | `rgba(255,255,255,0.50)` | `rgba(0,0,0,0.45)` | заголовки KPI-карточек |
 
 ---
 
-## Типографика
+## Типографика (`font`)
 
 ### Размеры (font.size)
+
 | Токен | rem | Применение |
 |---|---|---|
-| `xxs` | 0.62rem | section labels (JIRA CONNECTION) |
+| `xxs` | 0.62rem | section labels |
 | `xs` | 0.67rem | field labels, sublabels KPI |
-| `sm` | 0.72rem | mono-значения, вторичный текст |
+| `sm` | 0.72rem | mono-значения, secondary текст |
 | `base` | 0.78rem | инпуты, основной текст |
 | `md` | 0.82rem | risk/action items в AIPanel |
 | `lg` | 0.88rem | логотип |
 | `kpiSm` | 1.7rem | значение KPI в compact-режиме |
 | `kpiLg` | 2.1rem | значение KPI в comfortable-режиме |
 
-### Шрифты
-- **Sans**: `Inter, system-ui` — весь UI
-- **Mono**: `IBM Plex Mono` — JQL, P85, sparkline sublabels
+### Семейства
 
-### Веса
-`400 regular` / `500 medium` / `600 semibold` / `700 bold` / `800 extrabold`  
-Значения KPI — `800`. Section labels — `700`. Field labels — `600`.
+- **Sans**: `Inter, system-ui` — весь UI
+- **Mono**: `IBM Plex Mono` — JQL, P85, timestamps
+
+### Веса (`font.weight`)
+
+`400 regular` / `500 medium` / `600 semibold` / `700 bold` / `800 extrabold`
 
 ---
 
-## Радиусы
+## Радиусы (`radius`)
 
 | Токен | px | Применение |
 |---|---|---|
-| `radius.sm` | 6 | кнопки tweaks panel |
+| `radius.sm` | 6 | маленькие кнопки, бейджи |
 | `radius.md` | 7 | status pill, connect button |
 | `radius.input` | 8 | все инпуты |
 | `radius.card` | 12 | KPI-карточки |
-| `radius.panel` | 14 | AI-панель |
+| `radius.panel` | 14 | AI-панель, StaleIssuesPanel |
+
+---
+
+## Анимации (`transition`)
+
+| Токен | Значение | Применение |
+|---|---|---|
+| `transition.fast` | `0.15s ease` | hover-эффекты, opacity |
+| `transition.normal` | `0.20s ease` | смена темы, раскрытие панелей |
+| `transition.sidebar` | `width 0.22s cubic-bezier(0.4,0,0.2,1)` | sidebar toggle |
+| `transition.kpiBar` | `width 0.60s ease` | progress bar в KpiCard |
 
 ---
 
@@ -86,7 +116,6 @@
 
 ### KpiCard
 
-**Структура:**
 ```
 ┌─ status stripe (2px top) ──────────────┐
 │ LABEL              [sparkline]          │
@@ -98,69 +127,32 @@
 └─────────────────────────────────────────┘
 ```
 
-**Состояния:**
-- `good` — зелёная stripe + `rgba(34,197,94,0.07)` фон
-- `warn` — янтарная stripe
-- `bad` — красная stripe
-- `neutral` — без stripe, прозрачный фон
-
-**Do:** передавать `tooltip` с определением метрики  
-**Don't:** рендерить со статусом `bad` без `delta` — нет контекста динамики
-
----
+Sparkline: зелёный (`T.good`) при улучшении, серый (`T.textFaint`) иначе.  
+`getStatusColors(T, status)` → `{ fg, bg, border, stripe }`.
 
 ### AIPanel
 
-**Структура:**
 ```
-● AI INSIGHTS         [Summary] [Risks] [Actions]  ← только если analysis ≠ null
-────────────────────────────────────────────────
-  <текст таба>
+● AI INSIGHTS         [Summary] [Risks] [Actions]
+─────────────────────────────────────────────────
+  <текст активного таба>
 ```
 
-**Do:** показывать таб-бар только когда `analysis !== null`  
-**Don't:** рендерить пустые табы Risks/Actions без массивов — `.map()` упадёт
+Таб-бар рендерится только когда `analysis !== null`.
 
----
-
-### Sidebar — поля ввода
-
-**Focus ring:** `border-color: color.brand.focus` + `background: color.brand.glow`  
-**Blur:** возврат к `color.border.default` + `color.surface.card`  
-
-**API Token:** Show/Hide кнопка внутри поля (slot-паттерн), `paddingRight: 44`  
-**Connect:** два состояния — `disconnected` (синий) / `connected` (зелёный + ✓)  
-**Status pill:** показывается только когда `connected && host` — домен без `https://`
-
----
-
-### Кнопки
-
-| Вариант | Border | Background | Color |
-|---|---|---|---|
-| Primary (Connect) | `brand.border` | `brand.bg` | `text.primary` |
-| Connected | `good.border` | `good.bgPill` | `good.fg` |
-| Ghost (Demo) | `border.default` | transparent | `text.muted` |
-| Ghost hover | `border.strong` | `rgba(255,255,255,0.03)` | `text.secondary` |
-| Tweaks active | `brand.border` | `brand.bg` | `brand.default` |
-| Tweaks inactive | `border.default` | transparent | `text.muted` |
-
----
-
-### Status Pill (app bar)
+### StatusPill (app bar)
 
 | State | Color | Label |
 |---|---|---|
-| `idle` | `text.muted` | Idle |
-| `syncing` | `warn.fg` | Syncing… + spinner |
-| `done` | `good.fg` | Up to date |
-| `error` | `bad.fg` | Error |
-| `demo` | `demo.fg` | Demo |
+| `idle` | `T.textMuted` | Idle |
+| `syncing` | `T.warn` | Syncing… + spinner |
+| `done` | `T.good` | Up to date |
+| `error` | `T.bad` | Error |
+| `demo` | `T.demo` | Demo |
 
----
+### UpdatedAgo (app bar)
 
-## Известные ограничения
-
-- Все стили сейчас inline в JSX. Токены из `tokens.js` нужно подключать вручную при редактировании компонентов — авто-рефакторинг не делался.
-- Тёмная тема единственная. `color.bg = #0e1016` хардкод.
-- `autoSyncStale` не реализован — данные обновляются только вручную.
+Цвет меняется в зависимости от возраста данных:
+- ≤ 30 мин → `T.textSec` (нейтральный)
+- > 30 мин → `T.warn` + dot
+- > 2 ч → `T.bad` + dot
