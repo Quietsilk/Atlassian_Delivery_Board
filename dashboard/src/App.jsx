@@ -41,14 +41,16 @@ function deltaFlow(cur, pre, unit, throughput) {
 }
 
 function deltaSnap(cur, pre, lowerBetter) {
-  if (pre == null || pre === 0 || cur == null) return null;
+  if (pre == null || cur == null) return null;
   const diff = cur - pre;
   if (Math.abs(diff) < 0.05) return null;
+  const sign = diff > 0 ? "+" : "";
+  const good = lowerBetter ? diff < 0 : diff > 0;
+  if (pre === 0) return { text: `${sign}${round1(diff)}`, good };
   const pct = (diff / Math.abs(pre)) * 100;
   if (Math.abs(pct) > 200) return null;
-  const sign = diff > 0 ? "+" : "";
   const pSign = pct > 0 ? "+" : "";
-  return { text: `${sign}${round1(diff)} (${pSign}${round1(pct)}%)`, good: lowerBetter ? diff < 0 : diff > 0 };
+  return { text: `${sign}${round1(diff)} (${pSign}${round1(pct)}%)`, good };
 }
 
 function deltaPct(cur, pre, lowerBetter) {
@@ -70,10 +72,14 @@ function buildInsight(key, last, wipItems) {
 
   switch (key) {
     case "cycleTime": {
-      const long = items.filter(i => i.daysInProgress >= 14);
-      if (long.length > 0) return { text: `${long.length} item${long.length > 1 ? "s" : ""} >14d in progress`, level: "bad" };
-      if (wip > 7)         return { text: `High WIP: ${wip}`, level: "warn" };
-      return { text: "Stable flow", level: "neutral" };
+      const long14 = items.filter(i => i.daysInProgress >= 14);
+      const long7  = items.filter(i => i.daysInProgress >= 7);
+      if (long14.length > 0) return { text: `${long14.length} item${long14.length > 1 ? "s" : ""} >14d in progress`, level: "bad" };
+      if (wip > 7)           return { text: `High WIP: ${wip}`, level: "warn" };
+      if (long7.length > 0)  return { text: `${long7.length} item${long7.length > 1 ? "s" : ""} >7d in progress`, level: "warn" };
+      if (backlogAging > 30) return { text: `Backlog too old (${round1(backlogAging)}d)`, level: "bad" };
+      if (backlogAging > 14) return { text: "Aging increasing", level: "warn" };
+      return { text: "Healthy flow", level: "neutral" };
     }
     case "timeToMarket": {
       if (backlogAging > 20) return { text: `Old backlog: ${round1(backlogAging)}d avg`, level: "warn" };
@@ -111,7 +117,12 @@ function buildKpis(snaps, wipItems) {
   if (!snaps || snaps.length === 0) return null;
   const last = snaps[snaps.length - 1];
   const prev = snaps.length > 1 ? snaps[snaps.length - 2] : null;
-  const throughput = last.throughput ?? 0;
+  const throughput  = last.throughput ?? 0;
+  const prevTooOld  = prev ? (Date.now() - new Date(prev.timestamp).getTime()) > 86_400_000 : true;
+
+  const dFlow = (cur, pre, unit) => prevTooOld ? null : deltaFlow(cur, pre, unit, throughput);
+  const dSnap = (cur, pre, lb)   => prevTooOld ? null : deltaSnap(cur, pre, lb);
+  const dPct  = (cur, pre, lb)   => prevTooOld ? null : deltaPct(cur, pre, lb);
 
   const rate     = (last.completedCount ?? 0) > 0 ? (last.reopened / last.completedCount) * 100 : 0;
   const prevRate = prev && (prev.completedCount ?? 0) > 0 ? (prev.reopened / prev.completedCount) * 100 : null;
@@ -121,7 +132,7 @@ function buildKpis(snaps, wipItems) {
       key: "cycleTime",
       label: "Cycle Time", sublabel: "In Progress → Done",
       value: round1(last.cycleTime ?? 0), unit: "d",
-      delta: deltaFlow(last.cycleTime, prev?.cycleTime, "d", throughput),
+      delta: dFlow(last.cycleTime, prev?.cycleTime, "d"),
       insight: buildInsight("cycleTime", last, wipItems),
       status: last.cycleTime == null ? "neutral" : last.cycleTime <= 3 ? "good" : last.cycleTime <= 7 ? "warn" : "bad",
       barMax: 14, tooltip: "Median calendar days from 'In Progress' to 'Done'",
@@ -130,7 +141,7 @@ function buildKpis(snaps, wipItems) {
       key: "timeToMarket",
       label: "Time to Market", sublabel: "Created → Done",
       value: round1(last.timeToMarket ?? 0), unit: "d",
-      delta: deltaFlow(last.timeToMarket, prev?.timeToMarket, "d", throughput),
+      delta: dFlow(last.timeToMarket, prev?.timeToMarket, "d"),
       insight: buildInsight("timeToMarket", last, wipItems),
       status: last.timeToMarket == null ? "neutral" : last.timeToMarket <= 7 ? "good" : last.timeToMarket <= 14 ? "warn" : "bad",
       barMax: 28, tooltip: "Median days from ticket creation to completion",
@@ -139,7 +150,7 @@ function buildKpis(snaps, wipItems) {
       key: "flowEfficiency",
       label: "Flow Efficiency", sublabel: "Active / Total time",
       value: round1(last.flowEfficiency ?? 0), unit: "%",
-      delta: deltaPct(last.flowEfficiency, prev?.flowEfficiency, false),
+      delta: dPct(last.flowEfficiency, prev?.flowEfficiency, false),
       insight: buildInsight("flowEfficiency", last, wipItems),
       status: last.flowEfficiency == null ? "neutral" : last.flowEfficiency >= 40 ? "good" : last.flowEfficiency >= 20 ? "warn" : "bad",
       barMax: 100, tooltip: "% of total lead time the item was actively worked on",
@@ -148,7 +159,7 @@ function buildKpis(snaps, wipItems) {
       key: "reopened",
       label: "Reopened Rate", sublabel: `${last.reopened ?? 0} of ${last.completedCount ?? 0} completed`,
       value: round1(rate), unit: "%",
-      delta: deltaPct(rate, prevRate, true),
+      delta: dPct(rate, prevRate, true),
       insight: buildInsight("reopened", last, wipItems),
       status: rate === 0 ? "good" : rate < 5 ? "warn" : "bad",
       barMax: 20, tooltip: "% of completed issues that were reopened at least once",
@@ -157,7 +168,7 @@ function buildKpis(snaps, wipItems) {
       key: "wip",
       label: "WIP", sublabel: "In Progress now",
       value: last.wip ?? 0, unit: null,
-      delta: deltaSnap(last.wip, prev?.wip, true),
+      delta: dSnap(last.wip, prev?.wip, true),
       insight: buildInsight("wip", last, wipItems),
       status: last.wip == null ? "neutral" : last.wip <= 10 ? "good" : last.wip <= 20 ? "warn" : "bad",
       barMax: 30, tooltip: "Number of issues currently In Progress",
@@ -166,7 +177,7 @@ function buildKpis(snaps, wipItems) {
       key: "backlogAging",
       label: "Backlog Aging", sublabel: "Avg days untouched",
       value: round1(last.backlogAging ?? 0), unit: "d",
-      delta: deltaSnap(last.backlogAging, prev?.backlogAging, true),
+      delta: dSnap(last.backlogAging, prev?.backlogAging, true),
       insight: buildInsight("backlogAging", last, wipItems),
       status: last.backlogAging == null ? "neutral" : last.backlogAging <= 14 ? "good" : last.backlogAging <= 30 ? "warn" : "bad",
       barMax: 60, tooltip: "Average days since backlog issues were last updated",
