@@ -87,11 +87,10 @@ ai-delivery-analyst/
 │   │   ├── demo.js                    # DEMO_HISTORY (с wipItems), DEMO_ANALYSIS
 │   │   ├── tokens.js                  # Дизайн-токены (цвета, шрифты)
 │   │   ├── components/
-│   │   │   ├── KpiCard.jsx            # KPI-карточка: sparkline, delta, статус-бар
+│   │   │   ├── KpiCard.jsx            # KPI-карточка: value, delta, insight, статус-бар
 │   │   │   ├── AIPanel.jsx            # AI Insights: summary/risks/actions tabs
 │   │   │   ├── Sidebar.jsx            # Source picker, credentials form, status mapping
-│   │   │   ├── StaleIssuesPanel.jsx   # WIP-задачи с aging/blocker индикаторами
-│   │   │   └── Sparkline.jsx          # SVG-спарклайн
+│   │   │   └── StaleIssuesPanel.jsx   # WIP-задачи с aging/blocker индикаторами
 │   │   ├── context/
 │   │   │   └── ThemeContext.js        # ThemeContext + useT()
 │   │   └── hooks/
