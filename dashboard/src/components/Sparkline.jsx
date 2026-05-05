@@ -14,7 +14,7 @@ export default function Sparkline({ values, lowerBetter = true, width = 80, heig
   const lastY = parseFloat(pts.at(-1).split(",")[1]);
   const prevY = parseFloat(pts.at(-2).split(",")[1]);
   const improving = lowerBetter ? lastY > prevY : lastY < prevY;
-  const color = improving ? T.good : T.textFaint;
+  const color = improving ? T.good : T.textMuted;
   const [lx, ly] = pts.at(-1).split(",");
   return (
     <svg width={width} height={height} style={{ overflow: "visible", flexShrink: 0 }}>
