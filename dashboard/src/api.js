@@ -33,6 +33,7 @@ function normalizeSnapshot(snapshot) {
     completedCount:  metrics.completedCount        ?? 0,
     wip:             metrics.inProgressCount       ?? metrics.wip             ?? 0,
     backlogAging:    metrics.backlogAgingDays       ?? metrics.backlogAging    ?? 0,
+    throughput:      metrics.throughput            ?? 0,
     wipItems:        metrics.wipItems              ?? [],
     analysis:        parseAnalysis(rawAnalysis),
   };
