@@ -101,28 +101,6 @@ function UpdatedAgo({ timestamp, T }) {
   );
 }
 
-/* ─── StaleBanner ─────────────────────────────────────────────────────────── */
-
-function StaleBanner({ timestamp, onSync, T }) {
-  const level = staleLevel(timestamp);
-  if (level === "ok" || level === "none") return null;
-  const ago = formatAgo(timestamp);
-  const cfg = level === "red"
-    ? { bg: T.badBg,  border: T.badBdr,  fg: T.bad,  icon: "!", text: `Data is ${ago} old — metrics may be stale` }
-    : { bg: T.warnBg, border: T.warnBdr, fg: T.warn, icon: "⚠", text: `Data is ${ago} old — consider syncing` };
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderRadius: 10, background: cfg.bg, border: `1px solid ${cfg.border}` }}>
-      <div style={{ width: 20, height: 20, borderRadius: 5, background: cfg.bg, border: `1px solid ${cfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: font.size.xs, color: cfg.fg, fontWeight: font.weight.bold, flexShrink: 0 }}>
-        {cfg.icon}
-      </div>
-      <span style={{ fontSize: "0.8rem", color: cfg.fg, flex: 1 }}>{cfg.text}</span>
-      <button type="button" onClick={onSync} style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: radius.sm, color: cfg.fg, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", padding: "3px 10px", fontFamily: "inherit" }}>
-        Sync now
-      </button>
-    </div>
-  );
-}
-
 /* ─── StatusPill ──────────────────────────────────────────────────────────── */
 
 function StatusPill({ state, T }) {
@@ -217,12 +195,15 @@ export default function App() {
   }, [activeKey]);
 
   const handleSync = useCallback(async () => {
-    if (!active || !creds.connected) return;
+    if (!projects.length || !creds.connected) return;
     const previousTimestamp = snapshots.at(-1)?.timestamp || null;
     clearTimeout(pollRef.current);
     setSyncState("syncing"); setSyncError(null);
     try {
-      await postSync({ project: active.label, source: creds.source, creds: creds.currentCreds, jql: active.jql });
+      await Promise.all(projects.map(p =>
+        postSync({ project: p.label, source: creds.source, creds: creds.currentCreds, jql: p.jql })
+      ));
+      if (!active) { setSyncState("done"); return; }
       let attempts = 0;
       const poll = async () => {
         try {
@@ -238,7 +219,7 @@ export default function App() {
       };
       poll();
     } catch (e) { setSyncState("error"); setSyncError(e.message); }
-  }, [active, creds, snapshots]);
+  }, [active, projects, creds, snapshots]);
 
   useEffect(() => () => clearTimeout(pollRef.current), []);
 
@@ -312,8 +293,8 @@ export default function App() {
               <StatusPill state={syncState} T={T} />
               <UpdatedAgo timestamp={latestSnapshot?.timestamp} T={T} />
               {syncError && <span style={{ fontSize: "0.7rem", color: T.bad, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{syncError}</span>}
-              <button onClick={handleSync} disabled={!active || !creds.connected || syncState === "syncing"}
-                style={{ height: 28, padding: "0 14px", border: `1px solid ${T.brandBdr}`, borderRadius: radius.md, background: T.brandBg, color: T.brand, fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", opacity: (!active || !creds.connected) ? 0.4 : 1, transition: `opacity ${transition.fast}` }}>
+              <button onClick={handleSync} disabled={!projects.length || !creds.connected || syncState === "syncing"}
+                style={{ height: 28, padding: "0 14px", border: `1px solid ${T.brandBdr}`, borderRadius: radius.md, background: T.brandBg, color: T.brand, fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", opacity: (!projects.length || !creds.connected) ? 0.4 : 1, transition: `opacity ${transition.fast}` }}>
                 ↻ Sync
               </button>
               <ThemeToggle mode={mode} onToggle={toggleTheme} T={T} />
@@ -331,10 +312,6 @@ export default function App() {
                   <p style={{ fontSize: "0.8rem", color: T.textFaint }}>Add a project above, or load demo data from the sidebar.</p>
                 </div>
               </div>
-            )}
-
-            {hasData && syncState !== "demo" && (
-              <StaleBanner timestamp={latestSnapshot?.timestamp} onSync={handleSync} T={T} />
             )}
 
             {(active || hasData) && <AIPanel analysis={analysis} prominent={!!analysis} />}
