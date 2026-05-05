@@ -184,111 +184,58 @@ def _calc_predictability(mapped):
     return round(len(completed_in_period) / len(committed) * 100, 1)
 
 
-# ── Main pipeline ────────────────────────────────────────────────────────────
+# ── Shared pipeline ───────────────────────────────────────────────────────────
+
+def _run_pipeline(project_key, issues, db_path):
+    """map → structural metrics → interval flow metrics → save snapshot."""
+    mapped = [_map_issue(issue) for issue in issues]
+
+    metrics = calculate_metrics(issues, mapped=mapped)
+
+    prev     = get_latest(project_key, db_path)
+    since_ts = prev["timestamp"] if prev else None
+
+    completed_interval = _get_completed_in_interval(mapped, since_ts)
+    metrics["throughput"] = len(completed_interval)
+
+    completed_all = [m for m in mapped if m["resolved_at"]]
+    flow_source   = completed_interval if completed_interval else completed_all
+    metrics.update(calculate_flow_metrics(flow_source))
+
+    metrics["predictabilityPercent"] = _calc_predictability(mapped)
+    metrics["wipItems"]              = _compute_wip_items(issues, mapped)
+
+    ts = save_snapshot(project_key, metrics, db_path)
+    print(f"[ingestion] {project_key}: snapshot saved at {ts}")
+    return metrics
+
+
+# ── Public entry points ───────────────────────────────────────────────────────
 
 def run_ingestion(project_key, base_url, email, api_token, jql, db_path="snapshots.db"):
-    """Full ingestion pipeline for one project.
-
-    1. Fetch issues from Jira
-    2. Map issues once (Step 1 — mapping optimization)
-    3. Structural metrics: backlog / inProgress / reopened / aging
-    4. Interval extraction: issues completed since previous snapshot (Step 2–3)
-    5. Flow metrics from interval: P50/P85 cycle time + TTM (Step 5–7)
-    6. Throughput normalization: throughputPerDay (Step 4)
-    7. Predictability (approximation, Step 8)
-    8. wipRatio removed (Step 8)
-    """
+    """Fetch from Jira and run the ingestion pipeline."""
     print(f"[ingestion] {project_key}: fetching Jira…")
     issues = fetch_jira(base_url, email, api_token, jql)
     if not issues:
         raise ValueError("Jira query returned no issues; snapshot was not saved")
-
-    # Step 1 — compute mapped once, reuse everywhere
-    mapped = [_map_issue(issue) for issue in issues]
-
-    # Structural metrics (backlog, inProgress, reopened, aging)
-    metrics = calculate_metrics(issues, mapped=mapped)
-
-    # Previous snapshot for interval boundary (flow metrics only)
-    prev     = get_latest(project_key, db_path)
-    since_ts = prev["timestamp"] if prev else None
-
-    # Step 2–3: interval-based completed list
-    completed_interval = _get_completed_in_interval(mapped, since_ts)
-    # throughput = issues completed since last snapshot (interval count, sync-frequency aware)
-    metrics["throughput"] = len(completed_interval)
-
-    # Step 5–7: flow metrics from interval (same window for all three)
-    # Fall back to all completed issues on first sync (no prev snapshot)
-    completed_all = [m for m in mapped if m["resolved_at"]]
-    flow_source = completed_interval if completed_interval else completed_all
-    metrics.update(calculate_flow_metrics(flow_source))
-
-    # Step 8: predictability (marked approximation — rolling 30d window)
-    metrics["predictabilityPercent"] = _calc_predictability(mapped)
-
-    # Step 8: wipRatio deprecated — not saved
-
-    # WIP items for StaleIssuesPanel
-    metrics["wipItems"] = _compute_wip_items(issues, mapped)
-
-    ts = save_snapshot(project_key, metrics, db_path)
-    print(f"[ingestion] {project_key}: snapshot saved at {ts} — {metrics}")
-    return metrics
+    return _run_pipeline(project_key, issues, db_path)
 
 
 def run_ingestion_with_adapter(project_key, source, config, db_path="snapshots.db"):
-    """Full ingestion pipeline using any registered adapter.
+    """Fetch via any registered adapter and run the ingestion pipeline.
 
     Parameters
     ----------
-    project_key : str
-        Unique project identifier used as the storage key.
-    source : str
-        One of: "jira", "linear", "asana", "clickup".
-    config : dict
-        Adapter-specific configuration keys (see build_adapter docstring).
-    db_path : str
-        SQLite database path for snapshot storage.
-
-    The pipeline is identical to run_ingestion() but delegates fetch+normalise
-    to the appropriate Adapter subclass, so all adapters share the same metrics
-    calculation and snapshot storage logic.
+    project_key : str  — storage key
+    source : str       — "jira" | "linear" | "asana" | "clickup"
+    config : dict      — adapter-specific config (see build_adapter)
+    db_path : str      — SQLite path
     """
     from server.adapters import build_adapter
 
     print(f"[ingestion] {project_key}: fetching via {source} adapter…")
     adapter = build_adapter(source, config)
     issues  = adapter.fetch_and_normalize()
-
     if not issues:
         raise ValueError(f"{source} adapter returned no issues; snapshot was not saved")
-
-    # Step 1 — compute mapped once, reuse everywhere
-    mapped = [_map_issue(issue) for issue in issues]
-
-    # Structural metrics (backlog, inProgress, reopened, aging)
-    metrics = calculate_metrics(issues, mapped=mapped)
-
-    # Previous snapshot for interval boundary (flow metrics only)
-    prev     = get_latest(project_key, db_path)
-    since_ts = prev["timestamp"] if prev else None
-
-    # Step 2–3: interval-based completed list
-    completed_interval = _get_completed_in_interval(mapped, since_ts)
-    metrics["throughput"] = len(completed_interval)
-
-    # Step 5–7: flow metrics from interval (same window for all three)
-    completed_all = [m for m in mapped if m["resolved_at"]]
-    flow_source   = completed_interval if completed_interval else completed_all
-    metrics.update(calculate_flow_metrics(flow_source))
-
-    # Step 8: predictability (rolling 30d window approximation)
-    metrics["predictabilityPercent"] = _calc_predictability(mapped)
-
-    # WIP items for StaleIssuesPanel
-    metrics["wipItems"] = _compute_wip_items(issues, mapped)
-
-    ts = save_snapshot(project_key, metrics, db_path)
-    print(f"[ingestion] {project_key}: snapshot saved at {ts} — {metrics}")
-    return metrics
+    return _run_pipeline(project_key, issues, db_path)

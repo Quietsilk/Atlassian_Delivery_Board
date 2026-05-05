@@ -122,71 +122,6 @@ export function getTokens(mode) {
   return mode === "light" ? light : dark;
 }
 
-/* ─── Backward-compat named exports (dark values) ────────────────────────── */
-
-export const color = {
-  bg:      dark.bg,
-  surface: {
-    sidebar:   dark.bgSidebar,
-    card:      dark.bgCard,
-    cardHover: dark.bgCardHov,
-    overlay:   dark.bgOverlay,
-  },
-  border: {
-    subtle:  dark.borderSub,
-    default: dark.border,
-    strong:  dark.borderHi,
-  },
-  brand: {
-    default: dark.brand,
-    bg:      dark.brandBg,
-    bgHover: dark.brandBg,
-    border:  dark.brandBdr,
-    focus:   dark.brandFocus,
-    glow:    dark.brandGlow,
-  },
-  good: {
-    fg:         dark.good,
-    bg:         dark.goodBg,
-    bgPill:     dark.goodBg,
-    border:     dark.goodBdr,
-    borderPill: dark.goodBdr,
-    stripe:     dark.good,
-    glow:       `${dark.good}55`,
-  },
-  warn: {
-    fg:     dark.warn,
-    bg:     dark.warnBg,
-    bgPill: dark.warnBg,
-    border: dark.warnBdr,
-    stripe: dark.warn,
-  },
-  bad: {
-    fg:     dark.bad,
-    bg:     dark.badBg,
-    bgPill: dark.badBg,
-    border: dark.badBdr,
-    stripe: dark.bad,
-  },
-  demo: {
-    fg:     dark.demo,
-    bg:     dark.demoBg,
-    border: dark.demoBdr,
-  },
-  text: {
-    primary:   dark.text,
-    secondary: dark.textSec,
-    muted:     dark.textMuted,
-    faint:     dark.textFaint,
-    label:     dark.textLabel,
-    sublabel:  dark.textFaint,
-  },
-};
-
-export function statusColors(status) {
-  return getStatusColors(dark, status);
-}
-
 /* ─── Typography ──────────────────────────────────────────────────────────── */
 export const font = {
   family: { sans: "'Inter', system-ui, sans-serif", mono: "'IBM Plex Mono', monospace" },
@@ -195,14 +130,8 @@ export const font = {
   tracking: { tight:"-0.04em", normal:"0", wide:"0.03em", wider:"0.07em", widest:"0.10em" },
 };
 
-/* ─── Spacing ─────────────────────────────────────────────────────────────── */
-export const space = { 1:2,2:4,3:6,4:8,5:10,6:12,7:14,8:16,9:18,10:20,12:24,14:28,16:32 };
-
 /* ─── Radii ───────────────────────────────────────────────────────────────── */
 export const radius = { sm:6, md:7, input:8, card:12, panel:14 };
-
-/* ─── Shadows ─────────────────────────────────────────────────────────────── */
-export const shadow = { overlay: dark.overlayShadow, card: "0 1px 3px rgba(0,0,0,0.3)" };
 
 /* ─── Animation ───────────────────────────────────────────────────────────── */
 export const transition = {
@@ -211,6 +140,3 @@ export const transition = {
   sidebar: "width 0.22s cubic-bezier(0.4,0,0.2,1)",
   kpiBar:  "width 0.60s ease",
 };
-
-/* ─── Layout ──────────────────────────────────────────────────────────────── */
-export const layout = { sidebarWidth:264, appBarHeight:48, kpiColumns:3, kpiGapComfy:14, kpiGapCompact:10 };

@@ -79,7 +79,7 @@ def get_history(project_key, period=None, db_path=_DEFAULT_DB):
 
 
 def get_previous_snapshot(project_key, db_path=_DEFAULT_DB):
-    """Return the second-most-recent snapshot (used to compute throughput delta)."""
+    """Return the second-most-recent snapshot for a project, or None."""
     con = sqlite3.connect(db_path)
     rows = con.execute(
         "SELECT timestamp, metrics_json FROM snapshots WHERE project_key = ? ORDER BY id DESC LIMIT 2",
@@ -90,3 +90,4 @@ def get_previous_snapshot(project_key, db_path=_DEFAULT_DB):
         return None
     row = rows[1]
     return {"timestamp": row[0], "metrics": json.loads(row[1])}
+
