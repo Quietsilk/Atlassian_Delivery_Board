@@ -132,11 +132,10 @@ Source API (Jira / Linear / Asana / ClickUp)
 | Компонент | Назначение |
 |---|---|
 | `App.jsx` | Root: layout, sync-flow с поллингом, multi-project tabs |
-| `KpiCard.jsx` | KPI-карточка: status stripe, значение, delta, P85, sparkline, progress bar |
+| `KpiCard.jsx` | KPI-карточка: status stripe, value, delta, insight, progress bar |
 | `AIPanel.jsx` | Summary / Risks / Actions tabs; glowing dot при наличии analysis |
 | `Sidebar.jsx` | Source picker, credentials form, status mapping, demo data |
 | `StaleIssuesPanel.jsx` | WIP-задачи с aging/blocker индикаторами (коллапсируемая) |
-| `Sparkline.jsx` | SVG polyline, цвет = `T.good` если улучшение, `T.textFaint` иначе |
 
 ### Хуки
 

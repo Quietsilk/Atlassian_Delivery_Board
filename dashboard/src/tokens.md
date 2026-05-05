@@ -118,16 +118,23 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 
 ```
 ┌─ status stripe (2px top) ──────────────┐
-│ LABEL              [sparkline]          │
+│ LABEL                                   │
 │ sublabel                                │
 │                                         │
-│ 4.2 d  -20.8%                          │
-│ P85 7.1d                                │
+│ 4.2 d                                   │
+│ -1.9d vs last          ← delta          │
+│ 1 item >14d in progress ← insight       │
 │ ████████░░░░  (progress bar)           │
 └─────────────────────────────────────────┘
 ```
 
-Sparkline: зелёный (`T.good`) при улучшении, серый (`T.textFaint`) иначе.  
+**Delta** — формат зависит от типа метрики:
+- Flow (Cycle Time, TTM): `±Xd vs last` — скрывается если throughput < 5 или нет prev
+- Snapshot (WIP, Backlog, Reopened): `+3 (−44%)` — абсолютное + относительное %
+- Проценты (Flow Efficiency, Reopened Rate): `±X% vs last`
+
+**Insight** — детерминированный текст, рассчитывается в `buildInsight()` в App.jsx на основе `metrics + wipItems`. Цвет: `T.bad` / `T.warn` / `T.textMuted`.
+
 `getStatusColors(T, status)` → `{ fg, bg, border, stripe }`.
 
 ### AIPanel
