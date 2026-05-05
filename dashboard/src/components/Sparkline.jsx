@@ -1,4 +1,7 @@
+import { useT } from "../context/ThemeContext";
+
 export default function Sparkline({ values, lowerBetter = true, width = 80, height = 28 }) {
+  const T = useT();
   if (!values || values.length < 2) return null;
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -11,7 +14,7 @@ export default function Sparkline({ values, lowerBetter = true, width = 80, heig
   const lastY = parseFloat(pts.at(-1).split(",")[1]);
   const prevY = parseFloat(pts.at(-2).split(",")[1]);
   const improving = lowerBetter ? lastY > prevY : lastY < prevY;
-  const color = improving ? "#22c55e" : "rgba(255,255,255,0.3)";
+  const color = improving ? T.good : T.textFaint;
   const [lx, ly] = pts.at(-1).split(",");
   return (
     <svg width={width} height={height} style={{ overflow: "visible", flexShrink: 0 }}>

@@ -92,9 +92,12 @@ ai-delivery-analyst/
 │   │   │   ├── Sidebar.jsx            # Source picker, credentials form, status mapping
 │   │   │   ├── StaleIssuesPanel.jsx   # WIP-задачи с aging/blocker индикаторами
 │   │   │   └── Sparkline.jsx          # SVG-спарклайн
+│   │   ├── context/
+│   │   │   └── ThemeContext.js        # ThemeContext + useT()
 │   │   └── hooks/
+│   │       ├── useTheme.js            # dark/light mode → localStorage (ada:theme)
 │   │       ├── useCredentials.js      # Multi-source creds → localStorage (ada:creds-v2)
-│   │       └── useProjects.js         # Multi-project tabs → localStorage
+│   │       └── useProjects.js         # Multi-project tabs → localStorage (ada:projects-v2)
 │   ├── package.json
 │   └── vite.config.js
 ├── tests/
@@ -118,36 +121,34 @@ ai-delivery-analyst/
 
 ### Токены (`dashboard/src/tokens.js`)
 
-Единый источник цветов, типографики, отступов и теней. Все компоненты импортируют токены — хардкодить цвета в JSX нельзя.
+Единый источник цветов, типографики, отступов и анимаций. Все компоненты импортируют токены через `useT()` (тема-зависимые значения) или статические экспорты.
 
 ```js
-import { color, font, radius, transition, statusColors } from "../tokens";
+import { getStatusColors, font, radius, transition } from "../tokens";
+import { useT } from "../context/ThemeContext";
+const T = useT();  // возвращает объект с токенами текущей темы
 ```
 
-Текущая палитра — **v2 Calm**:
+Поддерживаются два режима: **Dark (Calm)** и **Light**. Переключение через кнопку в шапке.
 
-| Токен | Значение | Назначение |
-|---|---|---|
-| `color.bg` | `#111318` | Фон приложения |
-| `color.brand.default` | `#6b8cff` | Акцент (slate-blue) |
-| `color.good.fg` | `#4ade80` | Позитивный статус |
-| `color.warn.fg` | `#fbbf24` | Предупреждение |
-| `color.bad.fg` | `#f87171` | Негативный статус |
-| `color.surface.card` | `rgba(255,255,255,0.03)` | Фон карточки |
+| Токен | Dark | Light | Назначение |
+|---|---|---|---|
+| `T.bg` | `#13151b` | `#f0f2f5` | Фон приложения |
+| `T.brand` | `#6b8cff` | `#4f6fe8` | Акцент |
+| `T.good` | `#4ade80` | `#16a34a` | Позитивный статус |
+| `T.warn` | `#fbbf24` | `#b45309` | Предупреждение |
+| `T.bad` | `#f87171` | `#dc2626` | Негативный статус |
+| `T.bgCard` | `#1c1f28` | `#ffffff` | Фон карточки |
 
-KPI-карточки монохромные по умолчанию — цвет статуса только в 2px полоске сверху (`stripe`), тексте дельты и бордере. `statusColors(status)` возвращает `{ fg, bg, border, stripe }`.
+`getStatusColors(T, status)` возвращает `{ fg, bg, border, stripe }` для `good/warn/bad/neutral`.
 
 ### Формат дизайн-спеки (ТЗ)
-
-Рабочие форматы для передачи дизайна в разработку:
 
 | Формат | Когда |
 |---|---|
 | **JS-файл** (токены) | Новая палитра, обновление токенов — применяется напрямую |
 | **Markdown** со структурой props / поведение / визуал | Новый компонент или фича |
 | **Diff-описание** | Точечные изменения в существующем компоненте |
-
-Файлы кладутся в `Downloads/design/` или передаются в чат напрямую.
 
 ---
 
@@ -302,8 +303,7 @@ KPI-карточки монохромные по умолчанию — цвет
 
 ## Индикаторы актуальности
 
-- **UpdatedAgo** — в шапке дашборда показывает, когда был последний синк: серый (≤30 мин), жёлтый (>30 мин), красный (>2 ч)
-- **StaleBanner** — предупреждение над KPI-сеткой при устаревших данных, с кнопкой «Sync now»
+**UpdatedAgo** — в шапке дашборда рядом с кнопкой Sync показывает, когда был последний синк: серый (≤30 мин), жёлтый (>30 мин), красный (>2 ч).
 
 ---
 
