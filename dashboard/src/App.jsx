@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import KpiCard from "./components/KpiCard";
 import AIPanel from "./components/AIPanel";
 import StaleIssuesPanel from "./components/StaleIssuesPanel";
+
 import { useCredentials } from "./hooks/useCredentials";
 import { useProjects } from "./hooks/useProjects";
 import { useTheme } from "./hooks/useTheme";
@@ -29,40 +30,148 @@ function mergeHistoryWithLatest(history, latest) {
   return result;
 }
 
-function buildKpis(snaps, rich) {
+/* delta helpers */
+
+function deltaFlow(cur, pre, unit, throughput) {
+  if (pre == null || pre === 0 || cur == null || throughput < 5) return null;
+  const diff = cur - pre;
+  if (Math.abs(diff) < 0.1) return null;
+  const sign = diff > 0 ? "+" : "";
+  return { text: `${sign}${round1(diff)}${unit} vs last`, good: diff < 0 };
+}
+
+function deltaSnap(cur, pre, lowerBetter) {
+  if (pre == null || pre === 0 || cur == null) return null;
+  const diff = cur - pre;
+  if (Math.abs(diff) < 0.05) return null;
+  const pct = (diff / Math.abs(pre)) * 100;
+  if (Math.abs(pct) > 200) return null;
+  const sign = diff > 0 ? "+" : "";
+  const pSign = pct > 0 ? "+" : "";
+  return { text: `${sign}${round1(diff)} (${pSign}${round1(pct)}%)`, good: lowerBetter ? diff < 0 : diff > 0 };
+}
+
+function deltaPct(cur, pre, lowerBetter) {
+  if (pre == null || cur == null) return null;
+  const diff = cur - pre;
+  if (Math.abs(diff) < 0.5) return null;
+  const sign = diff > 0 ? "+" : "";
+  return { text: `${sign}${round1(diff)}% vs last`, good: lowerBetter ? diff < 0 : diff > 0 };
+}
+
+/* insight helpers */
+
+function buildInsight(key, last, wipItems) {
+  const wip          = last.wip ?? 0;
+  const backlogAging = last.backlogAging ?? 0;
+  const flowEff      = last.flowEfficiency ?? 0;
+  const reopened     = last.reopened ?? 0;
+  const items        = wipItems || [];
+
+  switch (key) {
+    case "cycleTime": {
+      const long = items.filter(i => i.daysInProgress >= 14);
+      if (long.length > 0) return { text: `${long.length} item${long.length > 1 ? "s" : ""} >14d in progress`, level: "bad" };
+      if (wip > 7)         return { text: `High WIP: ${wip}`, level: "warn" };
+      return { text: "Stable flow", level: "neutral" };
+    }
+    case "timeToMarket": {
+      if (backlogAging > 20) return { text: `Old backlog: ${round1(backlogAging)}d avg`, level: "warn" };
+      return { text: "Normal lead time", level: "neutral" };
+    }
+    case "flowEfficiency": {
+      if (flowEff < 20) return { text: "Too much waiting", level: "bad" };
+      if (flowEff < 40) return { text: "Moderate delays", level: "warn" };
+      return { text: "Healthy flow", level: "neutral" };
+    }
+    case "wip": {
+      const byAssignee = {};
+      for (const i of items) {
+        if (i.assignee) byAssignee[i.assignee] = (byAssignee[i.assignee] || 0) + 1;
+      }
+      const overloaded = Object.entries(byAssignee).find(([, cnt]) => cnt > 4);
+      if (overloaded) return { text: `${overloaded[0]} overloaded (${overloaded[1]})`, level: "warn" };
+      if (wip > 7)    return { text: "Too many parallel tasks", level: "warn" };
+      return { text: "WIP under control", level: "neutral" };
+    }
+    case "backlogAging": {
+      if (backlogAging > 30) return { text: `Backlog too old (${round1(backlogAging)}d)`, level: "bad" };
+      if (backlogAging > 14) return { text: "Aging increasing", level: "warn" };
+      return { text: "Backlog healthy", level: "neutral" };
+    }
+    case "reopened": {
+      if (reopened > 0) return { text: `${reopened} reopened issue${reopened > 1 ? "s" : ""}`, level: "warn" };
+      return { text: "No reopens", level: "neutral" };
+    }
+    default: return null;
+  }
+}
+
+function buildKpis(snaps, wipItems) {
   if (!snaps || snaps.length === 0) return null;
   const last = snaps[snaps.length - 1];
   const prev = snaps.length > 1 ? snaps[snaps.length - 2] : null;
-
-  const delta = (cur, pre, lowerBetter) => {
-    if (pre == null || pre === 0 || cur == null) return null;
-    const pct = ((cur - pre) / pre) * 100;
-    const better = lowerBetter ? pct < 0 : pct > 0;
-    const sign = pct > 0 ? "+" : "";
-    return { text: `${sign}${round1(pct)}%`, good: better };
-  };
-
-  const hist = (field) => snaps.map(s => s[field]).filter(v => v != null);
+  const throughput = last.throughput ?? 0;
 
   const rate     = (last.completedCount ?? 0) > 0 ? (last.reopened / last.completedCount) * 100 : 0;
   const prevRate = prev && (prev.completedCount ?? 0) > 0 ? (prev.reopened / prev.completedCount) * 100 : null;
-  const rateHistory = snaps.map(s =>
-    (s.completedCount ?? 0) > 0 ? (s.reopened / s.completedCount) * 100 : 0
-  );
-  const rateDelta = prevRate != null ? (() => {
-    const diff = rate - prevRate;
-    if (Math.abs(diff) < 0.05) return null;
-    return { text: (diff > 0 ? "↑" : "↓") + round1(Math.abs(diff)) + "%", good: diff < 0 };
-  })() : null;
 
   return [
-    { label: "Cycle Time",      sublabel: "In Progress → Done",  value: round1(last.cycleTime ?? 0),      unit: "d",  p85: last.cycleTimeP85    != null ? `${round1(last.cycleTimeP85)}d`    : null, delta: delta(last.cycleTime,    prev?.cycleTime,    true),  status: last.cycleTime    == null ? "neutral" : last.cycleTime    <= 3  ? "good" : last.cycleTime    <= 7  ? "warn" : "bad", history: hist("cycleTime"),    lowerBetter: true,  barMax: 14,  tooltip: "Median calendar days from 'In Progress' to 'Done'" },
-    { label: "Time to Market",  sublabel: "Created → Done",      value: round1(last.timeToMarket ?? 0),   unit: "d",  p85: last.timeToMarketP85 != null ? `${round1(last.timeToMarketP85)}d` : null, delta: delta(last.timeToMarket, prev?.timeToMarket, true),  status: last.timeToMarket == null ? "neutral" : last.timeToMarket <= 7  ? "good" : last.timeToMarket <= 14 ? "warn" : "bad", history: hist("timeToMarket"), lowerBetter: true,  barMax: 28,  tooltip: "Median days from ticket creation to completion" },
-    { label: "Flow Efficiency", sublabel: "Active / Total time", value: round1(last.flowEfficiency ?? 0), unit: "%",  p85: null,                                                                        delta: delta(last.flowEfficiency, prev?.flowEfficiency, false), status: last.flowEfficiency == null ? "neutral" : last.flowEfficiency >= 40 ? "good" : last.flowEfficiency >= 20 ? "warn" : "bad", history: hist("flowEfficiency"), lowerBetter: false, barMax: 100, tooltip: "% of total lead time the item was actively worked on" },
-    { label: "Reopened Rate",   sublabel: `${last.reopened ?? 0} of ${last.completedCount ?? 0} completed`, value: round1(rate), unit: "%", p85: null, delta: rateDelta, status: rate === 0 ? "good" : rate < 5 ? "warn" : "bad", history: rateHistory, lowerBetter: true, barMax: 20, tooltip: "% of completed issues that were reopened at least once" },
-    { label: "WIP",             sublabel: "In Progress now",     value: last.wip ?? 0,                    unit: null, p85: null,                                                                        delta: delta(last.wip,          prev?.wip,          true),  status: last.wip          == null ? "neutral" : last.wip          <= 10 ? "good" : last.wip          <= 20 ? "warn" : "bad", history: hist("wip"),          lowerBetter: true,  barMax: 30,  tooltip: "Number of issues currently In Progress" },
-    { label: "Backlog Aging",   sublabel: "Avg days untouched",  value: round1(last.backlogAging ?? 0),   unit: "d",  p85: null,                                                                        delta: delta(last.backlogAging, prev?.backlogAging, true),  status: last.backlogAging == null ? "neutral" : last.backlogAging <= 14 ? "good" : last.backlogAging <= 30 ? "warn" : "bad", history: hist("backlogAging"), lowerBetter: true,  barMax: 60,  tooltip: "Average days since backlog issues were last updated" },
-  ].map(k => ({ ...k, rich }));
+    {
+      key: "cycleTime",
+      label: "Cycle Time", sublabel: "In Progress → Done",
+      value: round1(last.cycleTime ?? 0), unit: "d",
+      delta: deltaFlow(last.cycleTime, prev?.cycleTime, "d", throughput),
+      insight: buildInsight("cycleTime", last, wipItems),
+      status: last.cycleTime == null ? "neutral" : last.cycleTime <= 3 ? "good" : last.cycleTime <= 7 ? "warn" : "bad",
+      barMax: 14, tooltip: "Median calendar days from 'In Progress' to 'Done'",
+    },
+    {
+      key: "timeToMarket",
+      label: "Time to Market", sublabel: "Created → Done",
+      value: round1(last.timeToMarket ?? 0), unit: "d",
+      delta: deltaFlow(last.timeToMarket, prev?.timeToMarket, "d", throughput),
+      insight: buildInsight("timeToMarket", last, wipItems),
+      status: last.timeToMarket == null ? "neutral" : last.timeToMarket <= 7 ? "good" : last.timeToMarket <= 14 ? "warn" : "bad",
+      barMax: 28, tooltip: "Median days from ticket creation to completion",
+    },
+    {
+      key: "flowEfficiency",
+      label: "Flow Efficiency", sublabel: "Active / Total time",
+      value: round1(last.flowEfficiency ?? 0), unit: "%",
+      delta: deltaPct(last.flowEfficiency, prev?.flowEfficiency, false),
+      insight: buildInsight("flowEfficiency", last, wipItems),
+      status: last.flowEfficiency == null ? "neutral" : last.flowEfficiency >= 40 ? "good" : last.flowEfficiency >= 20 ? "warn" : "bad",
+      barMax: 100, tooltip: "% of total lead time the item was actively worked on",
+    },
+    {
+      key: "reopened",
+      label: "Reopened Rate", sublabel: `${last.reopened ?? 0} of ${last.completedCount ?? 0} completed`,
+      value: round1(rate), unit: "%",
+      delta: deltaPct(rate, prevRate, true),
+      insight: buildInsight("reopened", last, wipItems),
+      status: rate === 0 ? "good" : rate < 5 ? "warn" : "bad",
+      barMax: 20, tooltip: "% of completed issues that were reopened at least once",
+    },
+    {
+      key: "wip",
+      label: "WIP", sublabel: "In Progress now",
+      value: last.wip ?? 0, unit: null,
+      delta: deltaSnap(last.wip, prev?.wip, true),
+      insight: buildInsight("wip", last, wipItems),
+      status: last.wip == null ? "neutral" : last.wip <= 10 ? "good" : last.wip <= 20 ? "warn" : "bad",
+      barMax: 30, tooltip: "Number of issues currently In Progress",
+    },
+    {
+      key: "backlogAging",
+      label: "Backlog Aging", sublabel: "Avg days untouched",
+      value: round1(last.backlogAging ?? 0), unit: "d",
+      delta: deltaSnap(last.backlogAging, prev?.backlogAging, true),
+      insight: buildInsight("backlogAging", last, wipItems),
+      status: last.backlogAging == null ? "neutral" : last.backlogAging <= 14 ? "good" : last.backlogAging <= 30 ? "warn" : "bad",
+      barMax: 60, tooltip: "Average days since backlog issues were last updated",
+    },
+  ];
 }
 
 /* ─── Staleness helpers ───────────────────────────────────────────────────── */
@@ -161,7 +270,6 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [newLabel,    setNewLabel]    = useState("");
 
-  const rich    = true;
   const compact = false;
 
   const pollRef        = useRef(null);
@@ -234,7 +342,7 @@ export default function App() {
     resetBoard(); addProject(label, jql); setNewLabel("");
   }, [newLabel, addProject, resetBoard]);
 
-  const kpis    = buildKpis(snapshots, rich);
+  const kpis    = buildKpis(snapshots, wipItems);
   const hasData = kpis != null;
   const gap     = compact ? 14 : 20;
 
