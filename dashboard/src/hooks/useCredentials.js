@@ -2,8 +2,8 @@ import { useState, useCallback } from "react";
 
 // ── localStorage helpers ───────────────────────────────────────────────────────
 const LS_SOURCE = "ada:source";
-const LS_CREDS  = "ada:creds-v2"; // { jira:{...}, linear:{...} }
-const ALLOWED_SOURCES = new Set(["jira", "linear"]);
+const LS_CREDS  = "ada:creds-v2"; // { jira:{...}, trello:{...} }
+const ALLOWED_SOURCES = new Set(["jira", "trello"]);
 
 const ls    = (k, fb = null) => { try { return localStorage.getItem(k) || fb; } catch { return fb; } };
 const lsSet = (k, v)         => { try { localStorage.setItem(k, v); }          catch { /* ignore storage errors */ } };
@@ -14,8 +14,8 @@ function loadSaved() {
 
 // ── Required fields per source (optional fields excluded) ─────────────────────
 const REQUIRED = {
-  jira:    ["baseUrl", "email", "apiToken"],
-  linear:  ["apiKey", "teamId"],
+  jira:   ["baseUrl", "email", "apiToken"],
+  trello: ["apiKey", "token", "boardId"],
 };
 
 export function hasRequired(source, vals) {

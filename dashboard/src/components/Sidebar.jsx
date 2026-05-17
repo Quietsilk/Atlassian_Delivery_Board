@@ -22,20 +22,25 @@ const SOURCES = {
     qualityNote: "Full changelog · P50/P85 · Flow Efficiency",
     caveat: null,
   },
-  linear: {
-    id: "linear", name: "Linear", quality: "high",
-    color: "#5E6AD2", colorBg: "rgba(94,106,210,0.1)", colorBorder: "rgba(94,106,210,0.3)",
+  trello: {
+    id: "trello", name: "Trello", quality: "high",
+    color: "#0079BF", colorBg: "rgba(0,121,191,0.1)", colorBorder: "rgba(0,121,191,0.3)",
     logo: (
-      <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
-        <path d="M1.22 61.5L38.5 98.78a50 50 0 01-37.28-37.28zM0 50.15L49.85 100A50 50 0 010 50.15zM13.55 15.35L84.65 86.45A50 50 0 0013.55 15.35zM26.1 4.55l69.35 69.35A50 50 0 0026.1 4.55zM50.15 0L100 49.85A50 50 0 0050.15 0z" fill="#5E6AD2"/>
+      <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
+        <rect x="1" y="1" width="30" height="30" rx="5" fill="#0079BF"/>
+        <rect x="4.5" y="4.5" width="10" height="18" rx="2" fill="white"/>
+        <rect x="17.5" y="4.5" width="10" height="12" rx="2" fill="white"/>
       </svg>
     ),
     fields: [
-      { id: "apiKey", label: "API Key", type: "password", placeholder: "lin_api_••••••••••", required: true },
-      { id: "teamId", label: "Team ID", type: "text",     placeholder: "Your Linear Team ID", required: true },
+      { id: "apiKey",          label: "API Key",           type: "password", placeholder: "Trello API key",            required: true },
+      { id: "token",           label: "Token",             type: "password", placeholder: "Trello OAuth token",        required: true },
+      { id: "boardId",         label: "Board ID",          type: "text",     placeholder: "Board ID from URL",         required: true },
+      { id: "listsInProgress", label: "In Progress Lists", type: "text",     placeholder: "In Progress, Doing",        required: false },
+      { id: "listsDone",       label: "Done Lists",        type: "text",     placeholder: "Done, Released",            required: false },
     ],
-    hint: "Settings → API → Personal API keys → Create key",
-    qualityNote: "Full history · P50/P85 · Flow Efficiency",
+    hint: "trello.com/app-key → copy API Key, then click Token link",
+    qualityNote: "Action history · P50/P85 · Flow Efficiency",
     caveat: null,
   },
 };

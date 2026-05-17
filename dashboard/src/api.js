@@ -52,9 +52,12 @@ export async function postSync({ project, source = "jira", creds = {}, jql }) {
     body.apiToken = creds.apiToken;
     // Auto-generate JQL from project label if not provided
     body.jql      = jql || `project = "${project.toUpperCase().replace(/\s+/g, "-")}" ORDER BY updated DESC`;
-  } else if (source === "linear") {
-    body.apiKey = creds.apiKey;
-    body.teamId = creds.teamId || "";
+  } else if (source === "trello") {
+    body.apiKey          = creds.apiKey;
+    body.token           = creds.token;
+    body.boardId         = creds.boardId;
+    body.listsInProgress = creds.listsInProgress || "";
+    body.listsDone       = creds.listsDone       || "";
   }
 
   const res = await fetch(`${BASE}/sync`, {
