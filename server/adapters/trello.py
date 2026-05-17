@@ -1,11 +1,12 @@
 """Trello adapter — REST API.
 
 Config keys:
-  api_key          — Trello API key
-  token            — Trello OAuth token
-  board_id         — board ID (from board URL or API)
-  lists_in_progress — comma-separated list names that mean "in progress"
-  lists_done        — comma-separated list names that mean "done"
+  api_key  — Trello API key
+  token    — Trello OAuth token
+  board_id — board ID (from board URL or API)
+
+List names are matched case-insensitively against built-in defaults.
+Override via lists_in_progress / lists_done (comma-separated) if needed.
 
 Trello has no native changelog — card movement history is fetched from
 the Action API (/1/cards/{id}/actions?filter=updateCard:idList).
@@ -32,6 +33,16 @@ def _created_from_id(card_id: str) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
 
 
+_DEFAULT_IN_PROGRESS = {
+    "in progress", "doing", "in development", "in dev", "development",
+    "в работе", "в разработке",
+}
+_DEFAULT_DONE = {
+    "done", "released", "complete", "completed", "closed", "finished",
+    "выполнено", "готово",
+}
+
+
 def _parse_list_names(raw: str) -> set:
     return {name.strip().lower() for name in raw.split(",") if name.strip()}
 
@@ -44,8 +55,8 @@ class TrelloAdapter(Adapter):
         self.api_key   = api_key
         self.token     = token
         self.board_id  = board_id
-        self._in_prog  = _parse_list_names(lists_in_progress)
-        self._done     = _parse_list_names(lists_done)
+        self._in_prog  = _parse_list_names(lists_in_progress) or _DEFAULT_IN_PROGRESS
+        self._done     = _parse_list_names(lists_done)        or _DEFAULT_DONE
         self._auth_qs  = f"key={api_key}&token={token}"
 
     # ── Fetch ────────────────────────────────────────────────────────────────
