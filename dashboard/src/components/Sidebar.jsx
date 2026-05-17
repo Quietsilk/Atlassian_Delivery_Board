@@ -190,15 +190,6 @@ function ConnectForm({ source, savedValues, connected, onConnect }) {
         ) : `Connect ${src.name}`}
       </button>
 
-      {/* Connected status pill */}
-      {connected && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: radius.md, background: T.goodBg, border: `1px solid ${T.goodBdr}` }}>
-          <div style={{ width: 5, height: 5, borderRadius: "50%", background: T.good, flexShrink: 0 }} />
-          <span style={{ fontSize: font.size.sm, color: T.textSec, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {src.name} · {src.qualityNote}
-          </span>
-        </div>
-      )}
     </div>
   );
 }
