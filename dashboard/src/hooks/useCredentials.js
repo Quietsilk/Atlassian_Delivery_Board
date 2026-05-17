@@ -59,5 +59,5 @@ export function useCredentials() {
   /** Saved credentials for the currently active source. */
   const currentCreds = savedCreds[source] || {};
 
-  return { source, setSource, connected, connect, currentCreds };
+  return { source, setSource, connected, connect, currentCreds, savedCreds };
 }

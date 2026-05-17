@@ -316,14 +316,21 @@ export default function App() {
 
   useEffect(() => { latestTsRef.current = snapshots.at(-1)?.timestamp ?? null; }, [snapshots]);
 
+  const canSync = projects.length > 0 && projects.some(p => {
+    const c = creds.savedCreds[p.source] || {};
+    return p.source === "jira"
+      ? !!(c.baseUrl && c.email && c.apiToken)
+      : !!(c.apiKey && c.token && c.boardId);
+  });
+
   const handleSync = useCallback(async () => {
-    if (!projects.length || !creds.connected) return;
+    if (!projects.length) return;
     const previousTimestamp = latestTsRef.current;
     clearTimeout(pollRef.current);
     setSyncState("syncing"); setSyncError(null);
     try {
       await Promise.all(projects.map(p =>
-        postSync({ project: p.label, source: creds.source, creds: creds.currentCreds, jql: p.jql })
+        postSync({ project: p.label, source: p.source || creds.source, creds: creds.savedCreds[p.source] || creds.currentCreds, jql: p.jql })
       ));
       if (!active) { setSyncState("done"); return; }
       let attempts = 0;
@@ -355,8 +362,8 @@ export default function App() {
     const label = newLabel.trim();
     if (!label) return;
     const jql = `project = "${label.toUpperCase().replace(/\s+/g, "-")}" ORDER BY updated DESC`;
-    resetBoard(); addProject(label, jql); setNewLabel("");
-  }, [newLabel, addProject, resetBoard]);
+    resetBoard(); addProject(label, creds.source, jql); setNewLabel("");
+  }, [newLabel, addProject, resetBoard, creds.source]);
 
   const kpis    = buildKpis(snapshots, wipItems);
   const hasData = kpis != null;
@@ -393,18 +400,23 @@ export default function App() {
 
             {/* Project tabs */}
             <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, overflow: "hidden", marginLeft: 6 }}>
-              {projects.map(p => (
-                <button key={p.id} onClick={() => { if (p.id !== activeId) { resetBoard(); setActiveId(p.id); } }} style={{
-                  padding: "4px 10px", border: "none", borderRadius: radius.sm, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap",
-                  background: p.id === activeId ? T.brandBg : "transparent",
-                  color: p.id === activeId ? T.brand : T.textLabel,
-                }}>
-                  {p.label}
-                  {p.id === activeId && (
-                    <span onClick={e => { e.stopPropagation(); resetBoard(); removeProject(p.id); }} style={{ marginLeft: 5, opacity: 0.4, fontSize: "0.7rem" }}>✕</span>
-                  )}
-                </button>
-              ))}
+              {projects.map(p => {
+                const srcColor = p.source === "trello" ? "#0079BF" : "#2684FF";
+                return (
+                  <button key={p.id} onClick={() => { if (p.id !== activeId) { resetBoard(); setActiveId(p.id); } }} style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "4px 10px", border: "none", borderRadius: radius.sm, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap",
+                    background: p.id === activeId ? T.brandBg : "transparent",
+                    color: p.id === activeId ? T.brand : T.textLabel,
+                  }}>
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: srcColor, flexShrink: 0, display: "inline-block" }} />
+                    {p.label}
+                    {p.id === activeId && (
+                      <span onClick={e => { e.stopPropagation(); resetBoard(); removeProject(p.id); }} style={{ marginLeft: 2, opacity: 0.4, fontSize: "0.7rem" }}>✕</span>
+                    )}
+                  </button>
+                );
+              })}
               <div style={{ display: "flex", gap: 4, marginLeft: 4 }}>
                 <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddProject()}
                   placeholder="Add project…" style={{ height: 26, borderRadius: radius.sm, border: `1px solid ${T.border}`, background: T.bgCard, color: T.text, padding: "0 8px", fontSize: "0.73rem", outline: "none", width: 110, fontFamily: "inherit" }} />
@@ -417,8 +429,8 @@ export default function App() {
               <StatusPill state={syncState} T={T} />
               <UpdatedAgo timestamp={latestSnapshot?.timestamp} T={T} />
               {syncError && <span style={{ fontSize: "0.7rem", color: T.bad, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{syncError}</span>}
-              <button onClick={handleSync} disabled={!projects.length || !creds.connected || syncState === "syncing"}
-                style={{ height: 28, padding: "0 14px", border: `1px solid ${T.brandBdr}`, borderRadius: radius.md, background: T.brandBg, color: T.brand, fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", opacity: (!projects.length || !creds.connected) ? 0.4 : 1, transition: `opacity ${transition.fast}` }}>
+              <button onClick={handleSync} disabled={!canSync || syncState === "syncing"}
+                style={{ height: 28, padding: "0 14px", border: `1px solid ${T.brandBdr}`, borderRadius: radius.md, background: T.brandBg, color: T.brand, fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", opacity: !canSync ? 0.4 : 1, transition: `opacity ${transition.fast}` }}>
                 ↻ Sync
               </button>
               <ThemeToggle mode={mode} onToggle={toggleTheme} T={T} />

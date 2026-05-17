@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 
-const LS_KEY        = "ada:projects-v2";
+const LS_KEY        = "ada:projects-v3";
 const LS_ACTIVE_KEY = "ada:activeId";
 
 function load() {
@@ -33,9 +33,9 @@ export function useProjects() {
     saveActiveId(id);
   }, []);
 
-  const addProject = useCallback((label, jql) => {
+  const addProject = useCallback((label, source, jql) => {
     const id = "p-" + Date.now();
-    const p = { id, label, jql: jql || `project = "${label}" ORDER BY updated DESC` };
+    const p = { id, label, source: source || "jira", jql: jql || `project = "${label}" ORDER BY updated DESC` };
     setProjects(prev => { const next = [...prev, p]; save(next); return next; });
     setActiveId(id);
     return id;
