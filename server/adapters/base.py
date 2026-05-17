@@ -131,4 +131,13 @@ def build_adapter(source: str, config: dict) -> Adapter:
             team_id = config["team_id"],
             filter_ = config.get("filter_", {}),
         )
-    raise ValueError(f"Unknown source: {source!r}. Supported: jira, linear")
+    if source == "trello":
+        from server.adapters.trello import TrelloAdapter
+        return TrelloAdapter(
+            api_key           = config["api_key"],
+            token             = config["token"],
+            board_id          = config["board_id"],
+            lists_in_progress = config.get("lists_in_progress", ""),
+            lists_done        = config.get("lists_done", ""),
+        )
+    raise ValueError(f"Unknown source: {source!r}. Supported: jira, linear, trello")

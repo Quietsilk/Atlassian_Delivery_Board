@@ -161,7 +161,7 @@ class TestApiEndpoints(unittest.TestCase):
             urllib.request.urlopen(req)
         self.assertEqual(ctx.exception.code, 400)
         body = json.loads(ctx.exception.read())
-        self.assertIn("supported: jira, linear", body["error"])
+        self.assertIn("supported: jira, linear, trello", body["error"])
 
     def test_post_sync_missing_project_returns_400(self):
         payload = json.dumps({"source": "jira"}).encode()

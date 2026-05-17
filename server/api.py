@@ -98,9 +98,25 @@ def handle_post_sync(handler, db_path, jira_credentials):
         config = {"api_key": api_key, "team_id": team_id,
                   "filter_": body.get("filter_", {})}
 
+    elif source == "trello":
+        api_key  = body.get("apiKey",  "").strip()
+        token    = body.get("token",   "").strip()
+        board_id = body.get("boardId", "").strip()
+        if not all([api_key, token, board_id]):
+            _json_response(handler, 400, {"ok": False,
+                "error": "trello requires: apiKey, token, boardId"})
+            return
+        config = {
+            "api_key":           api_key,
+            "token":             token,
+            "board_id":          board_id,
+            "lists_in_progress": body.get("listsInProgress", ""),
+            "lists_done":        body.get("listsDone", ""),
+        }
+
     else:
         _json_response(handler, 400, {"ok": False,
-            "error": f"unknown source {source!r}; supported: jira, linear"})
+            "error": f"unknown source {source!r}; supported: jira, linear, trello"})
         return
 
     # ── Launch background ingestion thread ───────────────────────────────────
