@@ -33,11 +33,9 @@ const SOURCES = {
       </svg>
     ),
     fields: [
-      { id: "apiKey",          label: "API Key",           type: "password", placeholder: "Trello API key",            required: true },
-      { id: "token",           label: "Token",             type: "password", placeholder: "Trello OAuth token",        required: true },
-      { id: "boardId",         label: "Board ID",          type: "text",     placeholder: "Board ID from URL",         required: true },
-      { id: "listsInProgress", label: "In Progress Lists", type: "text",     placeholder: "In Progress, Doing",        required: false },
-      { id: "listsDone",       label: "Done Lists",        type: "text",     placeholder: "Done, Released",            required: false },
+      { id: "apiKey",  label: "API Key",  type: "password", placeholder: "Trello API key",       required: true },
+      { id: "token",   label: "Token",    type: "password", placeholder: "Trello OAuth token",   required: true },
+      { id: "boardId", label: "Board ID", type: "text",     placeholder: "Board ID from URL",    required: true },
     ],
     hint: "trello.com/app-key → copy API Key, then click Token link",
     qualityNote: "Action history · P50/P85 · Flow Efficiency",
