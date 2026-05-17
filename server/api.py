@@ -58,9 +58,7 @@ def handle_post_sync(handler, db_path, jira_credentials):
     """POST /sync — triggers ingestion asynchronously.
 
     Jira body  (JSON): { project, baseUrl, email, apiToken, jql }
-    Linear body       : { project, source:"linear",  apiKey, teamId [, filter_] }
-    Asana body        : { project, source:"asana",   accessToken, projectGid }
-    ClickUp body      : { project, source:"clickup", apiKey, listId }
+    Linear body       : { project, source:"linear", apiKey, teamId [, filter_] }
 
     Returns immediately with { ok: true, queued: true }.
     Does NOT return metrics — caller must poll /latest.
@@ -97,27 +95,9 @@ def handle_post_sync(handler, db_path, jira_credentials):
         config = {"api_key": api_key, "team_id": team_id,
                   "filter_": body.get("filter_", {})}
 
-    elif source == "asana":
-        access_token = body.get("accessToken", "").strip()
-        project_gid  = body.get("projectGid",  "").strip()
-        if not all([access_token, project_gid]):
-            _json_response(handler, 400, {"ok": False,
-                "error": "asana requires: accessToken, projectGid"})
-            return
-        config = {"access_token": access_token, "project_gid": project_gid}
-
-    elif source == "clickup":
-        api_key = body.get("apiKey", "").strip()
-        list_id = body.get("listId", "").strip()
-        if not all([api_key, list_id]):
-            _json_response(handler, 400, {"ok": False,
-                "error": "clickup requires: apiKey, listId"})
-            return
-        config = {"api_key": api_key, "list_id": list_id}
-
     else:
         _json_response(handler, 400, {"ok": False,
-            "error": f"unknown source {source!r}; supported: jira, linear, asana, clickup"})
+            "error": f"unknown source {source!r}; supported: jira, linear"})
         return
 
     # ── Launch background ingestion thread ───────────────────────────────────

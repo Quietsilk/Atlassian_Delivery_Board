@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Sidebar from "./components/Sidebar";
 import KpiCard from "./components/KpiCard";
-import AIPanel from "./components/AIPanel";
 import StaleIssuesPanel from "./components/StaleIssuesPanel";
 
 import { useCredentials } from "./hooks/useCredentials";
@@ -9,7 +8,7 @@ import { useProjects } from "./hooks/useProjects";
 import { useTheme } from "./hooks/useTheme";
 import { ThemeContext } from "./context/ThemeContext";
 import { fetchLatest, fetchHistory, postSync } from "./api";
-import { DEMO_HISTORY, DEMO_ANALYSIS } from "./demo";
+import { DEMO_HISTORY } from "./demo";
 import { font, radius, transition } from "./tokens";
 
 /* ─── constants ───────────────────────────────────────────────────────────── */
@@ -82,7 +81,12 @@ function buildInsight(key, last, wipItems) {
       return { text: "Healthy flow", level: "neutral" };
     }
     case "timeToMarket": {
-      if (backlogAging > 20) return { text: `Old backlog: ${round1(backlogAging)}d avg`, level: "warn" };
+      const long21  = items.filter(i => i.daysInProgress >= 21);
+      const blocked = items.filter(i => i.blockedReason);
+      if (blocked.length > 0) return { text: `${blocked.length} blocked item${blocked.length > 1 ? "s" : ""}`, level: "bad" };
+      if (long21.length > 0)  return { text: `${long21.length} item${long21.length > 1 ? "s" : ""} >21d in progress`, level: "warn" };
+      if (backlogAging > 20)  return { text: `Old backlog: ${round1(backlogAging)}d avg`, level: "warn" };
+      if (wip > 10)           return { text: "High WIP slowing delivery", level: "warn" };
       return { text: "Normal lead time", level: "neutral" };
     }
     case "flowEfficiency": {
@@ -129,7 +133,7 @@ function buildKpis(snaps, wipItems) {
 
   return [
     {
-      key: "cycleTime",
+      id: "cycleTime",
       label: "Cycle Time", sublabel: "In Progress → Done",
       value: round1(last.cycleTime ?? 0), unit: "d",
       delta: dFlow(last.cycleTime, prev?.cycleTime, "d"),
@@ -138,7 +142,7 @@ function buildKpis(snaps, wipItems) {
       barMax: 14, tooltip: "Median calendar days from 'In Progress' to 'Done'",
     },
     {
-      key: "timeToMarket",
+      id: "timeToMarket",
       label: "Time to Market", sublabel: "Created → Done",
       value: round1(last.timeToMarket ?? 0), unit: "d",
       delta: dFlow(last.timeToMarket, prev?.timeToMarket, "d"),
@@ -147,7 +151,7 @@ function buildKpis(snaps, wipItems) {
       barMax: 28, tooltip: "Median days from ticket creation to completion",
     },
     {
-      key: "flowEfficiency",
+      id: "flowEfficiency",
       label: "Flow Efficiency", sublabel: "Active / Total time",
       value: round1(last.flowEfficiency ?? 0), unit: "%",
       delta: dPct(last.flowEfficiency, prev?.flowEfficiency, false),
@@ -156,7 +160,7 @@ function buildKpis(snaps, wipItems) {
       barMax: 100, tooltip: "% of total lead time the item was actively worked on",
     },
     {
-      key: "reopened",
+      id: "reopened",
       label: "Reopened Rate", sublabel: `${last.reopened ?? 0} of ${last.completedCount ?? 0} completed`,
       value: round1(rate), unit: "%",
       delta: dPct(rate, prevRate, true),
@@ -165,7 +169,7 @@ function buildKpis(snaps, wipItems) {
       barMax: 20, tooltip: "% of completed issues that were reopened at least once",
     },
     {
-      key: "wip",
+      id: "wip",
       label: "WIP", sublabel: "In Progress now",
       value: last.wip ?? 0, unit: null,
       delta: dSnap(last.wip, prev?.wip, true),
@@ -174,7 +178,7 @@ function buildKpis(snaps, wipItems) {
       barMax: 30, tooltip: "Number of issues currently In Progress",
     },
     {
-      key: "backlogAging",
+      id: "backlogAging",
       label: "Backlog Aging", sublabel: "Avg days untouched",
       value: round1(last.backlogAging ?? 0), unit: "d",
       delta: dSnap(last.backlogAging, prev?.backlogAging, true),
@@ -275,15 +279,13 @@ export default function App() {
   const { projects, activeId, setActiveId, active, addProject, removeProject } = useProjects();
 
   const [snapshots,   setSnapshots]   = useState([]);
-  const [analysis,    setAnalysis]    = useState(null);
   const [syncState,   setSyncState]   = useState("idle");
   const [syncError,   setSyncError]   = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [newLabel,    setNewLabel]    = useState("");
 
-  const compact = false;
-
-  const pollRef        = useRef(null);
+  const latestTsRef = useRef(null);
+  const pollRef     = useRef(null);
   const activeKey      = active?.label || null;
   const latestSnapshot = snapshots.at(-1) || null;
   const wipItems       = latestSnapshot?.wipItems || [];
@@ -295,7 +297,7 @@ export default function App() {
   }, [T.bg, mode]);
 
   const resetBoard = useCallback(() => {
-    setSnapshots([]); setAnalysis(null); setSyncState("idle"); setSyncError(null);
+    setSnapshots([]); setSyncState("idle"); setSyncError(null);
   }, []);
 
   useEffect(() => {
@@ -306,16 +308,17 @@ export default function App() {
         if (cancelled) return;
         const merged = mergeHistoryWithLatest(history, latest);
         setSnapshots(merged);
-        setAnalysis(latest?.analysis || null);
         if (merged.length) setSyncState("done");
       })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [activeKey]);
 
+  useEffect(() => { latestTsRef.current = snapshots.at(-1)?.timestamp ?? null; }, [snapshots]);
+
   const handleSync = useCallback(async () => {
     if (!projects.length || !creds.connected) return;
-    const previousTimestamp = snapshots.at(-1)?.timestamp || null;
+    const previousTimestamp = latestTsRef.current;
     clearTimeout(pollRef.current);
     setSyncState("syncing"); setSyncError(null);
     try {
@@ -330,20 +333,22 @@ export default function App() {
           const merged = mergeHistoryWithLatest(history, latest);
           const latestTs = latest?.timestamp || merged.at(-1)?.timestamp || null;
           if (latestTs && latestTs !== previousTimestamp) {
-            setSnapshots(merged); setAnalysis(latest?.analysis || null); setSyncState("done"); return;
+            setSnapshots(merged); setSyncState("done"); return;
           }
-        } catch {}
+        } catch {
+          // Keep polling; transient API misses are handled by the timeout below.
+        }
         if (++attempts < POLL_MAX_ATTEMPTS) { pollRef.current = setTimeout(poll, POLL_INTERVAL_MS); }
         else { setSyncState("error"); setSyncError("Sync did not produce a new snapshot"); }
       };
       poll();
     } catch (e) { setSyncState("error"); setSyncError(e.message); }
-  }, [active, projects, creds, snapshots]);
+  }, [active, projects, creds]);
 
   useEffect(() => () => clearTimeout(pollRef.current), []);
 
   const handleDemo = useCallback(() => {
-    setSnapshots(DEMO_HISTORY); setAnalysis(DEMO_ANALYSIS); setSyncState("demo");
+    setSnapshots(DEMO_HISTORY); setSyncState("demo");
   }, []);
 
   const handleAddProject = useCallback(() => {
@@ -355,13 +360,13 @@ export default function App() {
 
   const kpis    = buildKpis(snapshots, wipItems);
   const hasData = kpis != null;
-  const gap     = compact ? 14 : 20;
 
   return (
     <ThemeContext.Provider value={T}>
       <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: T.bg, color: T.text, fontFamily: font.family.sans, transition: `background ${transition.normal}, color ${transition.normal}` }}>
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+          :root { font-size: 20px; }
           * { box-sizing: border-box; margin: 0; padding: 0; }
           @keyframes spin { to { transform: rotate(360deg); } }
           [data-theme="dark"]  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); }
@@ -389,7 +394,7 @@ export default function App() {
             {/* Project tabs */}
             <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, overflow: "hidden", marginLeft: 6 }}>
               {projects.map(p => (
-                <button key={p.id} onClick={() => { resetBoard(); setActiveId(p.id); }} style={{
+                <button key={p.id} onClick={() => { if (p.id !== activeId) { resetBoard(); setActiveId(p.id); } }} style={{
                   padding: "4px 10px", border: "none", borderRadius: radius.sm, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap",
                   background: p.id === activeId ? T.brandBg : "transparent",
                   color: p.id === activeId ? T.brand : T.textLabel,
@@ -421,7 +426,7 @@ export default function App() {
           </div>
 
           {/* ── Body ──────────────────────────────────────────── */}
-          <div style={{ flex: 1, overflow: "auto", padding: compact ? "14px 16px" : "20px 22px", display: "flex", flexDirection: "column", gap }}>
+          <div style={{ flex: 1, overflow: "auto", padding: "20px 22px", display: "flex", flexDirection: "column", gap: 20 }}>
 
             {!active && !hasData && (
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -433,14 +438,12 @@ export default function App() {
               </div>
             )}
 
-            {(active || hasData) && <AIPanel analysis={analysis} prominent={!!analysis} />}
-
             {(active || hasData) && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: compact ? 10 : 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 14 }}>
                 {(hasData ? kpis : Array(6).fill(null)).map((kpi, i) => (
                   kpi
-                    ? <KpiCard key={kpi.label} {...kpi} compact={compact} />
-                    : <div key={i} style={{ borderRadius: radius.card, background: T.bgCard, border: `1px solid ${T.borderSub}`, padding: compact ? "12px 14px" : "16px 18px", minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    ? <KpiCard key={kpi.id} {...kpi} />
+                    : <div key={i} style={{ borderRadius: radius.card, background: T.bgCard, border: `1px solid ${T.borderSub}`, padding: "16px 18px", minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <span style={{ fontSize: "0.75rem", color: T.textFaint }}>—</span>
                       </div>
                 ))}
@@ -448,7 +451,11 @@ export default function App() {
             )}
 
             {(active || hasData) && wipItems.length > 0 && (
-              <StaleIssuesPanel items={wipItems} threshold={5} />
+              <StaleIssuesPanel
+                items={wipItems}
+                threshold={5}
+                issueBaseUrl={creds.source === "jira" ? creds.currentCreds?.baseUrl : null}
+              />
             )}
 
             {active && !hasData && syncState === "idle" && (

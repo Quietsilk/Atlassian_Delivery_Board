@@ -146,6 +146,23 @@ class TestApiEndpoints(unittest.TestCase):
         self.assertNotIn("metrics", body)
         self.assertNotIn("cycleTimeDays", body)
 
+    def test_post_sync_rejects_unsupported_source(self):
+        payload = json.dumps({
+            "project": "PROJ",
+            "source": "asana",
+            "accessToken": "tok",
+            "projectGid": "gid",
+        }).encode()
+        req = urllib.request.Request(
+            self._url("/sync"), data=payload,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req)
+        self.assertEqual(ctx.exception.code, 400)
+        body = json.loads(ctx.exception.read())
+        self.assertIn("supported: jira, linear", body["error"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

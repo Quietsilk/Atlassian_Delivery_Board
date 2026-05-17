@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { font, radius, transition } from "../tokens";
 import { useT } from "../context/ThemeContext";
 
@@ -25,9 +24,16 @@ function initials(name) {
   return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-export default function StaleIssuesPanel({ items = [], threshold = 5 }) {
+function issueHref(item, issueBaseUrl) {
+  if (item.url) return item.url;
+  if (issueBaseUrl && /^[A-Z][A-Z0-9]+-\d+$/.test(item.key || "")) {
+    return `${issueBaseUrl.replace(/\/$/, "")}/browse/${item.key}`;
+  }
+  return null;
+}
+
+export default function StaleIssuesPanel({ items = [], threshold = 5, issueBaseUrl = null }) {
   const T = useT();
-  const [open, setOpen] = useState(false);
 
   const stale   = items.filter(i => i.daysInProgress >= threshold);
   const blocked = items.filter(i => i.blockedReason);
@@ -45,8 +51,7 @@ export default function StaleIssuesPanel({ items = [], threshold = 5 }) {
       <style>{`@keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
       {/* ── Header ──────────────────────────────────────────────── */}
-      <button type="button" onClick={() => setOpen(v => !v)} style={{
-        width: "100%", background: "none", border: "none", cursor: "pointer",
+      <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "14px 18px", gap: 12, fontFamily: "inherit",
       }}>
@@ -70,16 +75,11 @@ export default function StaleIssuesPanel({ items = [], threshold = 5 }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: "0.7rem", color: T.textFaint }}>{items.length} tasks</span>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-            style={{ transform: open ? "rotate(180deg)" : "rotate(0)", transition: `transform ${transition.normal}`, flexShrink: 0 }}>
-            <path d="M3 5l4 4 4-4" stroke={T.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
         </div>
-      </button>
+      </div>
 
-      {/* ── Expanded list ────────────────────────────────────────── */}
-      {open && (
-        <div style={{ borderTop: `1px solid ${T.border}`, animation: `fadeIn ${transition.normal} ease` }}>
+      {/* ── List ─────────────────────────────────────────────────── */}
+      <div style={{ borderTop: `1px solid ${T.border}`, animation: `fadeIn ${transition.normal} ease` }}>
           {/* Legend */}
           <div style={{ padding: "7px 18px", borderBottom: `1px solid ${T.borderSub}`, display: "flex", alignItems: "center", gap: 14 }}>
             {[["≥14d", T.bad, "critical"], ["≥7d", T.warn, "aging"], ["<7d", T.textMuted, "ok"]].map(([label, clr, name]) => (
@@ -97,69 +97,76 @@ export default function StaleIssuesPanel({ items = [], threshold = 5 }) {
           )}
 
           {/* Rows */}
-          {sorted.map((item, i) => (
-            <div key={item.key + i} style={{
-              display: "flex", alignItems: "flex-start", gap: 12,
-              padding: "10px 18px",
-              borderBottom: i < sorted.length - 1 ? `1px solid ${T.borderSub}` : "none",
-              background: item.daysInProgress >= 14 ? T.badBg
-                        : item.daysInProgress >= 7  ? T.warnBg
-                        : "transparent",
-            }}>
-              {/* Age pill */}
-              <div style={{
-                flexShrink: 0, minWidth: 40,
-                padding: "3px 8px", borderRadius: radius.sm, textAlign: "center", marginTop: 2,
-                background: agingBg(T, item.daysInProgress),
-                border: `1px solid ${agingBorder(T, item.daysInProgress)}`,
+          <div style={{ maxHeight: "min(42vh, 420px)", overflowY: "auto", overscrollBehavior: "contain" }}>
+            {sorted.map((item, i) => {
+              const href = issueHref(item, issueBaseUrl);
+              const RowTag = href ? "a" : "div";
+              return (
+              <RowTag key={item.key + i} href={href || undefined} target={href ? "_blank" : undefined} rel={href ? "noreferrer" : undefined} style={{
+                display: "flex", alignItems: "flex-start", gap: 12,
+                padding: "10px 18px",
+                borderBottom: i < sorted.length - 1 ? `1px solid ${T.borderSub}` : "none",
+                color: "inherit", textDecoration: "none",
+                cursor: href ? "pointer" : "default",
+                background: item.daysInProgress >= 14 ? T.badBg
+                          : item.daysInProgress >= 7  ? T.warnBg
+                          : "transparent",
               }}>
-                <span style={{ fontSize: font.size.sm, fontWeight: 700, color: agingColor(T, item.daysInProgress), fontFamily: font.family.mono }}>
-                  {item.daysInProgress}d
-                </span>
-              </div>
+                {/* Age pill */}
+                <div style={{
+                  flexShrink: 0, minWidth: 40,
+                  padding: "3px 8px", borderRadius: radius.sm, textAlign: "center", marginTop: 2,
+                  background: agingBg(T, item.daysInProgress),
+                  border: `1px solid ${agingBorder(T, item.daysInProgress)}`,
+                }}>
+                  <span style={{ fontSize: font.size.sm, fontWeight: 700, color: agingColor(T, item.daysInProgress), fontFamily: font.family.mono }}>
+                    {item.daysInProgress}d
+                  </span>
+                </div>
 
-              {/* Key + title + blocker */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                  <span style={{ fontSize: font.size.xs, color: T.brand, fontFamily: font.family.mono, fontWeight: 600, flexShrink: 0 }}>
-                    {item.key}
-                  </span>
-                  <span style={{ fontSize: "0.65rem", padding: "1px 6px", borderRadius: 4, background: T.borderSub, color: T.textFaint, flexShrink: 0 }}>
-                    {item.status}
-                  </span>
-                </div>
-                <div style={{ fontSize: "0.8rem", color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: item.blockedReason ? 4 : 0 }}>
-                  {item.title || "—"}
-                </div>
-                {item.blockedReason && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3 }}>
-                    <div style={{ width: 14, height: 14, borderRadius: 3, background: T.badBg, border: `1px solid ${T.badBdr}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
-                        <path d="M3 1v2.5M3 4.5v.5" stroke={T.bad} strokeWidth="1.2" strokeLinecap="round"/>
-                      </svg>
+                {/* Key + title + blocker */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                    <span style={{ fontSize: font.size.xs, color: T.brand, fontFamily: font.family.mono, fontWeight: 600, flexShrink: 0 }}>
+                      {item.key}
+                    </span>
+                    <span style={{ fontSize: "0.65rem", padding: "1px 6px", borderRadius: 4, background: T.borderSub, color: T.textFaint, flexShrink: 0 }}>
+                      {item.status}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "0.8rem", color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: item.blockedReason ? 4 : 0 }}>
+                    {item.title || "—"}
+                  </div>
+                  {item.blockedReason && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3 }}>
+                      <div style={{ width: 14, height: 14, borderRadius: 3, background: T.badBg, border: `1px solid ${T.badBdr}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
+                          <path d="M3 1v2.5M3 4.5v.5" stroke={T.bad} strokeWidth="1.2" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <span style={{ fontSize: "0.7rem", color: T.bad, opacity: 0.75, fontStyle: "italic" }}>
+                        {item.blockedReason}
+                      </span>
                     </div>
-                    <span style={{ fontSize: "0.7rem", color: T.bad, opacity: 0.75, fontStyle: "italic" }}>
-                      {item.blockedReason}
+                  )}
+                </div>
+
+                {/* Assignee avatar */}
+                {item.assignee && (
+                  <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
+                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: T.brandBg, border: `1px solid ${T.brandBdr}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.58rem", fontWeight: 700, color: T.brand }}>
+                      {initials(item.assignee)}
+                    </div>
+                    <span style={{ fontSize: "0.7rem", color: T.textMuted }}>
+                      {item.assignee.split(" ")[0]}
                     </span>
                   </div>
                 )}
-              </div>
-
-              {/* Assignee avatar */}
-              {item.assignee && (
-                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: T.brandBg, border: `1px solid ${T.brandBdr}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.58rem", fontWeight: 700, color: T.brand }}>
-                    {initials(item.assignee)}
-                  </div>
-                  <span style={{ fontSize: "0.7rem", color: T.textMuted }}>
-                    {item.assignee.split(" ")[0]}
-                  </span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+              </RowTag>
+              );
+            })}
+          </div>
+      </div>
     </div>
   );
 }

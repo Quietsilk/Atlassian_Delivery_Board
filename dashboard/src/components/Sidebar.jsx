@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { font, radius, transition } from "../tokens";
 import { useT } from "../context/ThemeContext";
 
@@ -38,49 +38,7 @@ const SOURCES = {
     qualityNote: "Full history · P50/P85 · Flow Efficiency",
     caveat: null,
   },
-  asana: {
-    id: "asana", name: "Asana", quality: "medium",
-    color: "#F06A6A", colorBg: "rgba(240,106,106,0.1)", colorBorder: "rgba(240,106,106,0.3)",
-    logo: (
-      <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
-        <circle cx="50" cy="27" r="20" fill="#F06A6A"/>
-        <circle cx="20" cy="70" r="20" fill="#F06A6A"/>
-        <circle cx="80" cy="70" r="20" fill="#F06A6A"/>
-      </svg>
-    ),
-    fields: [
-      { id: "accessToken", label: "Personal Access Token",   type: "password", placeholder: "0/••••••••••••••",    required: true },
-      { id: "workspaceId", label: "Workspace / Project GID", type: "text",     placeholder: "Project GID from URL", required: true },
-    ],
-    hint: "My Profile → Apps → Manage Developer Apps → New token",
-    qualityNote: "Limited history · TODO→DONE only",
-    caveat: "Story-based changelog — cycle time is approximate, Flow Efficiency unavailable",
-  },
-  clickup: {
-    id: "clickup", name: "ClickUp", quality: "medium",
-    color: "#7B68EE", colorBg: "rgba(123,104,238,0.1)", colorBorder: "rgba(123,104,238,0.3)",
-    logo: (
-      <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
-        <path d="M10 65L30 45l20 22 20-22 20 20" stroke="#7B68EE" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-        <path d="M10 45L30 25l20 22 20-22 20 20" stroke="#7B68EE" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.5"/>
-      </svg>
-    ),
-    fields: [
-      { id: "apiToken", label: "API Token", type: "password", placeholder: "pk_••••••••••••••••",  required: true },
-      { id: "listId",   label: "List ID",   type: "text",     placeholder: "Your ClickUp List ID", required: true },
-      { id: "teamId",   label: "Team ID",   type: "text",     placeholder: "Optional — Team ID",   required: false },
-    ],
-    hint: "Settings → Apps → API → Generate token",
-    qualityNote: "Custom statuses · partial history",
-    caveat: "Custom statuses may need mapping. History may miss transitions.",
-  },
 };
-
-// ── localStorage helpers ──────────────────────────────────────────────────────
-const LS_STARTED = "ada:started-statuses";
-const LS_DONE    = "ada:done-statuses";
-const ls    = (k, fb) => { try { return localStorage.getItem(k) || fb; } catch { return fb; } };
-const lsSet = (k, v)  => { try { localStorage.setItem(k, v); }           catch {} };
 
 // ── QualityBadge ──────────────────────────────────────────────────────────────
 function QualityBadge({ quality }) {
@@ -138,8 +96,9 @@ function SourcePicker({ value, onChange }) {
 // ── InputField ────────────────────────────────────────────────────────────────
 function InputField({ label, type, placeholder, value, onChange }) {
   const T = useT();
-  const [show, setShow]       = useState(false);
-  const [focused, setFocused] = useState(false);
+  const [show,        setShow]        = useState(false);
+  const [focused,     setFocused]     = useState(false);
+  const [showHovered, setShowHovered] = useState(false);
   const isPassword = type === "password";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -164,12 +123,13 @@ function InputField({ label, type, placeholder, value, onChange }) {
         {isPassword && (
           <button type="button" onClick={() => setShow(v => !v)} style={{
             position: "absolute", right: 8, background: "none", border: "none",
-            color: T.textMuted, fontSize: "0.68rem", fontWeight: 600,
+            color: showHovered ? T.textSec : T.textMuted,
+            fontSize: "0.68rem", fontWeight: 600,
             cursor: "pointer", fontFamily: "inherit",
             transition: `color ${transition.fast}`,
           }}
-          onMouseEnter={e => e.target.style.color = T.textSec}
-          onMouseLeave={e => e.target.style.color = T.textMuted}
+          onMouseEnter={() => setShowHovered(true)}
+          onMouseLeave={() => setShowHovered(false)}
           >{show ? "Hide" : "Show"}</button>
         )}
       </div>
@@ -180,11 +140,9 @@ function InputField({ label, type, placeholder, value, onChange }) {
 // ── ConnectForm ───────────────────────────────────────────────────────────────
 function ConnectForm({ source, savedValues, connected, onConnect }) {
   const T = useT();
-  const src = SOURCES[source];
+  const src = SOURCES[source] || SOURCES.jira;
   const [values,     setValues]     = useState(() => savedValues || {});
   const [connecting, setConnecting] = useState(false);
-
-  useEffect(() => { setValues(savedValues || {}); }, [source]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allFilled = src.fields.filter(f => f.required).every(f => values[f.id]?.trim());
 
@@ -261,85 +219,11 @@ function ConnectForm({ source, savedValues, connected, onConnect }) {
   );
 }
 
-// ── StatusMapping ─────────────────────────────────────────────────────────────
-function StatusMapping() {
-  const T = useT();
-  const [started, setStarted] = useState(() => ls(LS_STARTED, "In Progress, In Development, Selected for Development"));
-  const [done,    setDone]    = useState(() => ls(LS_DONE,    "Done, Closed, Resolved"));
-  const [saved,   setSaved]   = useState(false);
-
-  function handleSave() {
-    lsSet(LS_STARTED, started);
-    lsSet(LS_DONE,    done);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1800);
-  }
-
-  const tareaStyle = {
-    borderRadius: radius.md, border: `1px solid ${T.borderHi}`,
-    background: T.bgInput, color: T.text,
-    padding: "6px 10px", fontSize: font.size.sm,
-    fontFamily: font.family.mono,
-    outline: "none", width: "100%", resize: "none",
-    lineHeight: 1.5, transition: `border-color ${transition.fast}`,
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ fontSize: font.size.xxs, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.textFaint }}>
-        Status Mapping
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", padding: "1px 7px", borderRadius: 4, background: T.brandBg, border: `1px solid ${T.brandBdr}`, fontSize: font.size.xs, fontWeight: 700, color: T.brand, fontFamily: font.family.mono }}>STARTED</span>
-          <span style={{ fontSize: font.size.xs, color: T.textFaint }}>In Progress states</span>
-        </div>
-        <textarea rows={2} value={started} onChange={e => setStarted(e.target.value)} style={tareaStyle}
-          onFocus={e => e.target.style.borderColor = T.brandFocus}
-          onBlur={e  => e.target.style.borderColor = T.borderHi} />
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", padding: "1px 7px", borderRadius: 4, background: T.goodBg, border: `1px solid ${T.goodBdr}`, fontSize: font.size.xs, fontWeight: 700, color: T.good, fontFamily: font.family.mono }}>DONE</span>
-          <span style={{ fontSize: font.size.xs, color: T.textFaint }}>Completed states</span>
-        </div>
-        <textarea rows={2} value={done} onChange={e => setDone(e.target.value)} style={tareaStyle}
-          onFocus={e => e.target.style.borderColor = T.brandFocus}
-          onBlur={e  => e.target.style.borderColor = T.borderHi} />
-      </div>
-
-      <div style={{ fontSize: "0.65rem", color: T.textFaint, lineHeight: 1.5 }}>
-        Comma-separated · case-insensitive
-      </div>
-
-      <button type="button" onClick={handleSave} style={{
-        height: 30, borderRadius: radius.md, width: "100%", fontFamily: "inherit",
-        border: `1px solid ${saved ? T.goodBdr : T.brandBdr}`,
-        background: saved ? T.goodBg : T.brandBg,
-        color: saved ? T.good : T.brand,
-        fontSize: "0.76rem", fontWeight: 600, cursor: "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-        transition: `all ${transition.normal}`,
-      }}>
-        {saved ? (
-          <>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M2 5l2.5 2.5 4-4" stroke={T.good} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Saved
-          </>
-        ) : "Save mapping"}
-      </button>
-    </div>
-  );
-}
-
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 export default function Sidebar({ creds, onDemo }) {
   const T = useT();
-  const src = SOURCES[creds.source];
+  const src = SOURCES[creds.source] || SOURCES.jira;
+  const [demoHovered, setDemoHovered] = useState(false);
   return (
     <aside style={{
       width: 264, flexShrink: 0,
@@ -368,7 +252,8 @@ export default function Sidebar({ creds, onDemo }) {
             <QualityBadge quality={src.quality} />
           </div>
           <ConnectForm
-            source={creds.source}
+            key={src.id}
+            source={src.id}
             savedValues={creds.currentCreds}
             connected={creds.connected}
             onConnect={creds.connect}
@@ -377,20 +262,15 @@ export default function Sidebar({ creds, onDemo }) {
 
         <div style={{ height: 1, background: T.borderSub }} />
 
-        {/* ── Status mapping ─────────────────────────────────── */}
-        <StatusMapping />
-
-        <div style={{ height: 1, background: T.borderSub }} />
-
         {/* ── Demo ───────────────────────────────────────────── */}
         <button type="button" onClick={onDemo} style={{
           height: 30, border: `1px solid ${T.borderHi}`, borderRadius: radius.input,
-          background: "transparent", color: T.textMuted,
+          background: "transparent", color: demoHovered ? T.textSec : T.textMuted,
           fontSize: "0.74rem", fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-          letterSpacing: "0.01em", transition: `color ${transition.fast}, border-color ${transition.fast}`,
+          letterSpacing: "0.01em", transition: `color ${transition.fast}`,
         }}
-        onMouseEnter={e => { e.currentTarget.style.color = T.textSec; e.currentTarget.style.borderColor = T.borderHi; }}
-        onMouseLeave={e => { e.currentTarget.style.color = T.textMuted; e.currentTarget.style.borderColor = T.borderHi; }}
+        onMouseEnter={() => setDemoHovered(true)}
+        onMouseLeave={() => setDemoHovered(false)}
         >⚡ Load demo data</button>
 
       </div>

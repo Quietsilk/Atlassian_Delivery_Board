@@ -60,7 +60,10 @@ def fetch_jira(base_url, email, api_token, jql):
     def _fetch_changelog(key):
         try:
             cl = _jira_request(f"{base_url}/rest/api/3/issue/{key}/changelog?maxResults=100", auth)
-            return key, cl.get("values", [])
+            values = cl.get("values", [])
+            if len(values) == 100:
+                print(f"  [warn] {key}: changelog at 100-entry limit — history may be truncated")
+            return key, values
         except Exception:
             return key, []
 
@@ -70,8 +73,10 @@ def fetch_jira(base_url, email, api_token, jql):
         for key, values in pool.map(_fetch_changelog, [i["key"] for i in all_issues]):
             changelogs[key] = values
 
+    browse_base = base_url.rstrip("/")
     for issue in all_issues:
         issue["changelog"] = {"histories": changelogs.get(issue["key"], [])}
+        issue["browseUrl"] = f"{browse_base}/browse/{issue['key']}"
 
     return all_issues
 
@@ -115,6 +120,7 @@ def _compute_wip_items(issues, mapped):
             "assignee":        assignee,
             "daysInProgress":  days,
             "status":          status,
+            "url":             issue.get("browseUrl") or issue.get("url"),
             "blockedReason":   None,
         })
 
@@ -227,7 +233,7 @@ def run_ingestion_with_adapter(project_key, source, config, db_path="snapshots.d
     Parameters
     ----------
     project_key : str  — storage key
-    source : str       — "jira" | "linear" | "asana" | "clickup"
+    source : str       — "jira" | "linear"
     config : dict      — adapter-specific config (see build_adapter)
     db_path : str      — SQLite path
     """

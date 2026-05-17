@@ -20,12 +20,10 @@ server.py  (тонкий HTTP-роутер, порт 5678)
             │       │       ├── POST /rest/api/3/search/jql  (пагинация, PAGE_SIZE=50)
             │       │       └── GET  /rest/api/3/issue/{key}/changelog  (параллельно, 10 потоков)
             │       │
-            │       ├── server/adapters/  — Linear / Asana / ClickUp
+            │       ├── server/adapters/  — Jira / Linear
             │       │       ├── base.py    Adapter ABC + build_adapter() + HTTP helpers
             │       │       ├── jira.py    JiraAdapter (канонический формат)
-            │       │       ├── linear.py  LinearAdapter (GraphQL → canonical)
-            │       │       ├── asana.py   AsanaAdapter (REST stories → canonical)
-            │       │       └── clickup.py ClickUpAdapter (task history → canonical)
+            │       │       └── linear.py  LinearAdapter (GraphQL → canonical)
             │       │
             │       └── server/metrics.py
             │               ├── calculate_metrics(issues)   → structural KPIs
@@ -64,7 +62,7 @@ server.py  (тонкий HTTP-роутер, порт 5678)
 Все адаптеры возвращают один canonical issue shape; `calculate_metrics()` не знает об источнике.
 
 **Инвариант 8 — `wipItems` в каждом снапшоте.**
-Список in-progress задач рассчитывается при ingestion и хранится вместе с метриками.
+Список in-progress задач рассчитывается при ingestion и хранится вместе с метриками. Если источник даёт URL задачи, элемент содержит `url`.
 
 ---
 
@@ -93,14 +91,14 @@ CREATE TABLE snapshots (
 | `api.py` | `handle_get_latest`, `handle_get_history`, `handle_post_sync` | HTTP handlers |
 | `scheduler.py` | `start_scheduler(projects, db_path, interval)` | Daemon-поток |
 | `adapters/base.py` | `Adapter`, `build_adapter(source, config)` | ABC + фабрика + HTTP helpers |
-| `adapters/{linear,asana,clickup}.py` | `*Adapter` | fetch + normalize → canonical |
+| `adapters/{jira,linear}.py` | `*Adapter` | fetch + normalize → canonical |
 
 ---
 
 ## Слои данных
 
 ```
-Source API (Jira / Linear / Asana / ClickUp)
+Source API (Jira / Linear)
             │
             ▼  Adapter.fetch_and_normalize()
     Canonical Issue (dict)
@@ -118,12 +116,12 @@ Source API (Jira / Linear / Asana / ClickUp)
             backlogAgingDays, completedCount, throughput, wipItems
             │
             ▼  save_snapshot → SQLite
-    Browser (UI)  KpiCard × 6 + AIPanel + StaleIssuesPanel
+    Browser (UI)  KpiCard × 6 + StaleIssuesPanel
 ```
 
 ---
 
-## Frontend (React 18 + Vite)
+## Frontend (React 19 + Vite)
 
 Запускается на порту 5173 (dev) или раздаётся через server.py (prod).
 
@@ -133,9 +131,8 @@ Source API (Jira / Linear / Asana / ClickUp)
 |---|---|
 | `App.jsx` | Root: layout, sync-flow с поллингом, multi-project tabs |
 | `KpiCard.jsx` | KPI-карточка: status stripe, value, delta, insight, progress bar |
-| `AIPanel.jsx` | Summary / Risks / Actions tabs; glowing dot при наличии analysis |
-| `Sidebar.jsx` | Source picker, credentials form, status mapping, demo data |
-| `StaleIssuesPanel.jsx` | WIP-задачи с aging/blocker индикаторами (коллапсируемая) |
+| `Sidebar.jsx` | Source picker, credentials form, demo data |
+| `StaleIssuesPanel.jsx` | WIP-задачи с aging/blocker индикаторами |
 
 ### Хуки
 
@@ -150,12 +147,10 @@ Source API (Jira / Linear / Asana / ClickUp)
 | Ключ | Содержимое |
 |---|---|
 | `ada:theme` | `"dark"` / `"light"` |
-| `ada:source` | `"jira"` / `"linear"` / `"asana"` / `"clickup"` |
-| `ada:creds-v2` | JSON: `{ jira:{baseUrl,email,apiToken}, linear:{apiKey,teamId}, … }` |
+| `ada:source` | `"jira"` / `"linear"` |
+| `ada:creds-v2` | JSON: `{ jira:{baseUrl,email,apiToken}, linear:{apiKey,teamId} }` |
 | `ada:projects-v2` | JSON: массив `{id, label, jql}` |
 | `ada:activeId` | ID активного проекта |
-| `ada:started-statuses` | Comma-separated статусы "In Progress" (status mapping) |
-| `ada:done-statuses` | Comma-separated статусы "Done" (status mapping) |
 
 ### Sync flow
 
@@ -179,4 +174,4 @@ STARTED = {"in progress", "selected for development", "в работе", "in dev
 DONE    = {"done", "closed", "resolved", "выполнено", "complete"}
 ```
 
-Все сравнения case-insensitive (`.lower()`). Пользователь может переопределить через Status Mapping в Sidebar (сохраняется в localStorage, передаётся в POST /sync).
+Все сравнения case-insensitive (`.lower()`). Пользовательский маппинг статусов в UI не поддерживается.
