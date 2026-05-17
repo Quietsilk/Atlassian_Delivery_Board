@@ -17,11 +17,14 @@ import urllib.parse
 def _json_response(handler, code, data):
     body = json.dumps(data).encode()
     handler.send_response(code)
-    handler.send_header("Content-Type",   "application/json")
-    handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Content-Type",        "application/json")
+    handler.send_header("Content-Length",      str(len(body)))
     handler.send_header("Access-Control-Allow-Origin",  "*")
     handler.send_header("Access-Control-Allow-Headers", "Content-Type")
     handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    handler.send_header("X-Content-Type-Options", "nosniff")
+    handler.send_header("X-Frame-Options",        "DENY")
+    handler.send_header("Referrer-Policy",        "no-referrer")
     handler.end_headers()
     handler.wfile.write(body)
 
