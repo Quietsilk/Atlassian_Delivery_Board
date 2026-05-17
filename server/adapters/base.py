@@ -114,8 +114,6 @@ def build_adapter(source: str, config: dict) -> Adapter:
     config keys per source:
       jira:    base_url, email, api_token, jql
       linear:  api_key, team_id  [, filter_]
-      asana:   access_token, project_gid
-      clickup: api_key, list_id
     """
     source = (source or "jira").lower().strip()
     if source == "jira":
@@ -133,16 +131,4 @@ def build_adapter(source: str, config: dict) -> Adapter:
             team_id = config["team_id"],
             filter_ = config.get("filter_", {}),
         )
-    if source == "asana":
-        from server.adapters.asana import AsanaAdapter
-        return AsanaAdapter(
-            access_token = config["access_token"],
-            project_gid  = config["project_gid"],
-        )
-    if source == "clickup":
-        from server.adapters.clickup import ClickUpAdapter
-        return ClickUpAdapter(
-            api_key = config["api_key"],
-            list_id = config["list_id"],
-        )
-    raise ValueError(f"Unknown source: {source!r}. Supported: jira, linear, asana, clickup")
+    raise ValueError(f"Unknown source: {source!r}. Supported: jira, linear")

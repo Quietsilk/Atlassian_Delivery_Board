@@ -7,7 +7,7 @@ function load() {
   try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; }
 }
 function save(v) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(v)); } catch {}
+  try { localStorage.setItem(LS_KEY, JSON.stringify(v)); } catch { /* ignore storage errors */ }
 }
 function loadActiveId() {
   try { return localStorage.getItem(LS_ACTIVE_KEY) || null; } catch { return null; }
@@ -16,7 +16,7 @@ function saveActiveId(id) {
   try {
     if (id) localStorage.setItem(LS_ACTIVE_KEY, id);
     else     localStorage.removeItem(LS_ACTIVE_KEY);
-  } catch {}
+  } catch { /* ignore storage errors */ }
 }
 
 export function useProjects() {

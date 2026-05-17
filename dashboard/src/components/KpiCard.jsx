@@ -11,12 +11,12 @@ function StatusBar({ value, max, clr, borderSub }) {
   );
 }
 
-export default function KpiCard({ label, sublabel, value, unit, delta, insight, status = "neutral", barMax, compact, tooltip }) {
+export default function KpiCard({ label, sublabel, value, unit, delta, insight, status = "neutral", barMax, tooltip }) {
   const T  = useT();
   const sc = getStatusColors(T, status);
   const [hovered, setHovered] = useState(false);
-  const pad = compact ? "12px 14px" : "16px 18px";
-  const num = compact ? font.size.kpiSm : font.size.kpiLg;
+  const pad = "16px 18px";
+  const num = font.size.kpiLg;
 
   const insightColor = insight?.level === "bad"  ? T.bad
                      : insight?.level === "warn" ? T.warn

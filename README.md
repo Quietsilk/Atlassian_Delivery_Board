@@ -1,18 +1,17 @@
 # AI Delivery Analyst
 
-Система раннего обнаружения рисков доставки. Подключается к Jira, Linear, Asana или ClickUp, рассчитывает метрики из changelog, анализирует через OpenAI и отображает всё в браузерном дашборде — с фоновым синком и персистентным хранением снапшотов.
+Система раннего обнаружения рисков доставки. Подключается к Jira или Linear, рассчитывает метрики из changelog, анализирует через OpenAI и отображает всё в браузерном дашборде — с фоновым синком и персистентным хранением снапшотов.
 
 ---
 
 ## Что делает
 
-1. Забирает задачи из выбранного источника (Jira / Linear / Asana / ClickUp) по проекту/списку
-2. Загружает changelog каждой задачи параллельно (10 потоков, Jira) или за один API-вызов (Linear/Asana/ClickUp)
+1. Забирает задачи из выбранного источника (Jira / Linear) по проекту/команде
+2. Загружает changelog каждой задачи параллельно (10 потоков, Jira) или через Linear history nodes
 3. Рассчитывает delivery-метрики: Cycle Time, Time to Market, Flow Efficiency, Reopened Rate, WIP, Backlog Aging
 4. Сохраняет снапшот в SQLite вместе со списком WIP-задач (`wipItems`) для детального разбора
-5. Анализирует метрики через OpenAI → Summary, Risks, Actions (опционально)
-6. Дашборд читает снапшоты через REST API (read-only UI)
-7. Фоновый планировщик автоматически синхронизирует проекты по расписанию
+5. Дашборд читает снапшоты через REST API (read-only UI)
+6. Фоновый планировщик автоматически синхронизирует проекты по расписанию
 
 Если запрос к источнику возвращает 0 задач, ingestion не сохраняет новый снапшот. Это защищает дашборд от ложных all-zero данных при ошибочном JQL, credentials или пустой выборке.
 
@@ -53,12 +52,9 @@ cd dashboard && npm run build
 
 - **Python 3.9+** — stdlib-only, zero dependencies
 - **SQLite** — персистентное хранение снапшотов через `server/storage.py`
-- **React 18 + Vite** — дашборд (`dashboard/`)
+- **React 19 + Vite** — дашборд (`dashboard/`)
 - **Jira Cloud REST API** — `/rest/api/3/search/jql` + changelog
 - **Linear GraphQL API** — issues + history nodes
-- **Asana REST API** — tasks + stories (changelog)
-- **ClickUp REST API** — tasks + task history
-- **OpenAI Responses API** — модель `o4-mini`, опционально
 
 ---
 
@@ -77,19 +73,16 @@ ai-delivery-analyst/
 │   └── adapters/
 │       ├── __init__.py                # build_adapter(), Adapter, CANONICAL_STARTED/DONE
 │       ├── base.py                    # Базовый класс Adapter + фабрика
-│       ├── linear.py                  # Linear GraphQL → canonical issues
-│       ├── asana.py                   # Asana REST → canonical issues
-│       └── clickup.py                 # ClickUp REST → canonical issues
-├── dashboard/                         # React 18 + Vite дашборд
+│       └── linear.py                  # Linear GraphQL → canonical issues
+├── dashboard/                         # React 19 + Vite дашборд
 │   ├── src/
 │   │   ├── App.jsx                    # Корневой компонент: layout, sync, staleness
 │   │   ├── api.js                     # fetchLatest, fetchHistory, postSync (multi-source)
-│   │   ├── demo.js                    # DEMO_HISTORY (с wipItems), DEMO_ANALYSIS
+│   │   ├── demo.js                    # DEMO_HISTORY (с wipItems)
 │   │   ├── tokens.js                  # Дизайн-токены (цвета, шрифты)
 │   │   ├── components/
 │   │   │   ├── KpiCard.jsx            # KPI-карточка: value, delta, insight, статус-бар
-│   │   │   ├── AIPanel.jsx            # AI Insights: summary/risks/actions tabs
-│   │   │   ├── Sidebar.jsx            # Source picker, credentials form, status mapping
+│   │   │   ├── Sidebar.jsx            # Source picker, credentials form
 │   │   │   └── StaleIssuesPanel.jsx   # WIP-задачи с aging/blocker индикаторами
 │   │   ├── context/
 │   │   │   └── ThemeContext.js        # ThemeContext + useT()
@@ -186,6 +179,7 @@ const T = useT();  // возвращает объект с токенами те
           "assignee": "Alexey M.",
           "daysInProgress": 14,
           "status": "In Progress",
+          "url": "https://company.atlassian.net/browse/PROJ-118",
           "blockedReason": "Waiting for security review"
         }
       ]
@@ -216,26 +210,6 @@ const T = useT();  // возвращает объект с токенами те
 }
 ```
 
-**POST /sync** — Asana:
-```json
-{
-  "project": "KEY",
-  "source": "asana",
-  "accessToken": "...",
-  "projectGid": "123456789"
-}
-```
-
-**POST /sync** — ClickUp:
-```json
-{
-  "project": "KEY",
-  "source": "clickup",
-  "apiKey": "pk_...",
-  "listId": "987654321"
-}
-```
-
 `POST /sync` возвращает только `{ok, queued}`. UI считает синк успешным после появления нового snapshot `timestamp` в `/latest`.
 
 ---
@@ -245,17 +219,9 @@ const T = useT();  // возвращает объект с токенами те
 | Источник | Качество | Обязательные поля | Примечание |
 |---|---|---|---|
 | **Jira** | Высокое | `baseUrl`, `email`, `apiToken` | Полный changelog, JQL-фильтрация |
-| **Linear** | Среднее | `apiKey`, `teamId` | История через `historyNodes`, нет blockedReason |
-| **Asana** | Среднее | `accessToken`, `workspaceId` | Changelog через stories |
-| **ClickUp** | Среднее | `apiToken`, `listId` | История через task history endpoint |
+| **Linear** | Высокое | `apiKey`, `teamId` | История через `historyNodes`, нет blockedReason |
 
 Все адаптеры нормализуют данные в единый канонический формат перед расчётом метрик — `calculate_metrics()` не знает об источнике.
-
-### Кастомный маппинг статусов
-
-В дашборде (Sidebar → Status Mapping) можно задать, какие статусы считаются «начатыми» и «завершёнными». Значения сохраняются в localStorage (`ada:started-statuses` / `ada:done-statuses`) и передаются в запрос синка.
-
-По умолчанию: `STARTED = in progress`, `DONE = done`.
 
 ---
 
@@ -292,9 +258,10 @@ const T = useT();  // возвращает объект с токенами те
 
 ### WIP-детализация (StaleIssuesPanel)
 
-Каждый снапшот содержит `wipItems` — список in-progress задач на момент синка. В дашборде отображается коллапсируемая панель с:
+Каждый снапшот содержит `wipItems` — список in-progress задач на момент синка. В дашборде отображается постоянно открытая панель с:
 
 - возраст задачи (дней в In Progress): ≥14d красный, ≥7d жёлтый
+- ссылка на задачу в источнике, если она доступна
 - статус блокировки (`blockedReason`)
 - исполнитель (аватар с инициалами)
 
@@ -308,19 +275,21 @@ const T = useT();  // возвращает объект с токенами те
 
 ## Тесты
 
+Тесты используют `pytest`:
+
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m pytest
 ```
 
-108 тестов, zero external dependencies:
+Zero external network dependencies:
 
 | Файл | Тестов | Покрытие |
 |---|---|---|
 | `test_metrics.py` | 44 | `calculate_metrics`, `calculate_flow_metrics`, `_percentile`, `_parse_dt` |
 | `test_storage.py` | 13 | SQLite CRUD, иммутабельность, фильтрация по периоду |
 | `test_ingestion.py` | 12 | completedCount, flow metrics interval, wipItems |
-| `test_api.py` | 8 | HTTP handlers, 400/404/202 статусы |
-| `test_adapters_product_tools.py` | 31 | Linear/Asana/ClickUp адаптеры, фабрика `build_adapter` |
+| `test_api.py` | 9 | HTTP handlers, 400/404/202 статусы, unsupported sources |
+| `test_adapters_product_tools.py` | 14 | Linear адаптер, фабрика `build_adapter`, отклонение unsupported sources |
 
 ---
 

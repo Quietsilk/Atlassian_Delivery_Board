@@ -2,10 +2,11 @@ import { useState, useCallback } from "react";
 
 // ── localStorage helpers ───────────────────────────────────────────────────────
 const LS_SOURCE = "ada:source";
-const LS_CREDS  = "ada:creds-v2"; // { jira:{...}, linear:{...}, asana:{...}, clickup:{...} }
+const LS_CREDS  = "ada:creds-v2"; // { jira:{...}, linear:{...} }
+const ALLOWED_SOURCES = new Set(["jira", "linear"]);
 
 const ls    = (k, fb = null) => { try { return localStorage.getItem(k) || fb; } catch { return fb; } };
-const lsSet = (k, v)         => { try { localStorage.setItem(k, v); }          catch {} };
+const lsSet = (k, v)         => { try { localStorage.setItem(k, v); }          catch { /* ignore storage errors */ } };
 
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem(LS_CREDS)) || {}; } catch { return {}; }
@@ -15,29 +16,32 @@ function loadSaved() {
 const REQUIRED = {
   jira:    ["baseUrl", "email", "apiToken"],
   linear:  ["apiKey", "teamId"],
-  asana:   ["accessToken", "workspaceId"],
-  clickup: ["apiToken", "listId"],
 };
 
 export function hasRequired(source, vals) {
   return !!(vals && (REQUIRED[source] || []).every(k => vals[k]?.trim()));
 }
 
+function normalizeSource(source) {
+  return ALLOWED_SOURCES.has(source) ? source : "jira";
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 export function useCredentials() {
-  const [source,     setSourceState] = useState(() => ls(LS_SOURCE) || "jira");
+  const [source,     setSourceState] = useState(() => normalizeSource(ls(LS_SOURCE) || "jira"));
   const [savedCreds, setSavedCreds]  = useState(loadSaved);
   const [connected,  setConnected]   = useState(() => {
-    const src  = ls(LS_SOURCE) || "jira";
+    const src  = normalizeSource(ls(LS_SOURCE) || "jira");
     return hasRequired(src, loadSaved()[src]);
   });
 
   /** Switch active source; restores connected state from previously saved creds. */
   const setSource = useCallback((s) => {
-    setSourceState(s);
-    lsSet(LS_SOURCE, s);
+    const source = normalizeSource(s);
+    setSourceState(source);
+    lsSet(LS_SOURCE, source);
     setSavedCreds(prev => {
-      setConnected(hasRequired(s, prev[s]));
+      setConnected(hasRequired(source, prev[source]));
       return prev;
     });
   }, []);

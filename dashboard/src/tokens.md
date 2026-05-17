@@ -65,6 +65,8 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 
 ## Типографика (`font`)
 
+Базовый размер `rem` в приложении: `20px`.
+
 ### Размеры (font.size)
 
 | Токен | rem | Применение |
@@ -73,7 +75,7 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 | `xs` | 0.67rem | field labels, sublabels KPI |
 | `sm` | 0.72rem | mono-значения, secondary текст |
 | `base` | 0.78rem | инпуты, основной текст |
-| `md` | 0.82rem | risk/action items в AIPanel |
+| `md` | 0.82rem | secondary text |
 | `lg` | 0.88rem | логотип |
 | `kpiSm` | 1.7rem | значение KPI в compact-режиме |
 | `kpiLg` | 2.1rem | значение KPI в comfortable-режиме |
@@ -136,16 +138,6 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 **Insight** — детерминированный текст, рассчитывается в `buildInsight()` в App.jsx на основе `metrics + wipItems`. Цвет: `T.bad` / `T.warn` / `T.textMuted`.
 
 `getStatusColors(T, status)` → `{ fg, bg, border, stripe }`.
-
-### AIPanel
-
-```
-● AI INSIGHTS         [Summary] [Risks] [Actions]
-─────────────────────────────────────────────────
-  <текст активного таба>
-```
-
-Таб-бар рендерится только когда `analysis !== null`.
 
 ### StatusPill (app bar)
 

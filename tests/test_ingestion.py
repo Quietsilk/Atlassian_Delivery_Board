@@ -8,7 +8,7 @@ import tempfile
 from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from server.ingestion import run_ingestion, _get_completed_in_interval
+from server.ingestion import run_ingestion, _get_completed_in_interval, _compute_wip_items
 from server.metrics import _map_issue
 from server.storage import init_db, get_latest
 
@@ -167,6 +167,22 @@ class TestRunIngestion(unittest.TestCase):
         self.assertEqual(m["throughput"], 0)
         # completedCount is cumulative total — 1 completed issue regardless of interval
         self.assertEqual(m["completedCount"], 1)
+
+    def test_wip_items_include_issue_url(self):
+        issue = make_issue(
+            key="PROJ-7",
+            status="In Progress",
+            created="2024-01-01T00:00:00Z",
+            transitions=[
+                {"date": "2024-01-02T00:00:00Z", "from": "To Do", "to": "In Progress"},
+            ],
+        )
+        issue["browseUrl"] = "https://jira.example.com/browse/PROJ-7"
+        mapped = [_map_issue(issue)]
+
+        result = _compute_wip_items([issue], mapped)
+
+        self.assertEqual(result[0]["url"], "https://jira.example.com/browse/PROJ-7")
 
 
 if __name__ == "__main__":

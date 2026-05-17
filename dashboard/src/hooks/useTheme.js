@@ -11,7 +11,7 @@ export function useTheme() {
   const toggleTheme = useCallback(() => {
     setMode(prev => {
       const next = prev === "dark" ? "light" : "dark";
-      try { localStorage.setItem(LS_KEY, next); } catch {}
+      try { localStorage.setItem(LS_KEY, next); } catch { /* ignore storage errors */ }
       return next;
     });
   }, []);
