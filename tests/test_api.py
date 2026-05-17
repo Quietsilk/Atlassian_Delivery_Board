@@ -163,6 +163,98 @@ class TestApiEndpoints(unittest.TestCase):
         body = json.loads(ctx.exception.read())
         self.assertIn("supported: jira, linear", body["error"])
 
+    def test_post_sync_missing_project_returns_400(self):
+        payload = json.dumps({"source": "jira"}).encode()
+        req = urllib.request.Request(
+            self._url("/sync"), data=payload,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req)
+        self.assertEqual(ctx.exception.code, 400)
+        body = json.loads(ctx.exception.read())
+        self.assertIn("project is required", body["error"])
+
+    def test_post_sync_jira_missing_api_token_returns_400(self):
+        payload = json.dumps({
+            "project": "PROJ", "source": "jira",
+            "baseUrl": "https://j.test", "email": "u@t.com",
+            # apiToken intentionally omitted
+            "jql": "project=PROJ",
+        }).encode()
+        req = urllib.request.Request(
+            self._url("/sync"), data=payload,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req)
+        self.assertEqual(ctx.exception.code, 400)
+        body = json.loads(ctx.exception.read())
+        self.assertIn("jira requires", body["error"])
+
+    def test_post_sync_jira_missing_jql_returns_400(self):
+        payload = json.dumps({
+            "project": "PROJ", "source": "jira",
+            "baseUrl": "https://j.test", "email": "u@t.com", "apiToken": "tok",
+            # jql intentionally omitted
+        }).encode()
+        req = urllib.request.Request(
+            self._url("/sync"), data=payload,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req)
+        self.assertEqual(ctx.exception.code, 400)
+
+    def test_post_sync_linear_missing_team_id_returns_400(self):
+        payload = json.dumps({
+            "project": "PROJ", "source": "linear",
+            "apiKey": "lin_key",
+            # teamId intentionally omitted
+        }).encode()
+        req = urllib.request.Request(
+            self._url("/sync"), data=payload,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req)
+        self.assertEqual(ctx.exception.code, 400)
+        body = json.loads(ctx.exception.read())
+        self.assertIn("linear requires", body["error"])
+
+    def test_post_sync_linear_missing_api_key_returns_400(self):
+        payload = json.dumps({
+            "project": "PROJ", "source": "linear",
+            # apiKey intentionally omitted
+            "teamId": "team-uuid",
+        }).encode()
+        req = urllib.request.Request(
+            self._url("/sync"), data=payload,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req)
+        self.assertEqual(ctx.exception.code, 400)
+
+    def test_post_sync_linear_queues_successfully(self):
+        payload = json.dumps({
+            "project": "PROJ", "source": "linear",
+            "apiKey": "lin_key", "teamId": "team-uuid",
+        }).encode()
+        mock_adapter = patch("server.adapters.build_adapter")
+        with mock_adapter as mock_ba, \
+             patch("server.ingestion.run_ingestion_with_adapter", return_value={}):
+            mock_ba.return_value.fetch_and_normalize.return_value = []
+            req = urllib.request.Request(
+                self._url("/sync"), data=payload,
+                headers={"Content-Type": "application/json"}, method="POST",
+            )
+            with urllib.request.urlopen(req) as r:
+                body = json.loads(r.read())
+                self.assertEqual(r.status, 202)
+        self.assertTrue(body["ok"])
+        self.assertTrue(body["queued"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
