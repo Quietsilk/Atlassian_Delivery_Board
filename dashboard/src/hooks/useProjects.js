@@ -4,7 +4,18 @@ const LS_KEY        = "ada:projects-v3";
 const LS_ACTIVE_KEY = "ada:activeId";
 
 function load() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; }
+  try {
+    const v3 = JSON.parse(localStorage.getItem(LS_KEY));
+    if (v3) return v3;
+    // Migrate from v2 — add default source
+    const v2 = JSON.parse(localStorage.getItem("ada:projects-v2"));
+    if (v2?.length) {
+      const migrated = v2.map(p => ({ ...p, source: p.source || "jira" }));
+      localStorage.setItem(LS_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
+    return [];
+  } catch { return []; }
 }
 function save(v) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(v)); } catch { /* ignore storage errors */ }
