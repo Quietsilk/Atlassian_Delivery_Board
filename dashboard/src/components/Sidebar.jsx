@@ -45,23 +45,6 @@ const SOURCES = {
   },
 };
 
-// ── QualityBadge ──────────────────────────────────────────────────────────────
-function QualityBadge({ quality }) {
-  const T = useT();
-  const high = quality === "high";
-  return (
-    <span style={{
-      fontSize: font.size.xxs, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
-      background: high ? T.goodBg  : T.warnBg,
-      border:     high ? `1px solid ${T.goodBdr}` : `1px solid ${T.warnBdr}`,
-      color:      high ? T.good : T.warn,
-      letterSpacing: "0.03em",
-    }}>
-      {high ? "High quality" : "Medium quality"}
-    </span>
-  );
-}
-
 // ── SourcePicker ──────────────────────────────────────────────────────────────
 function SourcePicker({ value, onChange }) {
   const T = useT();
@@ -86,10 +69,7 @@ function SourcePicker({ value, onChange }) {
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: src.color, borderRadius: "9px 9px 0 0" }} />
               )}
               {src.logo}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1 }}>
-                <span style={{ fontSize: font.size.base, fontWeight: 700, color: active ? src.color : T.textMuted }}>{src.name}</span>
-                <span style={{ fontSize: "0.6rem", color: T.textFaint }}>{src.quality} quality</span>
-              </div>
+              <span style={{ fontSize: font.size.base, fontWeight: 700, color: active ? src.color : T.textMuted }}>{src.name}</span>
             </button>
           );
         })}
@@ -217,7 +197,6 @@ function ConnectForm({ source, savedValues, connected, onConnect }) {
           <span style={{ fontSize: font.size.sm, color: T.textSec, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {src.name} · {src.qualityNote}
           </span>
-          <QualityBadge quality={src.quality} />
         </div>
       )}
     </div>
@@ -250,11 +229,10 @@ export default function Sidebar({ creds, onDemo }) {
 
         {/* ── Connection form ────────────────────────────────── */}
         <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ marginBottom: 12 }}>
             <span style={{ fontSize: font.size.xxs, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.textFaint }}>
               {src.name} Connection
             </span>
-            <QualityBadge quality={src.quality} />
           </div>
           <ConnectForm
             key={src.id}
