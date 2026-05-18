@@ -15,8 +15,8 @@ export default function KpiCard({ label, sublabel, value, unit, delta, insight, 
   const T  = useT();
   const sc = getStatusColors(T, status);
   const [hovered, setHovered] = useState(false);
-  const pad = "14px 16px";
-  const num = font.size.kpiLg;
+  const pad = "12px 14px";
+  const num = "1.72rem";
 
   const insightColor = insight?.level === "bad"  ? T.bad
                      : insight?.level === "warn" ? T.warn
@@ -31,7 +31,7 @@ export default function KpiCard({ label, sublabel, value, unit, delta, insight, 
         background: hovered ? T.bgCardHov : T.bgCard,
         border: `1px solid ${hovered ? T.borderHi : T.border}`,
         borderRadius: radius.card, padding: pad,
-        display: "flex", flexDirection: "column", gap: 5,
+        display: "flex", flexDirection: "column", gap: 8,
         cursor: "default",
         transition: `border-color ${transition.normal}, background ${transition.normal}, box-shadow ${transition.normal}`,
         position: "relative", overflow: "hidden",
@@ -39,10 +39,10 @@ export default function KpiCard({ label, sublabel, value, unit, delta, insight, 
       }}
     >
       {/* Title */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <div style={{ minWidth: 0 }}>
         <div style={{
-          fontSize: font.size.sm, fontWeight: font.weight.bold,
+          fontSize: font.size.base, fontWeight: font.weight.bold,
           color: T.text,
           letterSpacing: font.tracking.normal,
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -51,7 +51,7 @@ export default function KpiCard({ label, sublabel, value, unit, delta, insight, 
         </div>
         {sublabel && (
           <div style={{
-            fontSize: font.size.xs, color: T.textFaint,
+            fontSize: font.size.xs, color: T.textMuted,
             marginTop: 1, fontFamily: font.family.mono,
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>
@@ -61,12 +61,12 @@ export default function KpiCard({ label, sublabel, value, unit, delta, insight, 
         </div>
         <span style={{
           flexShrink: 0,
-          padding: "2px 7px",
+          padding: "2px 6px",
           borderRadius: radius.sm,
           background: sc.bg,
           border: `1px solid ${sc.border}`,
           color: sc.fg,
-          fontSize: font.size.xxs,
+          fontSize: "0.58rem",
           fontWeight: font.weight.bold,
           textTransform: "uppercase",
           letterSpacing: font.tracking.wide,
@@ -76,7 +76,8 @@ export default function KpiCard({ label, sublabel, value, unit, delta, insight, 
       </div>
 
       {/* Value */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 4, minWidth: 0 }}>
         <span style={{
           fontSize: num, fontWeight: font.weight.extrabold,
           color: T.text, letterSpacing: font.tracking.tight,
@@ -89,18 +90,18 @@ export default function KpiCard({ label, sublabel, value, unit, delta, insight, 
             {unit}
           </span>
         )}
-      </div>
-
-      {/* Delta */}
-      {delta && (
-        <div style={{
-          fontSize: font.size.xs, fontWeight: font.weight.medium,
-          color: delta.good ? T.good : T.bad,
-          fontFamily: font.family.mono,
-        }}>
-          {delta.text}
         </div>
-      )}
+        {delta && (
+          <span style={{
+            fontSize: font.size.xs, fontWeight: font.weight.semibold,
+            color: delta.good ? T.good : T.bad,
+            fontFamily: font.family.mono,
+            whiteSpace: "nowrap",
+          }}>
+            {delta.text}
+          </span>
+        )}
+      </div>
 
       {/* Insight */}
       {insight && (

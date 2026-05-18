@@ -51,21 +51,19 @@ function SourcePicker({ value, onChange }) {
       <span style={{ fontSize: font.size.xxs, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.textFaint }}>
         Data Source
       </span>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+      <div style={{ display: "flex", padding: 2, borderRadius: radius.md, border: `1px solid ${T.border}`, background: T.bgCard }}>
         {Object.values(SOURCES).map(src => {
           const active = value === src.id;
           return (
             <button key={src.id} type="button" onClick={() => onChange(src.id)} style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "9px 10px", borderRadius: radius.md,
-              border: `1px solid ${active ? T.brandBdr : T.border}`,
-              background: active ? T.brandBg : T.bgCard,
+              flex: 1,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+              padding: "7px 8px", borderRadius: radius.sm,
+              border: "none",
+              background: active ? T.brandBg : "transparent",
               cursor: "pointer", transition: `all ${transition.fast}`,
               position: "relative", overflow: "hidden", fontFamily: "inherit",
             }}>
-              {active && (
-                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: src.color, borderRadius: "9px 9px 0 0" }} />
-              )}
               {src.logo}
               <span style={{ fontSize: font.size.base, fontWeight: 700, color: active ? T.brand : T.textMuted }}>{src.name}</span>
             </button>
@@ -199,7 +197,7 @@ export default function Sidebar({ creds, onDemo }) {
   const [demoHovered, setDemoHovered] = useState(false);
   return (
     <aside style={{
-      width: 280, flexShrink: 0,
+      width: 268, flexShrink: 0,
       background: T.bgSidebar,
       borderRight: `1px solid ${T.border}`,
       display: "flex", flexDirection: "column", minHeight: "100vh",

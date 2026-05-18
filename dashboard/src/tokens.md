@@ -99,7 +99,7 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 | `radius.md` | 4 | status pill, connect button |
 | `radius.input` | 3 | все инпуты |
 | `radius.card` | 4 | KPI-карточки |
-| `radius.panel` | 4 | StaleIssuesPanel |
+| `radius.panel` | 4 | AIPanel |
 
 ---
 
@@ -123,14 +123,27 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 │ Label                         GOOD      │
 │ sublabel                                │
 │                                         │
-│ 4.2 d                                   │
-│ -1.9d vs last          ← delta          │
+│ 4.2 d          -1.9d vs last            │
 │ 1 item >14d in progress ← insight       │
 │ ████████░░░░  (progress bar)           │
 └─────────────────────────────────────────┘
 ```
 
 Status отображается lozenge-бейджем справа в заголовке карточки. Верхний status stripe не используется.
+
+### StaleIssuesPanel
+
+StaleIssuesPanel отображается как плоский Jira backlog-like issue list без внешней рамки панели. Над таблицей отображаются quick filters: `All`, `Aging`, `Blocked`, `Unassigned`; строки группируются по текущему статусу.
+
+```text
+All 5   Aging 3   Blocked 2   Unassigned 0
+
+IN PROGRESS 3
+Key      Summary                    Status       Assignee     Age
+PROJ-1   Payment retry handling      IN PROGRESS  Alexey M.    14d
+```
+
+Key отображается как ссылка, если доступен URL задачи. Age отображается lozenge-бейджем справа.
 
 **Delta** — формат зависит от типа метрики:
 - Flow (Cycle Time, TTM): `±Xd vs last` — скрывается если throughput < 5 или нет prev

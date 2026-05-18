@@ -424,37 +424,42 @@ export default function App() {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
           {/* ── App bar ────────────────────────────────────────── */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 16px", height: 54, borderBottom: `1px solid ${T.border}`, flexShrink: 0, position: "relative", background: T.bgBar, boxShadow: T.cardShadow }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 14px", height: 50, borderBottom: `1px solid ${T.border}`, flexShrink: 0, position: "relative", background: T.bgBar, boxShadow: T.cardShadow }}>
             {/* Hamburger */}
             <button aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} onClick={() => setSidebarOpen(v => !v)}
               style={{ width: 32, height: 32, border: "none", borderRadius: radius.md, background: T.bgCardHov, color: T.textSec, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect y="2" width="14" height="1.5" rx="1" fill="currentColor"/><rect y="6.25" width="14" height="1.5" rx="1" fill="currentColor"/><rect y="10.5" width="14" height="1.5" rx="1" fill="currentColor"/></svg>
             </button>
 
-            <span style={{ fontSize: font.size.lg, fontWeight: font.weight.bold, letterSpacing: font.tracking.normal, color: T.text, whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: font.size.md, fontWeight: font.weight.bold, letterSpacing: font.tracking.normal, color: T.text, whiteSpace: "nowrap" }}>
               Atlassian <span style={{ color: T.brand }}>Delivery</span> Board
             </span>
 
             {/* Project tabs */}
-            <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, overflow: "hidden", marginLeft: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, overflow: "hidden", marginLeft: 6 }}>
               {projects.map(p => {
                 const srcColor = p.source === "trello" ? "#0079BF" : "#2684FF";
                 return (
                   <button key={p.id} onClick={() => { if (p.id !== activeId) { resetBoard(); setActiveId(p.id); } }} style={{
                     display: "flex", alignItems: "center", gap: 5,
-                    padding: "5px 10px", border: "none", borderRadius: radius.sm, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap",
+                    padding: "6px 9px", border: "none", borderRadius: radius.sm, cursor: "pointer", fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap",
                     background: p.id === activeId ? T.brandBg : "transparent",
                     color: p.id === activeId ? T.brand : T.textSec,
                   }}>
                     <span style={{ width: 5, height: 5, borderRadius: "50%", background: srcColor, flexShrink: 0, display: "inline-block" }} />
                     {p.label}
+                    {p.id === activeId && p.methodology && (
+                      <span style={{ marginLeft: 3, padding: "1px 5px", borderRadius: radius.sm, background: T.bgCard, color: T.textFaint, fontSize: "0.58rem", textTransform: "uppercase" }}>
+                        {p.methodology}
+                      </span>
+                    )}
                     {p.id === activeId && (
                       <span onClick={e => { e.stopPropagation(); resetBoard(); removeProject(p.id); }} style={{ marginLeft: 2, opacity: 0.4, fontSize: "0.7rem" }}>✕</span>
                     )}
                   </button>
                 );
               })}
-              <div style={{ display: "flex", gap: 4, marginLeft: 4 }}>
+              <div style={{ display: "flex", gap: 4, marginLeft: 6, paddingLeft: 8, borderLeft: `1px solid ${T.borderSub}` }}>
                 <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddProject()}
                   placeholder="Project" style={{ height: 30, borderRadius: radius.input, border: `1px solid ${T.border}`, background: T.bgInput, color: T.text, padding: "0 8px", fontSize: "0.73rem", outline: "none", width: 96, fontFamily: "inherit" }} />
                 <select value={newMethodology || defaultMethodology} onChange={e => setNewMethodology(e.target.value)} style={{ height: 30, borderRadius: radius.input, border: `1px solid ${T.border}`, background: T.bgInput, color: T.textLabel, padding: "0 6px", fontSize: "0.73rem", outline: "none", fontFamily: "inherit" }}>
@@ -466,12 +471,12 @@ export default function App() {
             </div>
 
             {/* Right side */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
               <StatusPill state={syncState} T={T} />
               <UpdatedAgo timestamp={latestSnapshot?.timestamp} T={T} />
               {syncError && <span style={{ fontSize: "0.7rem", color: T.bad, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{syncError}</span>}
               <button onClick={handleSync} disabled={!canSync || syncState === "syncing"}
-                style={{ height: 32, padding: "0 14px", border: "none", borderRadius: radius.md, background: T.brand, color: "#fff", fontSize: "0.76rem", fontWeight: 700, cursor: "pointer", opacity: !canSync ? 0.45 : 1, transition: `opacity ${transition.fast}` }}>
+                style={{ height: 32, padding: "0 14px", border: "none", borderRadius: radius.md, background: canSync ? T.brand : T.borderSub, color: canSync ? "#fff" : T.textFaint, fontSize: "0.76rem", fontWeight: 700, cursor: canSync ? "pointer" : "not-allowed", transition: `opacity ${transition.fast}` }}>
                 ↻ Sync
               </button>
               <ThemeToggle mode={mode} onToggle={toggleTheme} T={T} />
@@ -479,7 +484,7 @@ export default function App() {
           </div>
 
           {/* ── Body ──────────────────────────────────────────── */}
-          <div style={{ flex: 1, overflow: "auto", padding: "24px", display: "flex", flexDirection: "column", gap: 18 }}>
+          <div style={{ flex: 1, overflow: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
 
             {!active && !hasData && (
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -491,7 +496,7 @@ export default function App() {
             )}
 
             {(active || hasData) && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 12 }}>
                 {(hasData ? kpis : Array(6).fill(null)).map((kpi, i) => (
                   kpi
                     ? <KpiCard key={kpi.id} {...kpi} />
