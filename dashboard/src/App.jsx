@@ -115,11 +115,18 @@ function buildInsight(key, last, wipItems) {
       if (sprintCompletion >= 65) return { text: "Partial sprint delivery", level: "warn" };
       return { text: "Low sprint completion", level: "bad" };
     }
+    case "reopenedRate": {
+      const reopenedRate = last.reopenedRate ?? 0;
+      const reopenedCount = last.reopenedCount ?? 0;
+      if (reopenedRate >= 10) return { text: `${reopenedCount} reopened item${reopenedCount === 1 ? "" : "s"}`, level: "bad" };
+      if (reopenedRate >= 5) return { text: "Some rework detected", level: "warn" };
+      return { text: "Low rework", level: "neutral" };
+    }
     default: return null;
   }
 }
 
-function buildKpis(snaps, wipItems) {
+function buildKpis(snaps, wipItems, methodology = "unknown") {
   if (!snaps || snaps.length === 0) return null;
   const last = snaps[snaps.length - 1];
   const prev = snaps.length > 1 ? snaps[snaps.length - 2] : null;
@@ -133,6 +140,38 @@ function buildKpis(snaps, wipItems) {
   const sprintCompletion = last.sprintCompletion;
   const prevSprintCompletion = prev?.sprintCompletion;
   const sprintValue = sprintCompletion == null ? "—" : round1(sprintCompletion);
+  let deliveryQualityKpi;
+  if (methodology === "kanban") {
+    deliveryQualityKpi = {
+      id: "reopenedRate",
+      label: "Reopened Rate", sublabel: `${last.reopenedCount ?? 0} reopened of ${last.completedCount ?? 0} completed`,
+      value: round1(last.reopenedRate ?? 0), unit: "%",
+      delta: dPct(last.reopenedRate, prev?.reopenedRate, true),
+      insight: buildInsight("reopenedRate", last, wipItems),
+      status: (last.reopenedRate ?? 0) === 0 ? "good" : last.reopenedRate < 5 ? "good" : last.reopenedRate < 10 ? "warn" : "bad",
+      barMax: 20, tooltip: "% of completed issues that were reopened at least once",
+    };
+  } else if (methodology === "scrum") {
+    deliveryQualityKpi = {
+      id: "sprintCompletion",
+      label: "Sprint Completion", sublabel: `${last.sprintCompletedCount ?? 0} of ${last.sprintCommittedCount ?? 0} committed`,
+      value: sprintValue, unit: sprintCompletion == null ? null : "%",
+      delta: dPct(sprintCompletion, prevSprintCompletion, false),
+      insight: buildInsight("sprintCompletion", last, wipItems),
+      status: sprintCompletion == null ? "neutral" : sprintCompletion >= 85 ? "good" : sprintCompletion >= 65 ? "warn" : "bad",
+      barMax: 100, tooltip: "% of tasks from sprint-start commitment completed by the latest closed sprint",
+    };
+  } else {
+    deliveryQualityKpi = {
+      id: "methodologyKpi",
+      label: "Methodology KPI", sublabel: "Scrum or Kanban required",
+      value: "—", unit: null,
+      delta: null,
+      insight: { text: "Unknown methodology", level: "neutral" },
+      status: "neutral",
+      barMax: 100, tooltip: "Select Scrum for Sprint Completion or Kanban for Reopened Rate",
+    };
+  }
 
   return [
     {
@@ -141,8 +180,8 @@ function buildKpis(snaps, wipItems) {
       value: round1(last.cycleTime ?? 0), unit: "d",
       delta: dFlow(last.cycleTime, prev?.cycleTime, "d"),
       insight: buildInsight("cycleTime", last, wipItems),
-      status: last.cycleTime == null ? "neutral" : last.cycleTime <= 3 ? "good" : last.cycleTime <= 7 ? "warn" : "bad",
-      barMax: 14, tooltip: "Median calendar days from 'In Progress' to 'Done'",
+      status: last.cycleTime == null ? "neutral" : last.cycleTime <= 5 ? "good" : last.cycleTime < 10 ? "warn" : "bad",
+      barMax: 10, tooltip: "Median calendar days from 'In Progress' to 'Done'",
     },
     {
       id: "timeToMarket",
@@ -150,8 +189,8 @@ function buildKpis(snaps, wipItems) {
       value: round1(last.timeToMarket ?? 0), unit: "d",
       delta: dFlow(last.timeToMarket, prev?.timeToMarket, "d"),
       insight: buildInsight("timeToMarket", last, wipItems),
-      status: last.timeToMarket == null ? "neutral" : last.timeToMarket <= 7 ? "good" : last.timeToMarket <= 14 ? "warn" : "bad",
-      barMax: 28, tooltip: "Median days from ticket creation to completion",
+      status: last.timeToMarket == null ? "neutral" : last.timeToMarket <= 10 ? "good" : last.timeToMarket < 20 ? "warn" : "bad",
+      barMax: 20, tooltip: "Median days from ticket creation to completion",
     },
     {
       id: "flowEfficiency",
@@ -159,26 +198,18 @@ function buildKpis(snaps, wipItems) {
       value: round1(last.flowEfficiency ?? 0), unit: "%",
       delta: dPct(last.flowEfficiency, prev?.flowEfficiency, false),
       insight: buildInsight("flowEfficiency", last, wipItems),
-      status: last.flowEfficiency == null ? "neutral" : last.flowEfficiency >= 40 ? "good" : last.flowEfficiency >= 20 ? "warn" : "bad",
+      status: last.flowEfficiency == null ? "neutral" : last.flowEfficiency >= 40 ? "good" : last.flowEfficiency > 15 ? "warn" : "bad",
       barMax: 100, tooltip: "% of total lead time the item was actively worked on",
     },
-    {
-      id: "sprintCompletion",
-      label: "Sprint Completion", sublabel: `${last.sprintCompletedCount ?? 0} of ${last.sprintCommittedCount ?? 0} committed`,
-      value: sprintValue, unit: sprintCompletion == null ? null : "%",
-      delta: dPct(sprintCompletion, prevSprintCompletion, false),
-      insight: buildInsight("sprintCompletion", last, wipItems),
-      status: sprintCompletion == null ? "neutral" : sprintCompletion >= 85 ? "good" : sprintCompletion >= 65 ? "warn" : "bad",
-      barMax: 100, tooltip: "% of tasks from sprint-start commitment completed by the latest closed sprint",
-    },
+    deliveryQualityKpi,
     {
       id: "wip",
       label: "WIP", sublabel: "In Progress now",
       value: last.wip ?? 0, unit: null,
       delta: dSnap(last.wip, prev?.wip, true),
       insight: buildInsight("wip", last, wipItems),
-      status: last.wip == null ? "neutral" : last.wip <= 10 ? "good" : last.wip <= 20 ? "warn" : "bad",
-      barMax: 30, tooltip: "Number of issues currently In Progress",
+      status: last.wip == null ? "neutral" : last.wip <= 5 ? "good" : last.wip < 15 ? "warn" : "bad",
+      barMax: 15, tooltip: "Number of issues currently In Progress",
     },
     {
       id: "backlogAging",
@@ -186,8 +217,8 @@ function buildKpis(snaps, wipItems) {
       value: round1(last.backlogAging ?? 0), unit: "d",
       delta: dSnap(last.backlogAging, prev?.backlogAging, true),
       insight: buildInsight("backlogAging", last, wipItems),
-      status: last.backlogAging == null ? "neutral" : last.backlogAging <= 14 ? "good" : last.backlogAging <= 30 ? "warn" : "bad",
-      barMax: 60, tooltip: "Average days since backlog issues were last updated",
+      status: last.backlogAging == null ? "neutral" : last.backlogAging <= 14 ? "good" : last.backlogAging < 30 ? "warn" : "bad",
+      barMax: 30, tooltip: "Average days since backlog issues were last updated",
     },
   ];
 }
@@ -286,6 +317,7 @@ export default function App() {
   const [syncError,   setSyncError]   = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [newLabel,    setNewLabel]    = useState("");
+  const [newMethodology, setNewMethodology] = useState("");
 
   const latestTsRef = useRef(null);
   const pollRef     = useRef(null);
@@ -365,11 +397,13 @@ export default function App() {
     const label = newLabel.trim();
     if (!label) return;
     const jql = `project = "${label.toUpperCase().replace(/\s+/g, "-")}" ORDER BY updated DESC`;
-    resetBoard(); addProject(label, creds.source, jql); setNewLabel("");
-  }, [newLabel, addProject, resetBoard, creds.source]);
+    const methodology = newMethodology || (creds.source === "trello" ? "kanban" : "scrum");
+    resetBoard(); addProject(label, creds.source, jql, methodology); setNewLabel("");
+  }, [newLabel, addProject, resetBoard, creds.source, newMethodology]);
 
-  const kpis    = buildKpis(snapshots, wipItems);
+  const kpis    = buildKpis(snapshots, wipItems, active?.methodology);
   const hasData = kpis != null;
+  const defaultMethodology = creds.source === "trello" ? "kanban" : "scrum";
 
   return (
     <ThemeContext.Provider value={T}>
@@ -423,6 +457,10 @@ export default function App() {
               <div style={{ display: "flex", gap: 4, marginLeft: 4 }}>
                 <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddProject()}
                   placeholder="Add project…" style={{ height: 26, borderRadius: radius.sm, border: `1px solid ${T.border}`, background: T.bgCard, color: T.text, padding: "0 8px", fontSize: "0.73rem", outline: "none", width: 110, fontFamily: "inherit" }} />
+                <select value={newMethodology || defaultMethodology} onChange={e => setNewMethodology(e.target.value)} style={{ height: 26, borderRadius: radius.sm, border: `1px solid ${T.border}`, background: T.bgCard, color: T.textLabel, padding: "0 6px", fontSize: "0.73rem", outline: "none", fontFamily: "inherit" }}>
+                  <option value="scrum">Scrum</option>
+                  <option value="kanban">Kanban</option>
+                </select>
                 <button onClick={handleAddProject} style={{ height: 26, padding: "0 10px", border: `1px solid ${T.brandBdr}`, borderRadius: radius.sm, background: T.brandBg, color: T.brand, fontSize: "0.73rem", cursor: "pointer" }}>+</button>
               </div>
             </div>

@@ -8,7 +8,7 @@
 
 1. Забирает задачи из выбранного источника (Jira / Trello) по проекту/борду
 2. Загружает changelog/history каждой задачи параллельно
-3. Рассчитывает delivery-метрики: Cycle Time, Time to Market, Flow Efficiency, Sprint Completion, WIP, Backlog Aging
+3. Рассчитывает delivery-метрики: Cycle Time, Time to Market, Flow Efficiency, methodology KPI, WIP, Backlog Aging
 4. Сохраняет снапшот в SQLite вместе со списком WIP-задач (`wipItems`) для детального разбора
 5. Дашборд читает снапшоты через REST API (read-only UI)
 6. Фоновый планировщик автоматически синхронизирует проекты по расписанию
@@ -90,7 +90,7 @@ ai-delivery-analyst/
 │   │   └── hooks/
 │   │       ├── useTheme.js            # dark/light mode → localStorage (ada:theme)
 │   │       ├── useCredentials.js      # Multi-source creds → localStorage (ada:creds-v2)
-│   │       └── useProjects.js         # Multi-project tabs → localStorage (ada:projects-v3)
+│   │       └── useProjects.js         # Multi-project tabs + methodology → localStorage (ada:projects-v3)
 │   ├── package.json
 │   └── vite.config.js
 ├── tests/
@@ -179,6 +179,8 @@ const T = useT();  // возвращает объект с токенами те
       "sprintRemovedCount": 2,
       "sprintCompletionBasis": "start_commitment",
       "sprintName": "Sprint 42",
+      "reopenedCount": 2,
+      "reopenedRatePercent": 1.4,
       "backlogSize": 56,
       "backlogAgingDays": 28.3,
       "predictabilityPercent": 59.1,
@@ -256,14 +258,15 @@ const T = useT();  // возвращает объект с токенами те
 
 Все метрики рассчитываются из changelog источника — не из статических полей.
 
-6 KPI-карточек в сетке 3×2:
+6 KPI-карточек в сетке 3×2. Четвёртый слот зависит от методологии проекта:
 
 | Метрика | Определение | Хорошо | Плохо |
 |---|---|---|---|
 | **Cycle Time** | P50/P85: последний старт → Done | P50 ≤ 5d | P50 ≥ 10d |
 | **Time to Market** | P50/P85: создание → Done | P50 ≤ 10d | P50 ≥ 20d |
 | **Flow Efficiency** | cycleTimeP50 / timeToMarketP50 × 100%, cap 100% | ≥ 40% | ≤ 15% |
-| **Sprint Completion** | completed committed tasks / tasks committed at sprint start × 100%, последний закрытый Jira-спринт. Если Jira report отдаёт пустой стартовый commitment, используется final scope без removed. | ≥ 85% | < 65% |
+| **Sprint Completion** | Scrum: completed committed tasks / tasks committed at sprint start × 100%, последний закрытый Jira-спринт. Если Jira report отдаёт пустой стартовый commitment, используется final scope без removed. | ≥ 85% | < 65% |
+| **Reopened Rate** | Kanban: reopenedCount / completedCount × 100% | < 5% | ≥ 10% |
 | **WIP** | Задачи в статусе In Progress | ≤ 5 | ≥ 15 |
 | **Backlog Aging** | Среднее кол-во дней в бэклоге | ≤ 14d | ≥ 30d |
 
@@ -314,7 +317,7 @@ Zero external network dependencies:
 3. **`completedCount` = кумулятивный** — всего завершённых задач на момент синка
 4. **Flow metrics раздельно** — `calculate_metrics` возвращает структурные метрики; `calculate_flow_metrics(completed_items)` — P50/P85 flow-метрики
 5. **`calculate_metrics` без period** — чистая функция, нет параметров cutoff/period; источник не знает об адаптере
-6. **Адаптер-инвариант** — все адаптеры возвращают один canonical issue shape; `calculate_metrics()` остаётся нетронутым при добавлении новых источников
+6. **Methodology KPI** — Scrum-проекты показывают `sprintCompletionPercent`; Kanban-проекты показывают `reopenedRatePercent`; unknown/invalid methodology показывает нейтральный `—`
 7. **Пустой result не сохраняется** — если источник вернул 0 задач, новый snapshot не создаётся
 8. **wipItems в каждом снапшоте** — список in-progress задач рассчитывается при ingestion и хранится вместе с метриками
 

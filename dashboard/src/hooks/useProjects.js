@@ -3,14 +3,19 @@ import { useState, useCallback } from "react";
 const LS_KEY        = "ada:projects-v3";
 const LS_ACTIVE_KEY = "ada:activeId";
 
+function normalizeProject(p) {
+  const source = p.source || "jira";
+  return { ...p, source, methodology: p.methodology || (source === "trello" ? "kanban" : "scrum") };
+}
+
 function load() {
   try {
     const v3 = JSON.parse(localStorage.getItem(LS_KEY));
-    if (v3) return v3;
+    if (v3) return v3.map(normalizeProject);
     // Migrate from v2 — add default source
     const v2 = JSON.parse(localStorage.getItem("ada:projects-v2"));
     if (v2?.length) {
-      const migrated = v2.map(p => ({ ...p, source: p.source || "jira" }));
+      const migrated = v2.map(normalizeProject);
       localStorage.setItem(LS_KEY, JSON.stringify(migrated));
       return migrated;
     }
@@ -44,9 +49,9 @@ export function useProjects() {
     saveActiveId(id);
   }, []);
 
-  const addProject = useCallback((label, source, jql) => {
+  const addProject = useCallback((label, source, jql, methodology) => {
     const id = "p-" + Date.now();
-    const p = { id, label, source: source || "jira", jql: jql || `project = "${label}" ORDER BY updated DESC` };
+    const p = normalizeProject({ id, label, source: source || "jira", methodology, jql: jql || `project = "${label}" ORDER BY updated DESC` });
     setProjects(prev => { const next = [...prev, p]; save(next); return next; });
     setActiveId(id);
     return id;

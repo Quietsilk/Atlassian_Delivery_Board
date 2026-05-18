@@ -25,7 +25,7 @@
 ~~Case-sensitive статусы (BUG-S01)~~ — исправлено, все сравнения через `.lower()`.
 ~~BUG-1: Done без resolutiondate~~ — changelog фетчится для всех задач.
 ~~BUG-2: Cycle Time от первого старта~~ — берётся последний STARTED перед done.
-~~BUG-3: Reopened не фильтруется по периоду~~ — KPI заменена на Sprint Completion по последнему закрытому Jira-спринту.
+~~BUG-3: Reopened не фильтруется по периоду~~ — KPI заменена на methodology KPI: Sprint Completion для Scrum, Reopened Rate для Kanban.
 ~~BUG-4: Задачи In Progress → Backlog невидимы~~ — changelog для всех задач.
 ~~Jira API token истекал 30 апреля 2026~~ — риск снят, как future-risk больше не актуален.
 ~~BUG-5: Throughput дублировал completedCount в дашборде~~ — Throughput убран из KPI-сетки; `completedCount` остаётся кумулятивным полем для расчёта дельт.

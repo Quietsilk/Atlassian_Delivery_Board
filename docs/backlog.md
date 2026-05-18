@@ -12,7 +12,7 @@
 - [ ] Blocked issues — детектирование по метке или статусу
 - [ ] Сравнение периодов (30d vs предыдущие 30d) на основе снапшотов
 - [ ] Story points в метриках (velocity, scope completion)
-- [x] Sprint Completion вместо Reopened Rate: последний закрытый Jira-спринт, completed committed / committed at start
+- [x] Methodology KPI: Scrum показывает Sprint Completion, Kanban показывает Reopened Rate
 
 ## Инфраструктура
 
@@ -51,6 +51,6 @@
 - [x] Regression suite: pytest, zero external network dependencies
 - [x] BUG-1: Done без resolutiondate корректно попадает в Throughput
 - [x] BUG-2: Cycle Time от последнего старта перед done
-- [x] BUG-3: Reopened KPI заменена на Sprint Completion
+- [x] BUG-3: Reopened KPI заменена на methodology KPI
 - [x] BUG-4: Задачи In Progress → Backlog видимы (changelog для всех)
 - [x] BUG-5: Throughput убран из KPI-сетки; `completedCount` оставлен как кумулятивное поле снапшота
