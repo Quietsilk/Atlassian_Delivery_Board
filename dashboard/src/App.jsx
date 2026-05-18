@@ -270,7 +270,7 @@ function StatusPill({ state, T }) {
     demo:    { fg: T.demo,     bg: T.demoBg,  label: "Demo" },
   }[state] ?? { fg: T.textMuted, bg: "transparent", label: state };
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: cfg.bg, border: `1px solid ${cfg.fg}40` }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: radius.sm, background: cfg.bg, border: `1px solid ${cfg.fg}40` }}>
       {state === "syncing"
         ? <div style={{ width: 6, height: 6, borderRadius: "50%", border: `1.5px solid ${cfg.fg}`, borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />
         : <div style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.fg }} />}
@@ -284,9 +284,9 @@ function StatusPill({ state, T }) {
 function ThemeToggle({ mode, onToggle, T }) {
   return (
     <button onClick={onToggle} title="Toggle theme" style={{
-      width: 28, height: 28, borderRadius: radius.md,
-      border: `1px solid ${T.border}`,
-      background: T.bgCard,
+      width: 32, height: 32, borderRadius: radius.md,
+      border: "none",
+      background: T.bgCardHov,
       cursor: "pointer",
       display: "flex", alignItems: "center", justifyContent: "center",
       transition: `all ${transition.fast}`, flexShrink: 0,
@@ -413,9 +413,9 @@ export default function App() {
           :root { font-size: 20px; }
           * { box-sizing: border-box; margin: 0; padding: 0; }
           @keyframes spin { to { transform: rotate(360deg); } }
-          [data-theme="dark"]  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); }
-          [data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
-          ::-webkit-scrollbar { width: 5px; height: 5px; }
+          [data-theme="dark"]  ::-webkit-scrollbar-thumb { background: #344054; }
+          [data-theme="light"] ::-webkit-scrollbar-thumb { background: #C1C7D0; }
+          ::-webkit-scrollbar { width: 8px; height: 8px; }
           ::-webkit-scrollbar-track { background: transparent; }
         `}</style>
 
@@ -424,15 +424,15 @@ export default function App() {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
           {/* ── App bar ────────────────────────────────────────── */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 14px", height: 48, borderBottom: `1px solid ${T.borderSub}`, flexShrink: 0, position: "relative", background: T.bgBar }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 16px", height: 54, borderBottom: `1px solid ${T.border}`, flexShrink: 0, position: "relative", background: T.bgBar, boxShadow: T.cardShadow }}>
             {/* Hamburger */}
             <button aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} onClick={() => setSidebarOpen(v => !v)}
-              style={{ width: 30, height: 30, border: `1px solid ${T.border}`, borderRadius: radius.md, background: "transparent", color: T.textSec, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              style={{ width: 32, height: 32, border: "none", borderRadius: radius.md, background: T.bgCardHov, color: T.textSec, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect y="2" width="14" height="1.5" rx="1" fill="currentColor"/><rect y="6.25" width="14" height="1.5" rx="1" fill="currentColor"/><rect y="10.5" width="14" height="1.5" rx="1" fill="currentColor"/></svg>
             </button>
 
-            <span style={{ fontSize: font.size.lg, fontWeight: font.weight.extrabold, letterSpacing: font.tracking.tight, color: T.text, whiteSpace: "nowrap" }}>
-              AI <span style={{ color: T.brand }}>Delivery</span> Analyst
+            <span style={{ fontSize: font.size.lg, fontWeight: font.weight.bold, letterSpacing: font.tracking.normal, color: T.text, whiteSpace: "nowrap" }}>
+              Atlassian <span style={{ color: T.brand }}>Delivery</span> Board
             </span>
 
             {/* Project tabs */}
@@ -442,9 +442,9 @@ export default function App() {
                 return (
                   <button key={p.id} onClick={() => { if (p.id !== activeId) { resetBoard(); setActiveId(p.id); } }} style={{
                     display: "flex", alignItems: "center", gap: 5,
-                    padding: "4px 10px", border: "none", borderRadius: radius.sm, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap",
+                    padding: "5px 10px", border: "none", borderRadius: radius.sm, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap",
                     background: p.id === activeId ? T.brandBg : "transparent",
-                    color: p.id === activeId ? T.brand : T.textLabel,
+                    color: p.id === activeId ? T.brand : T.textSec,
                   }}>
                     <span style={{ width: 5, height: 5, borderRadius: "50%", background: srcColor, flexShrink: 0, display: "inline-block" }} />
                     {p.label}
@@ -456,12 +456,12 @@ export default function App() {
               })}
               <div style={{ display: "flex", gap: 4, marginLeft: 4 }}>
                 <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddProject()}
-                  placeholder="Add project…" style={{ height: 26, borderRadius: radius.sm, border: `1px solid ${T.border}`, background: T.bgCard, color: T.text, padding: "0 8px", fontSize: "0.73rem", outline: "none", width: 110, fontFamily: "inherit" }} />
-                <select value={newMethodology || defaultMethodology} onChange={e => setNewMethodology(e.target.value)} style={{ height: 26, borderRadius: radius.sm, border: `1px solid ${T.border}`, background: T.bgCard, color: T.textLabel, padding: "0 6px", fontSize: "0.73rem", outline: "none", fontFamily: "inherit" }}>
+                  placeholder="Project" style={{ height: 30, borderRadius: radius.input, border: `1px solid ${T.border}`, background: T.bgInput, color: T.text, padding: "0 8px", fontSize: "0.73rem", outline: "none", width: 96, fontFamily: "inherit" }} />
+                <select value={newMethodology || defaultMethodology} onChange={e => setNewMethodology(e.target.value)} style={{ height: 30, borderRadius: radius.input, border: `1px solid ${T.border}`, background: T.bgInput, color: T.textLabel, padding: "0 6px", fontSize: "0.73rem", outline: "none", fontFamily: "inherit" }}>
                   <option value="scrum">Scrum</option>
                   <option value="kanban">Kanban</option>
                 </select>
-                <button onClick={handleAddProject} style={{ height: 26, padding: "0 10px", border: `1px solid ${T.brandBdr}`, borderRadius: radius.sm, background: T.brandBg, color: T.brand, fontSize: "0.73rem", cursor: "pointer" }}>+</button>
+                <button onClick={handleAddProject} style={{ height: 30, padding: "0 10px", border: "none", borderRadius: radius.input, background: T.brand, color: "#fff", fontSize: "0.73rem", fontWeight: 700, cursor: "pointer" }}>+</button>
               </div>
             </div>
 
@@ -471,7 +471,7 @@ export default function App() {
               <UpdatedAgo timestamp={latestSnapshot?.timestamp} T={T} />
               {syncError && <span style={{ fontSize: "0.7rem", color: T.bad, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{syncError}</span>}
               <button onClick={handleSync} disabled={!canSync || syncState === "syncing"}
-                style={{ height: 28, padding: "0 14px", border: `1px solid ${T.brandBdr}`, borderRadius: radius.md, background: T.brandBg, color: T.brand, fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", opacity: !canSync ? 0.4 : 1, transition: `opacity ${transition.fast}` }}>
+                style={{ height: 32, padding: "0 14px", border: "none", borderRadius: radius.md, background: T.brand, color: "#fff", fontSize: "0.76rem", fontWeight: 700, cursor: "pointer", opacity: !canSync ? 0.45 : 1, transition: `opacity ${transition.fast}` }}>
                 ↻ Sync
               </button>
               <ThemeToggle mode={mode} onToggle={toggleTheme} T={T} />
@@ -479,12 +479,11 @@ export default function App() {
           </div>
 
           {/* ── Body ──────────────────────────────────────────── */}
-          <div style={{ flex: 1, overflow: "auto", padding: "20px 22px", display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ flex: 1, overflow: "auto", padding: "24px", display: "flex", flexDirection: "column", gap: 18 }}>
 
             {!active && !hasData && (
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "2.5rem", marginBottom: 12 }}>📊</div>
                   <p style={{ fontSize: "0.95rem", color: T.textLabel, marginBottom: 6 }}>No project selected</p>
                   <p style={{ fontSize: "0.8rem", color: T.textFaint }}>Add a project above, or load demo data from the sidebar.</p>
                 </div>
@@ -512,7 +511,7 @@ export default function App() {
             )}
 
             {active && !hasData && syncState === "idle" && (
-              <div style={{ padding: "12px 16px", borderRadius: 10, background: T.brandBg, border: `1px solid ${T.brandBdr}`, fontSize: "0.8rem", color: T.textMuted, lineHeight: 1.6 }}>
+              <div style={{ padding: "12px 16px", borderRadius: radius.card, background: T.brandBg, border: `1px solid ${T.brandBdr}`, fontSize: "0.8rem", color: T.textMuted, lineHeight: 1.6 }}>
                 Open the sidebar, connect a source and click <strong style={{ color: T.textSec }}>↻ Sync</strong> — or load demo data.
               </div>
             )}

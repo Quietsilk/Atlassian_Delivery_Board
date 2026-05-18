@@ -57,9 +57,9 @@ function SourcePicker({ value, onChange }) {
           return (
             <button key={src.id} type="button" onClick={() => onChange(src.id)} style={{
               display: "flex", alignItems: "center", gap: 8,
-              padding: "9px 10px", borderRadius: 9,
-              border: `1px solid ${active ? src.colorBorder : T.border}`,
-              background: active ? src.colorBg : T.bgCard,
+              padding: "9px 10px", borderRadius: radius.md,
+              border: `1px solid ${active ? T.brandBdr : T.border}`,
+              background: active ? T.brandBg : T.bgCard,
               cursor: "pointer", transition: `all ${transition.fast}`,
               position: "relative", overflow: "hidden", fontFamily: "inherit",
             }}>
@@ -67,7 +67,7 @@ function SourcePicker({ value, onChange }) {
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: src.color, borderRadius: "9px 9px 0 0" }} />
               )}
               {src.logo}
-              <span style={{ fontSize: font.size.base, fontWeight: 700, color: active ? src.color : T.textMuted }}>{src.name}</span>
+              <span style={{ fontSize: font.size.base, fontWeight: 700, color: active ? T.brand : T.textMuted }}>{src.name}</span>
             </button>
           );
         })}
@@ -147,23 +147,23 @@ function ConnectForm({ source, savedValues, connected, onConnect }) {
       ))}
 
       {/* Hint */}
-      <div style={{ fontSize: font.size.xs, color: T.textFaint, lineHeight: 1.5, padding: "5px 9px", borderRadius: radius.sm, background: T.bgCard, border: `1px solid ${T.borderSub}` }}>
-        💡 {src.hint}
+      <div style={{ fontSize: font.size.xs, color: T.textFaint, lineHeight: 1.5, padding: "7px 9px", borderRadius: radius.sm, background: T.bgCardHov, border: `1px solid ${T.borderSub}` }}>
+        {src.hint}
       </div>
 
       {/* Caveat for medium quality sources */}
       {src.caveat && (
         <div style={{ fontSize: font.size.xs, color: T.warn, lineHeight: 1.5, padding: "5px 9px", borderRadius: radius.sm, background: T.warnBg, border: `1px solid ${T.warnBdr}` }}>
-          ⚠ {src.caveat}
+          {src.caveat}
         </div>
       )}
 
       {/* Connect button */}
       <button type="button" onClick={handleConnect} disabled={!allFilled || connecting} style={{
         height: 34, borderRadius: radius.input, width: "100%", fontFamily: "inherit",
-        border: `1px solid ${connected ? T.goodBdr : src.colorBorder}`,
-        background: connected ? T.goodBg : src.colorBg,
-        color: connected ? T.good : src.color,
+        border: connected ? `1px solid ${T.goodBdr}` : "none",
+        background: connected ? T.goodBg : T.brand,
+        color: connected ? T.good : "#fff",
         fontSize: "0.8rem", fontWeight: 700,
         cursor: allFilled && !connecting ? "pointer" : "not-allowed",
         opacity: !allFilled && !connecting ? 0.5 : 1,
@@ -199,9 +199,9 @@ export default function Sidebar({ creds, onDemo }) {
   const [demoHovered, setDemoHovered] = useState(false);
   return (
     <aside style={{
-      width: 264, flexShrink: 0,
+      width: 280, flexShrink: 0,
       background: T.bgSidebar,
-      borderRight: `1px solid ${T.borderSub}`,
+      borderRight: `1px solid ${T.border}`,
       display: "flex", flexDirection: "column", minHeight: "100vh",
     }}>
       <style>{`
@@ -236,14 +236,14 @@ export default function Sidebar({ creds, onDemo }) {
 
         {/* ── Demo ───────────────────────────────────────────── */}
         <button type="button" onClick={onDemo} style={{
-          height: 30, border: `1px solid ${T.borderHi}`, borderRadius: radius.input,
-          background: "transparent", color: demoHovered ? T.textSec : T.textMuted,
+          height: 32, border: `1px solid ${T.border}`, borderRadius: radius.input,
+          background: demoHovered ? T.bgCardHov : T.bgCard, color: demoHovered ? T.textSec : T.textMuted,
           fontSize: "0.74rem", fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
           letterSpacing: "0.01em", transition: `color ${transition.fast}`,
         }}
         onMouseEnter={() => setDemoHovered(true)}
         onMouseLeave={() => setDemoHovered(false)}
-        >⚡ Load demo data</button>
+        >Load demo data</button>
 
       </div>
     </aside>
