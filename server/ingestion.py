@@ -8,6 +8,7 @@ import json
 import base64
 import urllib.request
 import urllib.error
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 
@@ -45,7 +46,7 @@ def fetch_jira(base_url, email, api_token, jql):
         body = {
             "jql": jql, "maxResults": PAGE_SIZE,
             "fieldsByKeys": True,
-            "fields": ["summary", "status", "created", "resolutiondate", "assignee"],
+            "fields": ["summary", "status", "created", "resolutiondate", "assignee", "project"],
         }
         if next_page_token:
             body["nextPageToken"] = next_page_token
@@ -79,6 +80,149 @@ def fetch_jira(base_url, email, api_token, jql):
         issue["browseUrl"] = f"{browse_base}/browse/{issue['key']}"
 
     return all_issues
+
+
+# ── Jira sprint completion ──────────────────────────────────────────────────
+
+def _issue_keys(items):
+    keys = set()
+    for item in items or []:
+        key = item.get("key") or item.get("issueKey")
+        if key:
+            keys.add(key)
+    return keys
+
+
+def _added_issue_keys(value):
+    if isinstance(value, dict):
+        return set(value.keys())
+    if isinstance(value, list):
+        return {v for v in value if isinstance(v, str)}
+    return set()
+
+
+def _sprint_completion_from_report(report):
+    """Compute completion % from Jira sprint report contents.
+
+    Formula:
+      completed initial commitment / issues committed at sprint start * 100
+
+    Jira sprint report exposes:
+      completedIssues, issuesNotCompletedInCurrentSprint, puntedIssues,
+      issueKeysAddedDuringSprint.
+    """
+    contents = report.get("contents") or {}
+    completed = _issue_keys(contents.get("completedIssues"))
+    not_completed = _issue_keys(contents.get("issuesNotCompletedInCurrentSprint"))
+    removed = _issue_keys(contents.get("puntedIssues"))
+    added = _added_issue_keys(contents.get("issueKeysAddedDuringSprint"))
+
+    committed = (completed | not_completed | removed) - added
+    completed_committed = completed - added
+
+    basis = "start_commitment"
+    if not committed:
+        # Jira can report every issue as added after sprint start. In that case
+        # use final sprint scope, excluding removed/punted issues, so the KPI is
+        # still populated instead of returning an unusable empty commitment.
+        committed = completed | not_completed
+        completed_committed = completed
+        basis = "final_scope"
+
+    if not committed:
+        return {
+            "sprintCompletionPercent": None,
+            "sprintCommittedCount": 0,
+            "sprintCompletedCount": 0,
+            "sprintAddedCount": len(added),
+            "sprintRemovedCount": len(removed),
+            "sprintCompletionBasis": basis,
+        }
+
+    return {
+        "sprintCompletionPercent": round(len(completed_committed) / len(committed) * 100, 1),
+        "sprintCommittedCount": len(committed),
+        "sprintCompletedCount": len(completed_committed),
+        "sprintAddedCount": len(added),
+        "sprintRemovedCount": len(removed),
+        "sprintCompletionBasis": basis,
+    }
+
+
+def _project_key_from_issues(project_key, issues):
+    for issue in issues:
+        fields = issue.get("fields") or {}
+        project = fields.get("project") or {}
+        if project.get("key"):
+            return project["key"]
+        key = issue.get("key") or ""
+        if "-" in key:
+            return key.split("-", 1)[0]
+    return (project_key or "").upper()
+
+
+def _fetch_jira_sprint_completion(base_url, auth, project_key, issues):
+    """Fetch latest closed Jira sprint completion via Agile sprint report."""
+    result = {
+        "sprintCompletionPercent": None,
+        "sprintCommittedCount": 0,
+        "sprintCompletedCount": 0,
+        "sprintAddedCount": 0,
+        "sprintRemovedCount": 0,
+        "sprintName": None,
+        "sprintStartDate": None,
+        "sprintCompleteDate": None,
+    }
+
+    key = _project_key_from_issues(project_key, issues)
+    if not key:
+        return result
+
+    try:
+        query = urllib.parse.urlencode({
+            "projectKeyOrId": key,
+            "type": "scrum",
+            "maxResults": 50,
+        })
+        boards = _jira_request(f"{base_url}/rest/agile/1.0/board?{query}", auth).get("values", [])
+        if not boards:
+            return result
+        board_id = boards[0]["id"]
+
+        sprints = _jira_request(
+            f"{base_url}/rest/agile/1.0/board/{board_id}/sprint?state=closed&maxResults=50",
+            auth,
+        ).get("values", [])
+        if not sprints:
+            return result
+
+        closed = sorted(
+            sprints,
+            key=lambda s: s.get("completeDate") or s.get("endDate") or "",
+            reverse=True,
+        )
+        project_named = [
+            sprint for sprint in closed
+            if key.lower() in (sprint.get("name") or "").lower()
+        ]
+        latest = (project_named or closed)[0]
+        report_query = urllib.parse.urlencode({
+            "rapidViewId": board_id,
+            "sprintId": latest["id"],
+        })
+        report = _jira_request(
+            f"{base_url}/rest/greenhopper/1.0/rapid/charts/sprintreport?{report_query}",
+            auth,
+        )
+        result.update(_sprint_completion_from_report(report))
+        result.update({
+            "sprintName": latest.get("name"),
+            "sprintStartDate": latest.get("startDate"),
+            "sprintCompleteDate": latest.get("completeDate") or latest.get("endDate"),
+        })
+    except Exception as e:
+        print(f"  [warn] sprint completion unavailable for {key}: {e}")
+    return result
 
 
 # ── WIP items ────────────────────────────────────────────────────────────────
@@ -192,7 +336,7 @@ def _calc_predictability(mapped):
 
 # ── Shared pipeline ───────────────────────────────────────────────────────────
 
-def _run_pipeline(project_key, issues, db_path):
+def _run_pipeline(project_key, issues, db_path, extra_metrics=None):
     """map → structural metrics → interval flow metrics → save snapshot."""
     mapped = [_map_issue(issue) for issue in issues]
 
@@ -210,6 +354,8 @@ def _run_pipeline(project_key, issues, db_path):
 
     metrics["predictabilityPercent"] = _calc_predictability(mapped)
     metrics["wipItems"]              = _compute_wip_items(issues, mapped)
+    if extra_metrics:
+        metrics.update(extra_metrics)
 
     ts = save_snapshot(project_key, metrics, db_path)
     print(f"[ingestion] {project_key}: snapshot saved at {ts}")
@@ -221,10 +367,12 @@ def _run_pipeline(project_key, issues, db_path):
 def run_ingestion(project_key, base_url, email, api_token, jql, db_path="snapshots.db"):
     """Fetch from Jira and run the ingestion pipeline."""
     print(f"[ingestion] {project_key}: fetching Jira…")
+    auth = base64.b64encode(f"{email}:{api_token}".encode()).decode()
     issues = fetch_jira(base_url, email, api_token, jql)
     if not issues:
         raise ValueError("Jira query returned no issues; snapshot was not saved")
-    return _run_pipeline(project_key, issues, db_path)
+    sprint_metrics = _fetch_jira_sprint_completion(base_url.rstrip("/"), auth, project_key, issues)
+    return _run_pipeline(project_key, issues, db_path, extra_metrics=sprint_metrics)
 
 
 def run_ingestion_with_adapter(project_key, source, config, db_path="snapshots.db"):
@@ -233,7 +381,7 @@ def run_ingestion_with_adapter(project_key, source, config, db_path="snapshots.d
     Parameters
     ----------
     project_key : str  — storage key
-    source : str       — "jira" | "linear"
+    source : str       — "jira" | "trello"
     config : dict      — adapter-specific config (see build_adapter)
     db_path : str      — SQLite path
     """
@@ -244,4 +392,15 @@ def run_ingestion_with_adapter(project_key, source, config, db_path="snapshots.d
     issues  = adapter.fetch_and_normalize()
     if not issues:
         raise ValueError(f"{source} adapter returned no issues; snapshot was not saved")
-    return _run_pipeline(project_key, issues, db_path)
+
+    extra_metrics = None
+    if (source or "").lower().strip() == "jira":
+        auth = base64.b64encode(f"{config['email']}:{config['api_token']}".encode()).decode()
+        extra_metrics = _fetch_jira_sprint_completion(
+            config["base_url"].rstrip("/"),
+            auth,
+            project_key,
+            issues,
+        )
+
+    return _run_pipeline(project_key, issues, db_path, extra_metrics=extra_metrics)

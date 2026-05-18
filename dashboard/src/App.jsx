@@ -66,7 +66,7 @@ function buildInsight(key, last, wipItems) {
   const wip          = last.wip ?? 0;
   const backlogAging = last.backlogAging ?? 0;
   const flowEff      = last.flowEfficiency ?? 0;
-  const reopened     = last.reopened ?? 0;
+  const sprintCompletion = last.sprintCompletion;
   const items        = wipItems || [];
 
   switch (key) {
@@ -109,9 +109,11 @@ function buildInsight(key, last, wipItems) {
       if (backlogAging > 14) return { text: "Aging increasing", level: "warn" };
       return { text: "Backlog healthy", level: "neutral" };
     }
-    case "reopened": {
-      if (reopened > 0) return { text: `${reopened} reopened issue${reopened > 1 ? "s" : ""}`, level: "warn" };
-      return { text: "No reopens", level: "neutral" };
+    case "sprintCompletion": {
+      if (sprintCompletion == null) return { text: "No closed sprint data", level: "neutral" };
+      if (sprintCompletion >= 85) return { text: "Sprint commitment met", level: "neutral" };
+      if (sprintCompletion >= 65) return { text: "Partial sprint delivery", level: "warn" };
+      return { text: "Low sprint completion", level: "bad" };
     }
     default: return null;
   }
@@ -128,8 +130,9 @@ function buildKpis(snaps, wipItems) {
   const dSnap = (cur, pre, lb)   => prevTooOld ? null : deltaSnap(cur, pre, lb);
   const dPct  = (cur, pre, lb)   => prevTooOld ? null : deltaPct(cur, pre, lb);
 
-  const rate     = (last.completedCount ?? 0) > 0 ? (last.reopened / last.completedCount) * 100 : 0;
-  const prevRate = prev && (prev.completedCount ?? 0) > 0 ? (prev.reopened / prev.completedCount) * 100 : null;
+  const sprintCompletion = last.sprintCompletion;
+  const prevSprintCompletion = prev?.sprintCompletion;
+  const sprintValue = sprintCompletion == null ? "—" : round1(sprintCompletion);
 
   return [
     {
@@ -160,13 +163,13 @@ function buildKpis(snaps, wipItems) {
       barMax: 100, tooltip: "% of total lead time the item was actively worked on",
     },
     {
-      id: "reopened",
-      label: "Reopened Rate", sublabel: `${last.reopened ?? 0} of ${last.completedCount ?? 0} completed`,
-      value: round1(rate), unit: "%",
-      delta: dPct(rate, prevRate, true),
-      insight: buildInsight("reopened", last, wipItems),
-      status: rate === 0 ? "good" : rate < 5 ? "warn" : "bad",
-      barMax: 20, tooltip: "% of completed issues that were reopened at least once",
+      id: "sprintCompletion",
+      label: "Sprint Completion", sublabel: `${last.sprintCompletedCount ?? 0} of ${last.sprintCommittedCount ?? 0} committed`,
+      value: sprintValue, unit: sprintCompletion == null ? null : "%",
+      delta: dPct(sprintCompletion, prevSprintCompletion, false),
+      insight: buildInsight("sprintCompletion", last, wipItems),
+      status: sprintCompletion == null ? "neutral" : sprintCompletion >= 85 ? "good" : sprintCompletion >= 65 ? "warn" : "bad",
+      barMax: 100, tooltip: "% of tasks from sprint-start commitment completed by the latest closed sprint",
     },
     {
       id: "wip",

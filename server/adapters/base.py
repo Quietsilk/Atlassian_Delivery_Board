@@ -113,7 +113,7 @@ def build_adapter(source: str, config: dict) -> Adapter:
 
     config keys per source:
       jira:    base_url, email, api_token, jql
-      linear:  api_key, team_id  [, filter_]
+      trello:  api_key, token, board_id
     """
     source = (source or "jira").lower().strip()
     if source == "jira":
@@ -124,13 +124,6 @@ def build_adapter(source: str, config: dict) -> Adapter:
             api_token = config["api_token"],
             jql       = config["jql"],
         )
-    if source == "linear":
-        from server.adapters.linear import LinearAdapter
-        return LinearAdapter(
-            api_key = config["api_key"],
-            team_id = config["team_id"],
-            filter_ = config.get("filter_", {}),
-        )
     if source == "trello":
         from server.adapters.trello import TrelloAdapter
         return TrelloAdapter(
@@ -140,4 +133,4 @@ def build_adapter(source: str, config: dict) -> Adapter:
             lists_in_progress = config.get("lists_in_progress", ""),
             lists_done        = config.get("lists_done", ""),
         )
-    raise ValueError(f"Unknown source: {source!r}. Supported: jira, linear, trello")
+    raise ValueError(f"Unknown source: {source!r}. Supported: jira, trello")

@@ -5,10 +5,16 @@ import os
 import sqlite3
 import unittest
 import tempfile
+from contextlib import contextmanager
 from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from server.ingestion import run_ingestion, _get_completed_in_interval, _compute_wip_items
+from server.ingestion import (
+    run_ingestion,
+    _get_completed_in_interval,
+    _compute_wip_items,
+    _sprint_completion_from_report,
+)
 from server.metrics import _map_issue
 from server.storage import init_db, get_latest
 
@@ -96,8 +102,22 @@ class TestRunIngestion(unittest.TestCase):
     def tearDown(self):
         os.unlink(self.db)
 
+    @contextmanager
     def _mock_fetch(self, issues):
-        return patch("server.ingestion.fetch_jira", return_value=issues)
+        sprint_metrics = {
+            "sprintCompletionPercent": 75.0,
+            "sprintCommittedCount": 4,
+            "sprintCompletedCount": 3,
+            "sprintAddedCount": 1,
+            "sprintRemovedCount": 0,
+            "sprintCompletionBasis": "start_commitment",
+            "sprintName": "Sprint 1",
+            "sprintStartDate": "2024-01-01T00:00:00Z",
+            "sprintCompleteDate": "2024-01-14T00:00:00Z",
+        }
+        with patch("server.ingestion.fetch_jira", return_value=issues), \
+             patch("server.ingestion._fetch_jira_sprint_completion", return_value=sprint_metrics):
+            yield
 
     def test_first_snapshot_throughput_zero(self):
         """No previous snapshot → no interval → throughput = 0."""
@@ -138,7 +158,8 @@ class TestRunIngestion(unittest.TestCase):
             "timeToMarketP50", "timeToMarketP85",
             "flowEfficiencyPercent",
             "throughput", "completedCount",
-            "backlogSize", "inProgressCount", "reopenedCount",
+            "backlogSize", "inProgressCount",
+            "sprintCompletionPercent", "sprintCommittedCount", "sprintCompletedCount",
             "predictabilityPercent", "backlogAgingDays",
         )
         for key in required:
@@ -183,6 +204,36 @@ class TestRunIngestion(unittest.TestCase):
         result = _compute_wip_items([issue], mapped)
 
         self.assertEqual(result[0]["url"], "https://jira.example.com/browse/PROJ-7")
+
+
+class TestSprintCompletionFromReport(unittest.TestCase):
+    def test_counts_completed_from_initial_commitment(self):
+        report = {"contents": {
+            "completedIssues": [{"key": "PROJ-1"}, {"key": "PROJ-2"}, {"key": "PROJ-3"}],
+            "issuesNotCompletedInCurrentSprint": [{"key": "PROJ-4"}],
+            "puntedIssues": [{"key": "PROJ-5"}],
+            "issueKeysAddedDuringSprint": {"PROJ-3": True},
+        }}
+
+        result = _sprint_completion_from_report(report)
+
+        self.assertEqual(result["sprintCommittedCount"], 4)
+        self.assertEqual(result["sprintCompletedCount"], 2)
+        self.assertEqual(result["sprintAddedCount"], 1)
+        self.assertEqual(result["sprintRemovedCount"], 1)
+        self.assertEqual(result["sprintCompletionBasis"], "start_commitment")
+        self.assertEqual(result["sprintCompletionPercent"], 50.0)
+
+    def test_empty_commitment_uses_final_scope(self):
+        result = _sprint_completion_from_report({"contents": {
+            "completedIssues": [{"key": "PROJ-1"}],
+            "issuesNotCompletedInCurrentSprint": [{"key": "PROJ-2"}, {"key": "PROJ-3"}],
+            "issueKeysAddedDuringSprint": {"PROJ-1": True, "PROJ-2": True, "PROJ-3": True},
+        }})
+
+        self.assertEqual(result["sprintCompletionPercent"], 33.3)
+        self.assertEqual(result["sprintCommittedCount"], 3)
+        self.assertEqual(result["sprintCompletionBasis"], "final_scope")
 
 
 if __name__ == "__main__":

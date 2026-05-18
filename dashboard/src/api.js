@@ -10,7 +10,13 @@ function normalizeSnapshot(snapshot) {
     timeToMarket:    metrics.timeToMarketP50       ?? metrics.timeToMarketDays ?? metrics.timeToMarket ?? 0,
     timeToMarketP85: metrics.timeToMarketP85       ?? 0,
     flowEfficiency:  metrics.flowEfficiencyPercent ?? metrics.flowEfficiency   ?? 0,
-    reopened:        metrics.reopenedCount          ?? metrics.reopened         ?? 0,
+    sprintCompletion: metrics.sprintCompletionPercent ?? metrics.sprintCompletion ?? null,
+    sprintCommittedCount: metrics.sprintCommittedCount ?? 0,
+    sprintCompletedCount: metrics.sprintCompletedCount ?? 0,
+    sprintAddedCount: metrics.sprintAddedCount ?? 0,
+    sprintRemovedCount: metrics.sprintRemovedCount ?? 0,
+    sprintCompletionBasis: metrics.sprintCompletionBasis ?? null,
+    sprintName:      metrics.sprintName             ?? null,
     completedCount:  metrics.completedCount         ?? 0,
     wip:             metrics.inProgressCount        ?? metrics.wip              ?? 0,
     backlogAging:    metrics.backlogAgingDays        ?? metrics.backlogAging     ?? 0,
@@ -39,7 +45,7 @@ export async function fetchHistory(project) {
  * POST /sync — source-aware.
  *
  * @param {string} project  - project key / label
- * @param {string} source   - "jira" | "linear"
+ * @param {string} source   - "jira" | "trello"
  * @param {object} creds    - saved credentials for the active source (from useCredentials)
  * @param {string} [jql]    - optional JQL override (Jira only)
  */

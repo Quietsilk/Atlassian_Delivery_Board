@@ -2,11 +2,8 @@
 
 ## Активные
 
-**Jira API token истекает 30 апреля 2026.**
-Если не ротировать — live-синк перестанет работать. Нужно обновить токен в `.env` и в localStorage дашборда до этой даты.
-
 **STARTED/DONE статусы захардкожены.**
-Если в Jira-проекте используются нестандартные названия статусов, `started_at` будет `None` у всех задач → Cycle Time и Time to Market = 0. Workaround: добавить статус в `STARTED`/`DONE` в `server_app.py` вручную. Долгосрочно — вынести в UI-конфиг.
+Если в Jira-проекте используются нестандартные названия статусов, `started_at` будет `None` у всех задач → Cycle Time и Time to Market = 0. Workaround: добавить статус в `STARTED`/`DONE` в `server/metrics.py` вручную. Долгосрочно — вынести в UI-конфиг.
 
 **Legacy `/webhook/sync-report` блокирует HTTP-поток.**
 `server_app.Handler._handle()` выполняется синхронно в обработчике запроса: fetch Jira (N×changelog) + OpenAI — может занять 30-60 сек на большом проекте. В это время сервер недоступен для других запросов. Workaround: использовать новый `POST /sync` (возвращает 202 сразу, выполняет ингест в фоне).
@@ -28,6 +25,7 @@
 ~~Case-sensitive статусы (BUG-S01)~~ — исправлено, все сравнения через `.lower()`.
 ~~BUG-1: Done без resolutiondate~~ — changelog фетчится для всех задач.
 ~~BUG-2: Cycle Time от первого старта~~ — берётся последний STARTED перед done.
-~~BUG-3: Reopened не фильтруется по периоду~~ — считается только среди completed.
+~~BUG-3: Reopened не фильтруется по периоду~~ — KPI заменена на Sprint Completion по последнему закрытому Jira-спринту.
 ~~BUG-4: Задачи In Progress → Backlog невидимы~~ — changelog для всех задач.
-~~BUG-5: completedCount дублирует throughput~~ — completedCount удалён.
+~~Jira API token истекал 30 апреля 2026~~ — риск снят, как future-risk больше не актуален.
+~~BUG-5: Throughput дублировал completedCount в дашборде~~ — Throughput убран из KPI-сетки; `completedCount` остаётся кумулятивным полем для расчёта дельт.

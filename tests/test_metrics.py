@@ -38,7 +38,7 @@ class TestMetricsEmpty(unittest.TestCase):
         m = calculate_metrics([])
         self.assertEqual(m["backlogSize"], 0)
         self.assertEqual(m["inProgressCount"], 0)
-        self.assertEqual(m["reopenedCount"], 0)
+        self.assertNotIn("reopenedCount", m)
         self.assertEqual(m["backlogAgingDays"], 0)
 
     def test_no_period_in_signature(self):
@@ -56,7 +56,7 @@ class TestMetricsEmpty(unittest.TestCase):
 
 
 class TestMetricsBasic(unittest.TestCase):
-    def test_single_completed_counted_in_reopened(self):
+    def test_single_completed_counts_structural_metrics(self):
         issue = make_issue(
             status="Done",
             created="2024-01-01T00:00:00Z",
@@ -67,7 +67,6 @@ class TestMetricsBasic(unittest.TestCase):
             ],
         )
         m = calculate_metrics([issue])
-        self.assertEqual(m["reopenedCount"], 0)
         self.assertEqual(m["backlogSize"], 0)
         self.assertEqual(m["inProgressCount"], 0)
 
@@ -85,7 +84,7 @@ class TestMetricsBasic(unittest.TestCase):
         m = calculate_metrics([issue])
         self.assertEqual(m["backlogSize"], 1)
 
-    def test_reopened_only_among_done(self):
+    def test_reopened_count_not_returned_for_wip(self):
         wip = make_issue(
             status="In Progress",
             created="2024-01-01T00:00:00Z",
@@ -96,9 +95,9 @@ class TestMetricsBasic(unittest.TestCase):
             ],
         )
         m = calculate_metrics([wip])
-        self.assertEqual(m["reopenedCount"], 0)
+        self.assertNotIn("reopenedCount", m)
 
-    def test_reopened_counted_for_completed(self):
+    def test_reopened_count_not_returned_for_completed(self):
         done = make_issue(
             status="Done",
             created="2024-01-01T00:00:00Z",
@@ -111,7 +110,7 @@ class TestMetricsBasic(unittest.TestCase):
             ],
         )
         m = calculate_metrics([done])
-        self.assertEqual(m["reopenedCount"], 1)
+        self.assertNotIn("reopenedCount", m)
 
     def test_accepts_precomputed_mapped(self):
         """calculate_metrics accepts pre-computed mapped list (Step 1 optimization)."""

@@ -12,7 +12,7 @@
 - [ ] Blocked issues — детектирование по метке или статусу
 - [ ] Сравнение периодов (30d vs предыдущие 30d) на основе снапшотов
 - [ ] Story points в метриках (velocity, scope completion)
-- [ ] Reopened Rate в % (сейчас `reopenedCount` — абсолютное число; нужен знаменатель `completedCount`)
+- [x] Sprint Completion вместо Reopened Rate: последний закрытый Jira-спринт, completed committed / committed at start
 
 ## Инфраструктура
 
@@ -36,7 +36,7 @@
 - [x] Demo-кнопка в сайдбаре — всегда видна, не зависит от состояния данных
 - [x] Throughput — убран из дашборда (не рассчитывается без исторических данных)
 - [x] Tab switch: переключение проекта автоматически загружает данные
-- [x] Архитектурный рефакторинг (апрель 2026): `server/` пакет, SQLite, read-only UI, 77 тестов
+- [x] Архитектурный рефакторинг (апрель 2026): `server/` пакет, SQLite, read-only UI, регрессионное покрытие
 - [x] Persistent storage: SQLite снапшоты, иммутабельные строки, история бессрочно
 - [x] Background scheduler: daemon-поток, `PROJECTS` env, `SYNC_INTERVAL_SECONDS`
 - [x] Auto-sync + polling: GET /latest → 404 → POST /sync → poll 3s → auto-refresh
@@ -48,9 +48,9 @@
 - [x] Jira pagination (PAGE_SIZE=50, cursor-based)
 - [x] Changelog fetch для всех задач
 - [x] Case-insensitive статусная модель
-- [x] Regression suite: 77 тестов, stdlib unittest, zero deps
+- [x] Regression suite: pytest, zero external network dependencies
 - [x] BUG-1: Done без resolutiondate корректно попадает в Throughput
 - [x] BUG-2: Cycle Time от последнего старта перед done
-- [x] BUG-3: Reopened фильтруется по периоду (только среди completed)
+- [x] BUG-3: Reopened KPI заменена на Sprint Completion
 - [x] BUG-4: Задачи In Progress → Backlog видимы (changelog для всех)
-- [x] BUG-5: Удалён дублирующий completedCount
+- [x] BUG-5: Throughput убран из KPI-сетки; `completedCount` оставлен как кумулятивное поле снапшота
