@@ -6,7 +6,7 @@ Coverage targets:
   _http_get         — response parsed as JSON
   _http_post        — body serialised, Content-Type set, response parsed
   Adapter           — abstract methods raise, fetch_and_normalize composes
-  build_adapter     — jira/linear dispatch, case/whitespace, unknown source
+  build_adapter     — jira/trello dispatch, case/whitespace, unknown source
 """
 
 import sys
@@ -291,24 +291,10 @@ class TestBuildAdapter(unittest.TestCase):
         })
         self.assertIsInstance(adapter, JiraAdapter)
 
-    def test_builds_linear_adapter(self):
-        from server.adapters.linear import LinearAdapter
-        adapter = build_adapter("linear", {"api_key": "lin_key", "team_id": "team-1"})
-        self.assertIsInstance(adapter, LinearAdapter)
-
-    def test_linear_adapter_receives_filter(self):
-        from server.adapters.linear import LinearAdapter
-        adapter = build_adapter("linear", {
-            "api_key": "k", "team_id": "t",
-            "filter_": {"priority": {"eq": 1}},
-        })
-        self.assertIsInstance(adapter, LinearAdapter)
-        self.assertEqual(adapter.filter_, {"priority": {"eq": 1}})
-
     def test_unknown_source_raises_value_error(self):
         with self.assertRaises(ValueError) as ctx:
             build_adapter("asana", {})
-        self.assertIn("Supported: jira, linear", str(ctx.exception))
+        self.assertIn("Supported: jira, trello", str(ctx.exception))
 
     def test_source_is_case_insensitive(self):
         from server.adapters.jira import JiraAdapter
@@ -319,9 +305,12 @@ class TestBuildAdapter(unittest.TestCase):
         self.assertIsInstance(adapter, JiraAdapter)
 
     def test_source_strips_whitespace(self):
-        from server.adapters.linear import LinearAdapter
-        adapter = build_adapter("  linear  ", {"api_key": "k", "team_id": "t"})
-        self.assertIsInstance(adapter, LinearAdapter)
+        from server.adapters.jira import JiraAdapter
+        adapter = build_adapter("  jira  ", {
+            "base_url": "https://j.test", "email": "u@t.com",
+            "api_token": "tok", "jql": "project=X",
+        })
+        self.assertIsInstance(adapter, JiraAdapter)
 
     def test_empty_source_defaults_to_jira(self):
         from server.adapters.jira import JiraAdapter

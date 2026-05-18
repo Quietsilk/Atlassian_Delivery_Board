@@ -132,8 +132,8 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 
 **Delta** — формат зависит от типа метрики:
 - Flow (Cycle Time, TTM): `±Xd vs last` — скрывается если throughput < 5 или нет prev
-- Snapshot (WIP, Backlog, Reopened): `+3 (−44%)` — абсолютное + относительное %
-- Проценты (Flow Efficiency, Reopened Rate): `±X% vs last`
+- Snapshot (WIP, Backlog): `+3 (−44%)` — абсолютное + относительное %
+- Проценты (Flow Efficiency, Sprint Completion): `±X% vs last`
 
 **Insight** — детерминированный текст, рассчитывается в `buildInsight()` в App.jsx на основе `metrics + wipItems`. Цвет: `T.bad` / `T.warn` / `T.textMuted`.
 

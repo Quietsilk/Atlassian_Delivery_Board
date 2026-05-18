@@ -19,11 +19,12 @@ server.py  (тонкий HTTP-роутер, порт 5678)
             │       ├── fetch_jira()  — Jira-specific
             │       │       ├── POST /rest/api/3/search/jql  (пагинация, PAGE_SIZE=50)
             │       │       └── GET  /rest/api/3/issue/{key}/changelog  (параллельно, 10 потоков)
+            │       │       └── GET  Jira Agile sprint report для Sprint Completion
             │       │
-            │       ├── server/adapters/  — Jira / Linear
+            │       ├── server/adapters/  — Jira / Trello
             │       │       ├── base.py    Adapter ABC + build_adapter() + HTTP helpers
             │       │       ├── jira.py    JiraAdapter (канонический формат)
-            │       │       └── linear.py  LinearAdapter (GraphQL → canonical)
+            │       │       └── trello.py  TrelloAdapter (REST → canonical)
             │       │
             │       └── server/metrics.py
             │               ├── calculate_metrics(issues)   → structural KPIs
@@ -73,7 +74,7 @@ CREATE TABLE snapshots (
     id           INTEGER PRIMARY KEY,
     project_key  TEXT NOT NULL,
     timestamp    TEXT NOT NULL,   -- ISO 8601
-    metrics_json TEXT NOT NULL    -- JSON: cycleTimeP50, inProgressCount, reopenedCount, …
+    metrics_json TEXT NOT NULL    -- JSON: cycleTimeP50, inProgressCount, sprintCompletionPercent, …
 );
 ```
 
@@ -91,14 +92,14 @@ CREATE TABLE snapshots (
 | `api.py` | `handle_get_latest`, `handle_get_history`, `handle_post_sync` | HTTP handlers |
 | `scheduler.py` | `start_scheduler(projects, db_path, interval)` | Daemon-поток |
 | `adapters/base.py` | `Adapter`, `build_adapter(source, config)` | ABC + фабрика + HTTP helpers |
-| `adapters/{jira,linear}.py` | `*Adapter` | fetch + normalize → canonical |
+| `adapters/{jira,trello}.py` | `*Adapter` | fetch + normalize → canonical |
 
 ---
 
 ## Слои данных
 
 ```
-Source API (Jira / Linear)
+Source API (Jira / Trello)
             │
             ▼  Adapter.fetch_and_normalize()
     Canonical Issue (dict)
@@ -107,12 +108,13 @@ Source API (Jira / Linear)
             │
             ▼  _map_issue(issue)
     Mapped Issue (dict)
-            started_at, resolved_at, created_at, reopened
+            started_at, resolved_at, created_at
             │
             ▼  calculate_metrics / calculate_flow_metrics
     Metrics dict
             cycleTimeP50, cycleTimeP85, timeToMarketP50, timeToMarketP85,
-            flowEfficiencyPercent, inProgressCount, reopenedCount,
+            flowEfficiencyPercent, inProgressCount, sprintCompletionPercent,
+            sprintCompletionBasis,
             backlogAgingDays, completedCount, throughput, wipItems
             │
             ▼  save_snapshot → SQLite
@@ -140,16 +142,16 @@ Source API (Jira / Linear)
 |---|---|
 | `useTheme` | dark/light mode → `T` (токены), `toggleTheme` → localStorage (`ada:theme`) |
 | `useCredentials` | Multi-source creds → localStorage (`ada:source`, `ada:creds-v2`) |
-| `useProjects` | Multi-project tabs → localStorage (`ada:projects-v2`, `ada:activeId`) |
+| `useProjects` | Multi-project tabs → localStorage (`ada:projects-v3`, `ada:activeId`) |
 
 ### LocalStorage-ключи
 
 | Ключ | Содержимое |
 |---|---|
 | `ada:theme` | `"dark"` / `"light"` |
-| `ada:source` | `"jira"` / `"linear"` |
-| `ada:creds-v2` | JSON: `{ jira:{baseUrl,email,apiToken}, linear:{apiKey,teamId} }` |
-| `ada:projects-v2` | JSON: массив `{id, label, jql}` |
+| `ada:source` | `"jira"` / `"trello"` |
+| `ada:creds-v2` | JSON: `{ jira:{baseUrl,email,apiToken}, trello:{apiKey,token,boardId} }` |
+| `ada:projects-v3` | JSON: массив `{id, label, jql}` |
 | `ada:activeId` | ID активного проекта |
 
 ### Sync flow

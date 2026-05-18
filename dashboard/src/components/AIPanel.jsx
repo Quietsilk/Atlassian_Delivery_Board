@@ -5,7 +5,7 @@ import { useT } from "../context/ThemeContext";
 const TABS = ["summary", "risks", "actions"];
 const HINTS = [
   "Low flow efficiency often indicates excessive queue wait time",
-  "Reopened tasks can signal unclear acceptance criteria or QA gaps",
+  "Low sprint completion can signal overcommitment or scope churn",
 ];
 
 export default function AIPanel({ analysis, prominent }) {

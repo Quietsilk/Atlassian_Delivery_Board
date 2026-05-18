@@ -114,7 +114,7 @@ def calculate_metrics(issues, mapped=None):
     calculate_flow_metrics(completed_in_interval).
 
     Returns a dict with:
-        backlogSize, inProgressCount, reopenedCount, backlogAgingDays
+        backlogSize, inProgressCount, backlogAgingDays
     """
     if mapped is None:
         mapped = [_map_issue(issue) for issue in issues]
@@ -141,6 +141,5 @@ def calculate_metrics(issues, mapped=None):
         "backlogSize":      len(backlog),
         "inProgressCount":  len(in_progress),
         "completedCount":   len(completed),
-        "reopenedCount":    sum(1 for m in completed if m["reopened"]),
         "backlogAgingDays": backlog_aging,
     }

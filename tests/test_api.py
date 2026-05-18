@@ -25,7 +25,8 @@ def tmp_db():
 
 
 METRICS = {"cycleTimeDays": 3.0, "timeToMarketDays": 6.0, "throughput": 5,
-           "flowEfficiencyPercent": 50.0, "backlogSize": 1, "inProgressCount": 2, "reopenedCount": 0}
+           "flowEfficiencyPercent": 50.0, "backlogSize": 1, "inProgressCount": 2,
+           "sprintCompletionPercent": 75.0}
 
 
 class ApiHandler(http.server.BaseHTTPRequestHandler):
@@ -118,8 +119,7 @@ class TestApiEndpoints(unittest.TestCase):
             "project": "PROJ", "baseUrl": "https://j.test",
             "email": "u@t.com", "apiToken": "tok", "jql": "project=PROJ",
         }).encode()
-        with patch("server.ingestion.fetch_jira", return_value=[]), \
-             patch("server.ingestion.save_snapshot", return_value="2024-01-01T00:00:00+00:00"):
+        with patch("server.ingestion.run_ingestion_with_adapter", return_value={}):
             req = urllib.request.Request(
                 self._url("/sync"), data=payload,
                 headers={"Content-Type": "application/json"}, method="POST",
@@ -135,8 +135,7 @@ class TestApiEndpoints(unittest.TestCase):
             "project": "PROJ", "baseUrl": "https://j.test",
             "email": "u@t.com", "apiToken": "tok", "jql": "project=PROJ",
         }).encode()
-        with patch("server.ingestion.fetch_jira", return_value=[]), \
-             patch("server.ingestion.save_snapshot", return_value="2024-01-01T00:00:00+00:00"):
+        with patch("server.ingestion.run_ingestion_with_adapter", return_value={}):
             req = urllib.request.Request(
                 self._url("/sync"), data=payload,
                 headers={"Content-Type": "application/json"}, method="POST",
@@ -161,7 +160,7 @@ class TestApiEndpoints(unittest.TestCase):
             urllib.request.urlopen(req)
         self.assertEqual(ctx.exception.code, 400)
         body = json.loads(ctx.exception.read())
-        self.assertIn("supported: jira, linear, trello", body["error"])
+        self.assertIn("supported: jira, trello", body["error"])
 
     def test_post_sync_missing_project_returns_400(self):
         payload = json.dumps({"source": "jira"}).encode()
@@ -205,56 +204,6 @@ class TestApiEndpoints(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             urllib.request.urlopen(req)
         self.assertEqual(ctx.exception.code, 400)
-
-    def test_post_sync_linear_missing_team_id_returns_400(self):
-        payload = json.dumps({
-            "project": "PROJ", "source": "linear",
-            "apiKey": "lin_key",
-            # teamId intentionally omitted
-        }).encode()
-        req = urllib.request.Request(
-            self._url("/sync"), data=payload,
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            urllib.request.urlopen(req)
-        self.assertEqual(ctx.exception.code, 400)
-        body = json.loads(ctx.exception.read())
-        self.assertIn("linear requires", body["error"])
-
-    def test_post_sync_linear_missing_api_key_returns_400(self):
-        payload = json.dumps({
-            "project": "PROJ", "source": "linear",
-            # apiKey intentionally omitted
-            "teamId": "team-uuid",
-        }).encode()
-        req = urllib.request.Request(
-            self._url("/sync"), data=payload,
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            urllib.request.urlopen(req)
-        self.assertEqual(ctx.exception.code, 400)
-
-    def test_post_sync_linear_queues_successfully(self):
-        payload = json.dumps({
-            "project": "PROJ", "source": "linear",
-            "apiKey": "lin_key", "teamId": "team-uuid",
-        }).encode()
-        mock_adapter = patch("server.adapters.build_adapter")
-        with mock_adapter as mock_ba, \
-             patch("server.ingestion.run_ingestion_with_adapter", return_value={}):
-            mock_ba.return_value.fetch_and_normalize.return_value = []
-            req = urllib.request.Request(
-                self._url("/sync"), data=payload,
-                headers={"Content-Type": "application/json"}, method="POST",
-            )
-            with urllib.request.urlopen(req) as r:
-                body = json.loads(r.read())
-                self.assertEqual(r.status, 202)
-        self.assertTrue(body["ok"])
-        self.assertTrue(body["queued"])
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

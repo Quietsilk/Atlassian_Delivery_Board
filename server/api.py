@@ -61,7 +61,7 @@ def handle_post_sync(handler, db_path, jira_credentials):
     """POST /sync — triggers ingestion asynchronously.
 
     Jira body  (JSON): { project, baseUrl, email, apiToken, jql }
-    Linear body       : { project, source:"linear", apiKey, teamId [, filter_] }
+    Trello body       : { project, source:"trello", apiKey, token, boardId }
 
     Returns immediately with { ok: true, queued: true }.
     Does NOT return metrics — caller must poll /latest.
@@ -88,16 +88,6 @@ def handle_post_sync(handler, db_path, jira_credentials):
             return
         config = {"base_url": base_url, "email": email, "api_token": api_token, "jql": jql}
 
-    elif source == "linear":
-        api_key = body.get("apiKey", "").strip()
-        team_id = body.get("teamId", "").strip()
-        if not all([api_key, team_id]):
-            _json_response(handler, 400, {"ok": False,
-                "error": "linear requires: apiKey, teamId"})
-            return
-        config = {"api_key": api_key, "team_id": team_id,
-                  "filter_": body.get("filter_", {})}
-
     elif source == "trello":
         api_key  = body.get("apiKey",  "").strip()
         token    = body.get("token",   "").strip()
@@ -116,7 +106,7 @@ def handle_post_sync(handler, db_path, jira_credentials):
 
     else:
         _json_response(handler, 400, {"ok": False,
-            "error": f"unknown source {source!r}; supported: jira, linear, trello"})
+            "error": f"unknown source {source!r}; supported: jira, trello"})
         return
 
     # ── Launch background ingestion thread ───────────────────────────────────

@@ -141,10 +141,10 @@ class TestComputeWipItems(unittest.TestCase):
         self.assertEqual(result[0]["url"], "https://jira.example.com/browse/T-10")
 
     def test_url_field_used_when_browse_url_absent(self):
-        issue = {**IN_PROGRESS, "url": "https://linear.app/team/issue/T-10"}
+        issue = {**IN_PROGRESS, "url": "https://trello.com/c/card-id"}
         mapped = [_map_issue(issue)]
         result = _compute_wip_items([issue], mapped)
-        self.assertEqual(result[0]["url"], "https://linear.app/team/issue/T-10")
+        self.assertEqual(result[0]["url"], "https://trello.com/c/card-id")
 
     def test_url_is_none_when_neither_present(self):
         mapped = [_map_issue(IN_PROGRESS)]
@@ -322,12 +322,12 @@ class TestRunIngestionWithAdapter(unittest.TestCase):
     def test_empty_adapter_result_raises_value_error(self):
         with patch("server.adapters.build_adapter", return_value=self._mock_adapter([])):
             with self.assertRaises(ValueError):
-                run_ingestion_with_adapter("PROJ", "linear", {}, self.db)
+                run_ingestion_with_adapter("PROJ", "trello", {}, self.db)
 
     def test_no_snapshot_saved_on_empty_adapter_result(self):
         with patch("server.adapters.build_adapter", return_value=self._mock_adapter([])):
             try:
-                run_ingestion_with_adapter("PROJ", "linear", {}, self.db)
+                run_ingestion_with_adapter("PROJ", "trello", {}, self.db)
             except ValueError:
                 pass
         self.assertIsNone(get_latest("PROJ", self.db))
@@ -335,30 +335,30 @@ class TestRunIngestionWithAdapter(unittest.TestCase):
     def test_saves_snapshot_when_adapter_returns_issues(self):
         issues = [self._canonical_done_issue()]
         with patch("server.adapters.build_adapter", return_value=self._mock_adapter(issues)):
-            run_ingestion_with_adapter("PROJ", "linear", {}, self.db)
+            run_ingestion_with_adapter("PROJ", "trello", {}, self.db)
         self.assertIsNotNone(get_latest("PROJ", self.db))
 
     def test_returns_metrics_with_required_keys(self):
         issues = [self._canonical_done_issue()]
         with patch("server.adapters.build_adapter", return_value=self._mock_adapter(issues)):
-            metrics = run_ingestion_with_adapter("PROJ", "linear", {}, self.db)
+            metrics = run_ingestion_with_adapter("PROJ", "trello", {}, self.db)
         for key in ("completedCount", "wipItems", "throughput",
                     "cycleTimeP50", "flowEfficiencyPercent"):
             self.assertIn(key, metrics, f"Missing: {key}")
 
     def test_build_adapter_called_with_source_and_config(self):
-        config = {"api_key": "k", "team_id": "t"}
+        config = {"api_key": "k", "token": "t", "board_id": "b"}
         with patch("server.adapters.build_adapter",
                    return_value=self._mock_adapter([self._canonical_done_issue()])) as mock_ba:
-            run_ingestion_with_adapter("PROJ", "linear", config, self.db)
-        mock_ba.assert_called_once_with("linear", config)
+            run_ingestion_with_adapter("PROJ", "trello", config, self.db)
+        mock_ba.assert_called_once_with("trello", config)
 
     def test_adapter_exception_propagates(self):
         adapter = MagicMock()
         adapter.fetch_and_normalize.side_effect = ConnectionError("API down")
         with patch("server.adapters.build_adapter", return_value=adapter):
             with self.assertRaises(ConnectionError):
-                run_ingestion_with_adapter("PROJ", "linear", {}, self.db)
+                run_ingestion_with_adapter("PROJ", "trello", {}, self.db)
 
 
 if __name__ == "__main__":
