@@ -17,6 +17,8 @@ function normalizeSnapshot(snapshot) {
     sprintRemovedCount: metrics.sprintRemovedCount ?? 0,
     sprintCompletionBasis: metrics.sprintCompletionBasis ?? null,
     sprintName:      metrics.sprintName             ?? null,
+    reopenedCount:   metrics.reopenedCount          ?? 0,
+    reopenedRate:    metrics.reopenedRatePercent    ?? metrics.reopenedRate ?? 0,
     completedCount:  metrics.completedCount         ?? 0,
     wip:             metrics.inProgressCount        ?? metrics.wip              ?? 0,
     backlogAging:    metrics.backlogAgingDays        ?? metrics.backlogAging     ?? 0,

@@ -122,6 +122,8 @@ def calculate_metrics(issues, mapped=None):
     in_progress = [m for m in mapped if m["started_at"] and not m["resolved_at"]]
     backlog     = [m for m in mapped if not m["started_at"] and not m["resolved_at"]]
     completed   = [m for m in mapped if m["resolved_at"]]
+    reopened_count = sum(1 for m in completed if m["reopened"])
+    reopened_rate = round(reopened_count / len(completed) * 100, 1) if completed else 0
 
     # Backlog aging: avg days from created_at to now for pure backlog issues
     now = datetime.now(timezone.utc)
@@ -141,5 +143,7 @@ def calculate_metrics(issues, mapped=None):
         "backlogSize":      len(backlog),
         "inProgressCount":  len(in_progress),
         "completedCount":   len(completed),
+        "reopenedCount":    reopened_count,
+        "reopenedRatePercent": reopened_rate,
         "backlogAgingDays": backlog_aging,
     }

@@ -38,7 +38,8 @@ class TestMetricsEmpty(unittest.TestCase):
         m = calculate_metrics([])
         self.assertEqual(m["backlogSize"], 0)
         self.assertEqual(m["inProgressCount"], 0)
-        self.assertNotIn("reopenedCount", m)
+        self.assertEqual(m["reopenedCount"], 0)
+        self.assertEqual(m["reopenedRatePercent"], 0)
         self.assertEqual(m["backlogAgingDays"], 0)
 
     def test_no_period_in_signature(self):
@@ -84,7 +85,7 @@ class TestMetricsBasic(unittest.TestCase):
         m = calculate_metrics([issue])
         self.assertEqual(m["backlogSize"], 1)
 
-    def test_reopened_count_not_returned_for_wip(self):
+    def test_reopened_rate_ignores_unresolved_reopened_issue(self):
         wip = make_issue(
             status="In Progress",
             created="2024-01-01T00:00:00Z",
@@ -95,9 +96,10 @@ class TestMetricsBasic(unittest.TestCase):
             ],
         )
         m = calculate_metrics([wip])
-        self.assertNotIn("reopenedCount", m)
+        self.assertEqual(m["reopenedCount"], 0)
+        self.assertEqual(m["reopenedRatePercent"], 0)
 
-    def test_reopened_count_not_returned_for_completed(self):
+    def test_reopened_rate_uses_completed_count_denominator(self):
         done = make_issue(
             status="Done",
             created="2024-01-01T00:00:00Z",
@@ -110,7 +112,8 @@ class TestMetricsBasic(unittest.TestCase):
             ],
         )
         m = calculate_metrics([done])
-        self.assertNotIn("reopenedCount", m)
+        self.assertEqual(m["reopenedCount"], 1)
+        self.assertEqual(m["reopenedRatePercent"], 100.0)
 
     def test_accepts_precomputed_mapped(self):
         """calculate_metrics accepts pre-computed mapped list (Step 1 optimization)."""

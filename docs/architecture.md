@@ -114,7 +114,7 @@ Source API (Jira / Trello)
     Metrics dict
             cycleTimeP50, cycleTimeP85, timeToMarketP50, timeToMarketP85,
             flowEfficiencyPercent, inProgressCount, sprintCompletionPercent,
-            sprintCompletionBasis,
+            sprintCompletionBasis, reopenedCount, reopenedRatePercent,
             backlogAgingDays, completedCount, throughput, wipItems
             │
             ▼  save_snapshot → SQLite
@@ -142,7 +142,7 @@ Source API (Jira / Trello)
 |---|---|
 | `useTheme` | dark/light mode → `T` (токены), `toggleTheme` → localStorage (`ada:theme`) |
 | `useCredentials` | Multi-source creds → localStorage (`ada:source`, `ada:creds-v2`) |
-| `useProjects` | Multi-project tabs → localStorage (`ada:projects-v3`, `ada:activeId`) |
+| `useProjects` | Multi-project tabs + methodology → localStorage (`ada:projects-v3`, `ada:activeId`) |
 
 ### LocalStorage-ключи
 
@@ -151,8 +151,10 @@ Source API (Jira / Trello)
 | `ada:theme` | `"dark"` / `"light"` |
 | `ada:source` | `"jira"` / `"trello"` |
 | `ada:creds-v2` | JSON: `{ jira:{baseUrl,email,apiToken}, trello:{apiKey,token,boardId} }` |
-| `ada:projects-v3` | JSON: массив `{id, label, jql}` |
+| `ada:projects-v3` | JSON: массив `{id, label, source, methodology, jql}` |
 | `ada:activeId` | ID активного проекта |
+
+`methodology` поддерживает только `"scrum"` и `"kanban"`. Любое другое значение считается unknown и даёт нейтральный KPI-slot `—`.
 
 ### Sync flow
 
