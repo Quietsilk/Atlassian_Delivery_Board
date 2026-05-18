@@ -32,7 +32,7 @@
 - [x] React API mapping: `src/api.js` нормализует backend `metrics_json` в UI-поля для `buildKpis()`
 - [x] Переключение проектов в React-дашборде сбрасывает snapshots/analysis при смене activeId
 - [x] Sync flow: React завершает синк только по новому snapshot timestamp; backend не сохраняет пустой Jira-result
-- [x] Full UI/UX redesign: 6 KPI-карточек 3×2 с sparklines, delta %, P85, статус-барами и AI-панелью
+- [x] Full UI/UX redesign: 6 KPI-карточек 3×2 с sparklines, delta %, P85 и статус-барами
 - [x] Demo-кнопка в сайдбаре — всегда видна, не зависит от состояния данных
 - [x] Throughput — убран из дашборда (не рассчитывается без исторических данных)
 - [x] Tab switch: переключение проекта автоматически загружает данные

@@ -132,7 +132,7 @@ Source API (Jira / Trello)
 | Компонент | Назначение |
 |---|---|
 | `App.jsx` | Root: layout, sync-flow с поллингом, multi-project tabs |
-| `KpiCard.jsx` | KPI-карточка: status stripe, value, delta, insight, progress bar |
+| `KpiCard.jsx` | KPI-карточка: status badge в заголовке, value, delta, insight, progress bar |
 | `Sidebar.jsx` | Source picker, credentials form, demo data |
 | `StaleIssuesPanel.jsx` | WIP-задачи с aging/blocker индикаторами |
 

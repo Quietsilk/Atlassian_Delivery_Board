@@ -1,9 +1,9 @@
-# Design System — AI Delivery Analyst
+# Design System — Atlassian Delivery Board
 
 Единственный источник правды для цветов, типографики, отступов и анимаций.  
 Файл: `src/tokens.js`
 
-Поддерживаются две темы: **Dark (Calm)** и **Light**. Переключение — кнопка в шапке.
+Поддерживаются две темы: **Light** и **Dark**. Light — основная тема в Atlassian-inspired стиле.
 
 ---
 
@@ -25,29 +25,29 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 
 | Токен | Dark | Light | Назначение |
 |---|---|---|---|
-| `T.bg` | `#13151b` | `#f0f2f5` | root background |
-| `T.bgBar` | `rgba(19,21,27,0.95)` | `rgba(244,246,249,0.95)` | app bar |
-| `T.bgCard` | `#1c1f28` | `#ffffff` | KPI-карточки, AI-панель |
-| `T.bgSidebar` | `rgba(0,0,0,0.20)` | `rgba(0,0,0,0.025)` | сайдбар |
+| `T.bg` | `#0C111B` | `#F4F5F7` | root background |
+| `T.bgBar` | `#101828` | `#FFFFFF` | app bar |
+| `T.bgCard` | `#182230` | `#FFFFFF` | KPI-карточки, панели |
+| `T.bgSidebar` | `#111827` | `#FAFBFC` | сайдбар |
 
 ### Brand
 
 | Токен | Dark | Light | Назначение |
 |---|---|---|---|
-| `T.brand` | `#6b8cff` | `#4f6fe8` | акцент: кнопки, активные табы, AI-точка |
-| `T.brandBg` | `rgba(107,140,255,0.08)` | `rgba(79,111,232,0.07)` | фон brand-элементов |
-| `T.brandBdr` | `rgba(107,140,255,0.30)` | `rgba(79,111,232,0.25)` | рамка brand-элементов |
-| `T.brandFocus` | `rgba(107,140,255,0.40)` | `rgba(79,111,232,0.35)` | border при :focus |
-| `T.brandGlow` | `rgba(107,140,255,0.03)` | `rgba(79,111,232,0.04)` | bg при :focus |
+| `T.brand` | `#579DFF` | `#0052CC` | акцент: primary actions, активные табы |
+| `T.brandBg` | `rgba(87,157,255,0.14)` | `#DEEBFF` | фон brand-элементов |
+| `T.brandBdr` | `rgba(87,157,255,0.38)` | `#B3D4FF` | рамка brand-элементов |
+| `T.brandFocus` | `#85B8FF` | `#4C9AFF` | border при :focus |
+| `T.brandGlow` | `rgba(87,157,255,0.10)` | `#F4F8FF` | bg при :focus |
 
 ### Статусы
 
 | Токен | Dark | Light | Назначение |
 |---|---|---|---|
-| `T.good` / `T.goodBg` / `T.goodBdr` | `#4ade80` | `#16a34a` | позитивный |
-| `T.warn` / `T.warnBg` / `T.warnBdr` | `#fbbf24` | `#b45309` | предупреждение |
-| `T.bad` / `T.badBg` / `T.badBdr` | `#f87171` | `#dc2626` | критический |
-| `T.demo` / `T.demoBg` / `T.demoBdr` | `#a78bfa` | `#7c3aed` | demo-данные |
+| `T.good` / `T.goodBg` / `T.goodBdr` | `#57D9A3` | `#00875A` | позитивный |
+| `T.warn` / `T.warnBg` / `T.warnBdr` | `#F5CD47` | `#974F0C` | предупреждение |
+| `T.bad` / `T.badBg` / `T.badBdr` | `#F87168` | `#DE350B` | критический |
+| `T.demo` / `T.demoBg` / `T.demoBdr` | `#9F8FEF` | `#6554C0` | demo-данные |
 
 **Правило:** `getStatusColors(T, status)` → `{ fg, bg, border, stripe }` — не писать switch/if.
 
@@ -55,11 +55,11 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 
 | Токен | Dark | Light | Назначение |
 |---|---|---|---|
-| `T.text` | `#dde1ea` | `#1a1d24` | основной текст, KPI-значения |
-| `T.textSec` | `rgba(255,255,255,0.55)` | `rgba(0,0,0,0.55)` | вторичный текст |
-| `T.textMuted` | `rgba(255,255,255,0.42)` | `rgba(0,0,0,0.40)` | field labels |
-| `T.textFaint` | `rgba(255,255,255,0.30)` | `rgba(0,0,0,0.28)` | section labels, sparkline neutral |
-| `T.textLabel` | `rgba(255,255,255,0.50)` | `rgba(0,0,0,0.45)` | заголовки KPI-карточек |
+| `T.text` | `#F9FAFB` | `#172B4D` | основной текст, KPI-значения |
+| `T.textSec` | `#D0D5DD` | `#42526E` | вторичный текст |
+| `T.textMuted` | `#98A2B3` | `#6B778C` | field labels |
+| `T.textFaint` | `#667085` | `#8993A4` | section labels |
+| `T.textLabel` | `#B3B9C4` | `#42526E` | заголовки KPI-карточек |
 
 ---
 
@@ -95,11 +95,11 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 
 | Токен | px | Применение |
 |---|---|---|
-| `radius.sm` | 6 | маленькие кнопки, бейджи |
-| `radius.md` | 7 | status pill, connect button |
-| `radius.input` | 8 | все инпуты |
-| `radius.card` | 12 | KPI-карточки |
-| `radius.panel` | 14 | AI-панель, StaleIssuesPanel |
+| `radius.sm` | 3 | маленькие кнопки, lozenge |
+| `radius.md` | 4 | status pill, connect button |
+| `radius.input` | 3 | все инпуты |
+| `radius.card` | 4 | KPI-карточки |
+| `radius.panel` | 4 | StaleIssuesPanel |
 
 ---
 
@@ -119,8 +119,8 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 ### KpiCard
 
 ```
-┌─ status stripe (2px top) ──────────────┐
-│ LABEL                                   │
+┌─────────────────────────────────────────┐
+│ Label                         GOOD      │
 │ sublabel                                │
 │                                         │
 │ 4.2 d                                   │
@@ -129,6 +129,8 @@ const sc = getStatusColors(T, "warn");  // { fg, bg, border, stripe }
 │ ████████░░░░  (progress bar)           │
 └─────────────────────────────────────────┘
 ```
+
+Status отображается lozenge-бейджем справа в заголовке карточки. Верхний status stripe не используется.
 
 **Delta** — формат зависит от типа метрики:
 - Flow (Cycle Time, TTM): `±Xd vs last` — скрывается если throughput < 5 или нет prev

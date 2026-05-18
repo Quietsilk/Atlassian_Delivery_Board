@@ -5,7 +5,7 @@ const LS_KEY = "ada:theme";
 
 export function useTheme() {
   const [mode, setMode] = useState(() => {
-    try { return localStorage.getItem(LS_KEY) || "dark"; } catch { return "dark"; }
+    try { return localStorage.getItem(LS_KEY) || "light"; } catch { return "light"; }
   });
 
   const toggleTheme = useCallback(() => {

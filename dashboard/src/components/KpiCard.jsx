@@ -5,8 +5,8 @@ import { useT } from "../context/ThemeContext";
 function StatusBar({ value, max, clr, borderSub }) {
   const pct = Math.min(100, (value / max) * 100);
   return (
-    <div style={{ height: 3, background: borderSub, borderRadius: 2, overflow: "hidden", marginTop: 2 }}>
-      <div style={{ height: "100%", width: `${pct}%`, background: clr, borderRadius: 2, transition: transition.kpiBar }} />
+    <div style={{ height: 4, background: borderSub, borderRadius: 999, overflow: "hidden", marginTop: 4 }}>
+      <div style={{ height: "100%", width: `${pct}%`, background: clr, borderRadius: 999, transition: transition.kpiBar }} />
     </div>
   );
 }
@@ -15,7 +15,7 @@ export default function KpiCard({ label, sublabel, value, unit, delta, insight, 
   const T  = useT();
   const sc = getStatusColors(T, status);
   const [hovered, setHovered] = useState(false);
-  const pad = "16px 18px";
+  const pad = "14px 16px";
   const num = font.size.kpiLg;
 
   const insightColor = insight?.level === "bad"  ? T.bad
@@ -29,29 +29,22 @@ export default function KpiCard({ label, sublabel, value, unit, delta, insight, 
       onMouseLeave={() => setHovered(false)}
       style={{
         background: hovered ? T.bgCardHov : T.bgCard,
-        border: `1px solid ${hovered ? T.borderHi : sc.border}`,
+        border: `1px solid ${hovered ? T.borderHi : T.border}`,
         borderRadius: radius.card, padding: pad,
         display: "flex", flexDirection: "column", gap: 5,
         cursor: "default",
-        transition: `border-color ${transition.normal}, background ${transition.normal}`,
+        transition: `border-color ${transition.normal}, background ${transition.normal}, box-shadow ${transition.normal}`,
         position: "relative", overflow: "hidden",
-        boxShadow: T.cardShadow,
+        boxShadow: hovered ? T.overlayShadow : T.cardShadow,
       }}
     >
-      {/* Status stripe */}
-      <div style={{
-        position: "absolute", top: 0, left: 0, right: 0, height: 2,
-        background: sc.stripe,
-        borderRadius: `${radius.card}px ${radius.card}px 0 0`,
-        opacity: 0.85,
-      }} />
-
       {/* Title */}
-      <div>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
         <div style={{
-          fontSize: font.size.sm, fontWeight: font.weight.semibold,
-          color: T.textLabel, textTransform: "uppercase",
-          letterSpacing: font.tracking.wider,
+          fontSize: font.size.sm, fontWeight: font.weight.bold,
+          color: T.text,
+          letterSpacing: font.tracking.normal,
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         }}>
           {label}
@@ -65,6 +58,21 @@ export default function KpiCard({ label, sublabel, value, unit, delta, insight, 
             {sublabel}
           </div>
         )}
+        </div>
+        <span style={{
+          flexShrink: 0,
+          padding: "2px 7px",
+          borderRadius: radius.sm,
+          background: sc.bg,
+          border: `1px solid ${sc.border}`,
+          color: sc.fg,
+          fontSize: font.size.xxs,
+          fontWeight: font.weight.bold,
+          textTransform: "uppercase",
+          letterSpacing: font.tracking.wide,
+        }}>
+          {status}
+        </span>
       </div>
 
       {/* Value */}

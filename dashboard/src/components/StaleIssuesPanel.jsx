@@ -53,21 +53,22 @@ export default function StaleIssuesPanel({ items = [], threshold = 5, issueBaseU
       {/* ── Header ──────────────────────────────────────────────── */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "14px 18px", gap: 12, fontFamily: "inherit",
+        padding: "13px 16px", gap: 12, fontFamily: "inherit",
+        background: T.bgCard,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: font.size.sm, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: T.textFaint }}>
+          <span style={{ fontSize: font.size.sm, fontWeight: 700, letterSpacing: font.tracking.normal, color: T.text }}>
             Stale Issues
           </span>
           <div style={{ display: "flex", gap: 5 }}>
             {stale.length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 5, background: T.warnBg, border: `1px solid ${T.warnBdr}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: radius.sm, background: T.warnBg, border: `1px solid ${T.warnBdr}` }}>
                 <span style={{ width: 4, height: 4, borderRadius: "50%", background: T.warn, display: "block" }} />
                 <span style={{ fontSize: font.size.xs, fontWeight: 700, color: T.warn }}>{stale.length} aging</span>
               </div>
             )}
             {blocked.length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 5, background: T.badBg, border: `1px solid ${T.badBdr}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: radius.sm, background: T.badBg, border: `1px solid ${T.badBdr}` }}>
                 <span style={{ fontSize: font.size.xs, fontWeight: 700, color: T.bad }}>{blocked.length} blocked</span>
               </div>
             )}
@@ -81,7 +82,7 @@ export default function StaleIssuesPanel({ items = [], threshold = 5, issueBaseU
       {/* ── List ─────────────────────────────────────────────────── */}
       <div style={{ borderTop: `1px solid ${T.border}`, animation: `fadeIn ${transition.normal} ease` }}>
           {/* Legend */}
-          <div style={{ padding: "7px 18px", borderBottom: `1px solid ${T.borderSub}`, display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ padding: "8px 16px", borderBottom: `1px solid ${T.borderSub}`, display: "flex", alignItems: "center", gap: 14, background: T.bgCardHov }}>
             {[["≥14d", T.bad, "critical"], ["≥7d", T.warn, "aging"], ["<7d", T.textMuted, "ok"]].map(([label, clr, name]) => (
               <div key={name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: clr }} />
@@ -104,7 +105,7 @@ export default function StaleIssuesPanel({ items = [], threshold = 5, issueBaseU
               return (
               <RowTag key={item.key + i} href={href || undefined} target={href ? "_blank" : undefined} rel={href ? "noreferrer" : undefined} style={{
                 display: "flex", alignItems: "flex-start", gap: 12,
-                padding: "10px 18px",
+                padding: "10px 16px",
                 borderBottom: i < sorted.length - 1 ? `1px solid ${T.borderSub}` : "none",
                 color: "inherit", textDecoration: "none",
                 cursor: href ? "pointer" : "default",
@@ -130,7 +131,7 @@ export default function StaleIssuesPanel({ items = [], threshold = 5, issueBaseU
                     <span style={{ fontSize: font.size.xs, color: T.brand, fontFamily: font.family.mono, fontWeight: 600, flexShrink: 0 }}>
                       {item.key}
                     </span>
-                    <span style={{ fontSize: "0.65rem", padding: "1px 6px", borderRadius: 4, background: T.borderSub, color: T.textFaint, flexShrink: 0 }}>
+                    <span style={{ fontSize: "0.65rem", padding: "1px 6px", borderRadius: radius.sm, background: T.borderSub, color: T.textFaint, flexShrink: 0 }}>
                       {item.status}
                     </span>
                   </div>
