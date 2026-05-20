@@ -265,7 +265,7 @@ def _compute_wip_items(issues, mapped):
             "daysInProgress":  days,
             "status":          status,
             "url":             issue.get("browseUrl") or issue.get("url"),
-            "blockedReason":   None,
+            "blockedReason":   issue.get("blockedReason"),
         })
 
     wip.sort(key=lambda x: x["daysInProgress"], reverse=True)

@@ -92,7 +92,7 @@ CREATE TABLE snapshots (
 | `api.py` | `handle_get_latest`, `handle_get_history`, `handle_post_sync` | HTTP handlers |
 | `scheduler.py` | `start_scheduler(projects, db_path, interval)` | Daemon-поток |
 | `adapters/base.py` | `Adapter`, `build_adapter(source, config)` | ABC + фабрика + HTTP helpers |
-| `adapters/{jira,trello}.py` | `*Adapter` | fetch + normalize → canonical |
+| `adapters/{jira,trello}.py` | `*Adapter` | fetch + normalize → canonical; Trello action history ограничен `lookbackDays` (`1..365`, default `21`) по `dateLastActivity`, Trello workflow может определяться labels |
 
 ---
 

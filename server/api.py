@@ -13,6 +13,10 @@ import os
 import threading
 import urllib.parse
 
+_TRELLO_LOOKBACK_DEFAULT = 21
+_TRELLO_LOOKBACK_MIN = 1
+_TRELLO_LOOKBACK_MAX = 365
+
 
 def _json_response(handler, code, data):
     body = json.dumps(data).encode()
@@ -57,6 +61,21 @@ def handle_get_history(handler, db_path):
     _json_response(handler, 200, {"ok": True, "snapshots": snapshots})
 
 
+def _parse_trello_lookback_days(value):
+    """Validate Trello lookbackDays for action-history fetch."""
+    if value is None:
+        return _TRELLO_LOOKBACK_DEFAULT
+    if isinstance(value, bool):
+        raise ValueError("trello lookbackDays must be an integer from 1 to 365")
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise ValueError("trello lookbackDays must be an integer from 1 to 365")
+    if parsed < _TRELLO_LOOKBACK_MIN or parsed > _TRELLO_LOOKBACK_MAX:
+        raise ValueError("trello lookbackDays must be an integer from 1 to 365")
+    return parsed
+
+
 def handle_post_sync(handler, db_path, jira_credentials):
     """POST /sync — triggers ingestion asynchronously.
 
@@ -96,12 +115,18 @@ def handle_post_sync(handler, db_path, jira_credentials):
             _json_response(handler, 400, {"ok": False,
                 "error": "trello requires: apiKey, token, boardId"})
             return
+        try:
+            lookback_days = _parse_trello_lookback_days(body.get("lookbackDays"))
+        except ValueError as e:
+            _json_response(handler, 400, {"ok": False, "error": str(e)})
+            return
         config = {
             "api_key":           api_key,
             "token":             token,
             "board_id":          board_id,
             "lists_in_progress": body.get("listsInProgress", ""),
             "lists_done":        body.get("listsDone", ""),
+            "lookback_days":     lookback_days,
         }
 
     else:

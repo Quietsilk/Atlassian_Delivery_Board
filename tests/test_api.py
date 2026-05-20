@@ -205,5 +205,53 @@ class TestApiEndpoints(unittest.TestCase):
             urllib.request.urlopen(req)
         self.assertEqual(ctx.exception.code, 400)
 
+    def _post_trello_sync(self, lookback_days):
+        payload = {
+            "project": "PROJ", "source": "trello",
+            "apiKey": "key", "token": "tok", "boardId": "board",
+        }
+        if lookback_days != "__omit__":
+            payload["lookbackDays"] = lookback_days
+        req = urllib.request.Request(
+            self._url("/sync"), data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        return urllib.request.urlopen(req)
+
+    def test_post_sync_trello_invalid_lookback_string_returns_400(self):
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._post_trello_sync("abc")
+        self.assertEqual(ctx.exception.code, 400)
+        body = json.loads(ctx.exception.read())
+        self.assertIn("lookbackDays", body["error"])
+
+    def test_post_sync_trello_zero_lookback_returns_400(self):
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._post_trello_sync(0)
+        self.assertEqual(ctx.exception.code, 400)
+
+    def test_post_sync_trello_negative_lookback_returns_400(self):
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._post_trello_sync(-1)
+        self.assertEqual(ctx.exception.code, 400)
+
+    def test_post_sync_trello_too_large_lookback_returns_400(self):
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._post_trello_sync(366)
+        self.assertEqual(ctx.exception.code, 400)
+
+    def test_post_sync_trello_valid_custom_lookback_passed_to_adapter(self):
+        captured = {}
+
+        def fake_ingestion(project, source, config, db_path):
+            captured.update(config)
+
+        with patch("server.ingestion.run_ingestion_with_adapter", side_effect=fake_ingestion):
+            with self._post_trello_sync(42) as r:
+                body = json.loads(r.read())
+                self.assertEqual(r.status, 202)
+        self.assertTrue(body["ok"])
+        self.assertEqual(captured["lookback_days"], 42)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
