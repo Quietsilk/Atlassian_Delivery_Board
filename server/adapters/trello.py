@@ -16,7 +16,7 @@ Card creation timestamp is encoded in the first 8 hex chars of card.id
 """
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from server.adapters.base import (
     Adapter, CANONICAL_STARTED, CANONICAL_DONE,
@@ -25,12 +25,19 @@ from server.adapters.base import (
 
 _BASE = "https://api.trello.com/1"
 _MAX_ACTIONS = 1000
+_DEFAULT_LOOKBACK_DAYS = 21
+_MAX_WORKERS = 3
 
 
 def _created_from_id(card_id: str) -> str:
     """Extract creation timestamp from Trello card ID (first 8 hex chars = unix ts)."""
+    return _created_from_id_dt(card_id).isoformat()
+
+
+def _created_from_id_dt(card_id: str) -> datetime:
+    """Extract creation datetime from Trello card ID."""
     ts = int(card_id[:8], 16)
-    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(ts, tz=timezone.utc)
 
 
 _DEFAULT_IN_PROGRESS = {
@@ -41,22 +48,58 @@ _DEFAULT_DONE = {
     "done", "released", "complete", "completed", "closed", "finished",
     "выполнено", "готово",
 }
+_LABEL_IN_PROGRESS = {
+    "в работе", "на согласовании", "блок",
+}
+_LABEL_DONE = {
+    "готово",
+}
+_LABEL_BACKLOG = {
+    "бэклог", "долг", "отложено",
+}
+_LABEL_BLOCKED = {
+    "блок",
+}
 
 
 def _parse_list_names(raw: str) -> set:
     return {name.strip().lower() for name in raw.split(",") if name.strip()}
 
 
+def _parse_trello_dt(value: str):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _label_names(card: dict) -> list:
+    labels = card.get("labels") or []
+    return [(label.get("name") or "").strip() for label in labels if (label.get("name") or "").strip()]
+
+
+def _has_lifecycle_signal(histories: list) -> bool:
+    for history in histories:
+        for item in history.get("items", []):
+            if (item.get("toString") or "").lower() in (CANONICAL_STARTED, CANONICAL_DONE):
+                return True
+    return False
+
+
 class TrelloAdapter(Adapter):
     source = "trello"
 
     def __init__(self, api_key: str, token: str, board_id: str,
-                 lists_in_progress: str = "", lists_done: str = ""):
+                 lists_in_progress: str = "", lists_done: str = "",
+                 lookback_days: int = _DEFAULT_LOOKBACK_DAYS):
         self.api_key   = api_key
         self.token     = token
         self.board_id  = board_id
         self._in_prog  = _parse_list_names(lists_in_progress) or _DEFAULT_IN_PROGRESS
         self._done     = _parse_list_names(lists_done)        or _DEFAULT_DONE
+        self._lookback_days = max(int(lookback_days or _DEFAULT_LOOKBACK_DAYS), 1)
         self._auth_qs  = f"key={api_key}&token={token}"
 
     # ── Fetch ────────────────────────────────────────────────────────────────
@@ -68,16 +111,24 @@ class TrelloAdapter(Adapter):
             f"?filter=all&members=true&{self._auth_qs}",
             headers={},
         ))
-        print(f"  [trello] {len(cards)} cards, fetching actions…")
-
+        cutoff = datetime.now(timezone.utc) - timedelta(days=self._lookback_days)
         # Fetch list names to resolve idList → list name
         lists = _with_retry(lambda: _http_get(
             f"{_BASE}/boards/{self.board_id}/lists?{self._auth_qs}",
             headers={},
         ))
         list_names = {lst["id"]: lst["name"] for lst in lists}
+        recent_ids = {
+            card["id"] for card in cards
+            if (_parse_trello_dt(card.get("dateLastActivity")) or _created_from_id_dt(card["id"])) >= cutoff
+        }
+        print(f"  [trello] {len(cards)} cards, fetching actions for {len(recent_ids)} changed in last {self._lookback_days}d…")
 
         def _fetch_actions(card):
+            if card["id"] not in recent_ids:
+                card["_actions"] = []
+                card["_listNames"] = list_names
+                return card
             actions = _with_retry(lambda: _http_get(
                 f"{_BASE}/cards/{card['id']}/actions"
                 f"?filter=updateCard:idList&limit={_MAX_ACTIONS}&{self._auth_qs}",
@@ -89,10 +140,10 @@ class TrelloAdapter(Adapter):
             card["_listNames"] = list_names
             return card
 
-        with ThreadPoolExecutor(max_workers=10) as pool:
+        with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
             enriched = list(pool.map(_fetch_actions, cards))
 
-        print(f"  [trello] fetched actions for {len(enriched)} cards")
+        print(f"  [trello] enriched {len(enriched)} cards")
         return enriched
 
     # ── Normalize ────────────────────────────────────────────────────────────
@@ -108,14 +159,29 @@ class TrelloAdapter(Adapter):
             return CANONICAL_STARTED
         return list_name  # treated as backlog by metrics layer
 
+    def _status_from_labels(self, card: dict):
+        names = _label_names(card)
+        lowered = {name.lower() for name in names}
+        if lowered & _LABEL_DONE:
+            return CANONICAL_DONE
+        if lowered & _LABEL_IN_PROGRESS:
+            return CANONICAL_STARTED
+        for name in names:
+            if name.lower() in _LABEL_BACKLOG:
+                return name
+        return None
+
     def _to_canonical(self, card: dict) -> dict:
         actions    = card.get("_actions", [])
         list_names = card.get("_listNames", {})
 
         current_list = list_names.get(card.get("idList", ""), "")
+        label_status = self._status_from_labels(card)
         # Archived cards that are in a "done" list count as done;
         # otherwise fall back to "done" if closed
-        if card.get("closed") and not current_list:
+        if label_status:
+            current_status = label_status
+        elif card.get("closed") and not current_list:
             current_status = CANONICAL_DONE
         else:
             current_status = self._canonical_status(current_list)
@@ -144,7 +210,7 @@ class TrelloAdapter(Adapter):
                 }],
             })
 
-        if not histories:
+        if not histories or (label_status and not _has_lifecycle_signal(histories)):
             histories = self._synthesise_lifecycle(card, current_status, resolution_date)
 
         # Assignee: first member's fullName (Trello allows multiple)
@@ -163,6 +229,7 @@ class TrelloAdapter(Adapter):
                 "assignee":       {"displayName": assignee} if assignee else None,
             },
             "changelog": {"histories": histories},
+            "blockedReason": "БЛОК" if {name.lower() for name in _label_names(card)} & _LABEL_BLOCKED else None,
         }
 
     @staticmethod

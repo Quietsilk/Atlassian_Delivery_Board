@@ -148,7 +148,8 @@ Key отображается как ссылка, если доступен URL 
 **Delta** — формат зависит от типа метрики:
 - Flow (Cycle Time, TTM): `±Xd vs last` — скрывается если throughput < 5 или нет prev
 - Snapshot (WIP, Backlog): `+3 (−44%)` — абсолютное + относительное %
-- Проценты (Flow Efficiency, Sprint Completion, Reopened Rate): `±X% vs last`
+- Проценты (Sprint Completion, Reopened Rate): `±Xpp vs last`
+- Flow Efficiency: `±Xpp vs recent` — сравнение с baseline из последних 3 предыдущих снапшотов с throughput ≥ 5; скрывается если текущий throughput < 5
 
 **Insight** — детерминированный текст, рассчитывается в `buildInsight()` в App.jsx на основе `metrics + wipItems`. Цвет: `T.bad` / `T.warn` / `T.textMuted`.
 

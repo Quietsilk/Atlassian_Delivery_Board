@@ -98,9 +98,9 @@ ai-delivery-analyst/
 │   ├── test_storage.py                # 13 тестов
 │   ├── test_ingestion.py              # 16 тестов
 │   ├── test_ingestion_extended.py     # 34 теста
-│   ├── test_api.py                    # 12 тестов
+│   ├── test_api.py                    # 17 тестов
 │   ├── test_adapters_base.py          # 33 теста
-│   ├── test_adapters_trello.py        # 29 тестов
+│   ├── test_adapters_trello.py        # 35 тестов
 │   └── test_scheduler.py              # 17 тестов
 ├── docs/
 │   ├── architecture.md
@@ -208,11 +208,14 @@ Light — тема по умолчанию. Переключение Light/Dark 
   "source": "trello",
   "apiKey": "trello_api_key",
   "token": "trello_token",
-  "boardId": "BOARD_ID"
+  "boardId": "BOARD_ID",
+  "lookbackDays": 21
 }
 ```
 
 `POST /sync` возвращает только `{ok, queued}`. UI считает синк успешным после появления нового snapshot `timestamp` в `/latest`.
+
+Trello sync обрабатывает все карточки board. `lookbackDays` ограничивает только загрузку Trello action history для карточек, изменённых за последние N дней (`dateLastActivity`), чтобы не упираться в rate limit на больших boards; WIP, Backlog Aging, completedCount и wipItems остаются board-scoped. Допустимый диапазон: `1..365`, default `21`.
 
 ---
 
@@ -221,7 +224,7 @@ Light — тема по умолчанию. Переключение Light/Dark 
 | Источник | Качество | Обязательные поля | Примечание |
 |---|---|---|---|
 | **Jira** | Высокое | `baseUrl`, `email`, `apiToken` | Полный changelog, JQL-фильтрация, Sprint Completion через Agile API |
-| **Trello** | Высокое | `apiKey`, `token`, `boardId` | История через card actions, без Sprint Completion |
+| **Trello** | Среднее | `apiKey`, `token`, `boardId` | История через card actions; workflow может определяться labels (`В РАБОТЕ`, `на согласовании`, `БЛОК`, `ГОТОВО`, `БЭКЛОГ`, `ДОЛГ`, `Отложено`); без Sprint Completion |
 
 Все адаптеры нормализуют данные в единый канонический формат перед расчётом метрик — `calculate_metrics()` не знает об источнике.
 
@@ -259,6 +262,8 @@ Light — тема по умолчанию. Переключение Light/Dark 
 | **WIP** | Задачи в статусе In Progress | ≤ 5 | ≥ 15 |
 | **Backlog Aging** | Среднее кол-во дней в бэклоге | ≤ 14d | ≥ 30d |
 
+Flow Efficiency value всегда рассчитывается по формуле `cycleTimeP50 / timeToMarketP50 × 100%`. Для снижения дневного шума delta в UI сравнивает текущее значение с baseline из последних 3 предыдущих снапшотов с `throughput ≥ 5`, а не с одним предыдущим снапшотом. Если текущий `throughput < 5`, delta скрывается.
+
 ### WIP-детализация (StaleIssuesPanel)
 
 Каждый снапшот содержит `wipItems` — список in-progress задач на момент синка. В дашборде отображается постоянно открытый Jira backlog-like список с:
@@ -294,9 +299,9 @@ Zero external network dependencies:
 | `test_storage.py` | 13 | SQLite CRUD, иммутабельность, фильтрация по периоду |
 | `test_ingestion.py` | 16 | completedCount, flow metrics interval, sprintCompletion, wipItems |
 | `test_ingestion_extended.py` | 34 | WIP details, adapter path, ingestion errors |
-| `test_api.py` | 12 | HTTP handlers, 400/404/202 статусы, unsupported sources |
+| `test_api.py` | 17 | HTTP handlers, 400/404/202 статусы, unsupported sources |
 | `test_adapters_base.py` | 33 | Adapter ABC, retry/http helpers, Jira/Trello factory |
-| `test_adapters_trello.py` | 29 | Trello adapter fetch/normalize |
+| `test_adapters_trello.py` | 35 | Trello adapter fetch/normalize |
 | `test_scheduler.py` | 17 | Scheduler loop, project configs, intervals |
 
 ---

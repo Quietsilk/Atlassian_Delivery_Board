@@ -57,7 +57,30 @@ function deltaPct(cur, pre, lowerBetter) {
   const diff = cur - pre;
   if (Math.abs(diff) < 0.5) return null;
   const sign = diff > 0 ? "+" : "";
-  return { text: `${sign}${round1(diff)}% vs last`, good: lowerBetter ? diff < 0 : diff > 0 };
+  return { text: `${sign}${round1(diff)}pp vs last`, good: lowerBetter ? diff < 0 : diff > 0 };
+}
+
+function deltaPctBaseline(cur, baseline, lowerBetter, label) {
+  if (baseline == null || cur == null) return null;
+  const diff = cur - baseline;
+  if (Math.abs(diff) < 0.5) return null;
+  const sign = diff > 0 ? "+" : "";
+  return { text: `${sign}${round1(diff)}pp vs ${label}`, good: lowerBetter ? diff < 0 : diff > 0 };
+}
+
+function recentPctBaseline(snaps, key, count = 3) {
+  const previous = snaps.slice(0, -1)
+    .filter(s => s[key] != null && (s.throughput ?? 0) >= 5)
+    .slice(-count);
+  if (previous.length === 0) return null;
+  return previous.reduce((sum, s) => sum + s[key], 0) / previous.length;
+}
+
+function flowEfficiencySublabel(last) {
+  if ((last.cycleTime ?? 0) > 0 && (last.timeToMarket ?? 0) > 0) {
+    return `Active ${round1(last.cycleTime)}d / Total ${round1(last.timeToMarket)}d`;
+  }
+  return "Active / Total time";
 }
 
 /* insight helpers */
@@ -90,7 +113,7 @@ function buildInsight(key, last, wipItems) {
       return { text: "Normal lead time", level: "neutral" };
     }
     case "flowEfficiency": {
-      if (flowEff < 20) return { text: "Too much waiting", level: "bad" };
+      if (flowEff < 20) return { text: "Waiting dominates", level: "bad" };
       if (flowEff < 40) return { text: "Moderate delays", level: "warn" };
       return { text: "Healthy flow", level: "neutral" };
     }
@@ -136,6 +159,10 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
   const dFlow = (cur, pre, unit) => prevTooOld ? null : deltaFlow(cur, pre, unit, throughput);
   const dSnap = (cur, pre, lb)   => prevTooOld ? null : deltaSnap(cur, pre, lb);
   const dPct  = (cur, pre, lb)   => prevTooOld ? null : deltaPct(cur, pre, lb);
+  const flowEfficiencyBaseline = recentPctBaseline(snaps, "flowEfficiency");
+  const dFlowEfficiency = throughput < 5
+    ? null
+    : deltaPctBaseline(last.flowEfficiency, flowEfficiencyBaseline, false, "recent");
 
   const sprintCompletion = last.sprintCompletion;
   const prevSprintCompletion = prev?.sprintCompletion;
@@ -194,9 +221,9 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
     },
     {
       id: "flowEfficiency",
-      label: "Flow Efficiency", sublabel: "Active / Total time",
+      label: "Flow Efficiency", sublabel: flowEfficiencySublabel(last),
       value: round1(last.flowEfficiency ?? 0), unit: "%",
-      delta: dPct(last.flowEfficiency, prev?.flowEfficiency, false),
+      delta: dFlowEfficiency,
       insight: buildInsight("flowEfficiency", last, wipItems),
       status: last.flowEfficiency == null ? "neutral" : last.flowEfficiency >= 40 ? "good" : last.flowEfficiency > 15 ? "warn" : "bad",
       barMax: 100, tooltip: "% of total lead time the item was actively worked on",

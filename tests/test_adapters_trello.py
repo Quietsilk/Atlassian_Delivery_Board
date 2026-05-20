@@ -13,17 +13,19 @@ from server.adapters.base import CANONICAL_STARTED, CANONICAL_DONE
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _make_adapter(lists_in_progress="In Progress", lists_done="Done"):
+def _make_adapter(lists_in_progress="In Progress", lists_done="Done", lookback_days=36500):
     return TrelloAdapter(
         api_key="key", token="tok", board_id="board1",
         lists_in_progress=lists_in_progress,
         lists_done=lists_done,
+        lookback_days=lookback_days,
     )
 
 
 def _make_card(card_id="507f1f77bcf86cd799439011", name="Fix bug",
                short_link="abc123", id_list="list1",
-               closed=False, members=None, date_last="2024-01-10T00:00:00Z"):
+               closed=False, members=None, date_last="2024-01-10T00:00:00Z",
+               labels=None):
     return {
         "id":               card_id,
         "name":             name,
@@ -32,6 +34,7 @@ def _make_card(card_id="507f1f77bcf86cd799439011", name="Fix bug",
         "closed":           closed,
         "members":          members or [],
         "dateLastActivity": date_last,
+        "labels":           labels or [],
     }
 
 
@@ -43,6 +46,10 @@ def _make_action(date, list_before, list_after):
             "listAfter":  {"name": list_after},
         },
     }
+
+
+def _make_label(name, color="yellow"):
+    return {"name": name, "color": color}
 
 
 # ── _created_from_id ──────────────────────────────────────────────────────────
@@ -208,6 +215,49 @@ class TestTrelloAdapterNormalize(unittest.TestCase):
         result = self.adapter._to_canonical(card)
         self.assertEqual(result["fields"]["status"]["name"], CANONICAL_DONE)
 
+    def test_workflow_label_in_progress_overrides_list(self):
+        card = self._card_with_actions(
+            card=_make_card(id_list="list3", labels=[_make_label("В РАБОТЕ")]),
+            list_names={"list3": "Any List"},
+        )
+        result = self.adapter._to_canonical(card)
+        self.assertEqual(result["fields"]["status"]["name"], CANONICAL_STARTED)
+        self.assertEqual(result["changelog"]["histories"][0]["items"][0]["toString"], CANONICAL_STARTED)
+
+    def test_workflow_label_done_overrides_list(self):
+        card = self._card_with_actions(
+            card=_make_card(id_list="list3", labels=[_make_label("ГОТОВО")]),
+            list_names={"list3": "Any List"},
+        )
+        result = self.adapter._to_canonical(card)
+        self.assertEqual(result["fields"]["status"]["name"], CANONICAL_DONE)
+        self.assertIsNotNone(result["fields"]["resolutiondate"])
+
+    def test_backlog_label_treated_as_backlog(self):
+        card = self._card_with_actions(
+            card=_make_card(id_list="list3", labels=[_make_label("БЭКЛОГ")]),
+            list_names={"list3": "Any List"},
+        )
+        result = self.adapter._to_canonical(card)
+        self.assertEqual(result["fields"]["status"]["name"], "БЭКЛОГ")
+        self.assertEqual(result["changelog"]["histories"], [])
+
+    def test_non_workflow_labels_do_not_override_list_status(self):
+        card = self._card_with_actions(
+            card=_make_card(id_list="list1", labels=[_make_label("ПРИОРИТЕТ")]),
+            list_names={"list1": "In Progress"},
+        )
+        result = self.adapter._to_canonical(card)
+        self.assertEqual(result["fields"]["status"]["name"], CANONICAL_STARTED)
+
+    def test_block_label_sets_blocked_reason(self):
+        card = self._card_with_actions(
+            card=_make_card(id_list="list3", labels=[_make_label("БЛОК")]),
+            list_names={"list3": "Any List"},
+        )
+        result = self.adapter._to_canonical(card)
+        self.assertEqual(result["blockedReason"], "БЛОК")
+
     def test_normalize_returns_list(self):
         card = self._card_with_actions()
         result = self.adapter.normalize([card])
@@ -290,6 +340,27 @@ class TestTrelloAdapterFetch(unittest.TestCase):
                    side_effect=self._mock_http([], [])):
             result = self.adapter.fetch()
         self.assertEqual(result, [])
+
+    def test_fetch_keeps_old_cards_but_skips_old_actions(self):
+        recent = _make_card(card_id="507f1f77bcf86cd799439011", short_link="recent",
+                            date_last="2999-01-10T00:00:00Z")
+        old = _make_card(card_id="507f1f77bcf86cd799439012", short_link="old",
+                         date_last="2000-01-10T00:00:00Z")
+        lists = [{"id": "list1", "name": "In Progress"}]
+        adapter = _make_adapter(lookback_days=21)
+
+        with patch("server.adapters.trello._http_get",
+                   side_effect=self._mock_http([recent, old], lists, {
+                       "507f1f77bcf86cd799439011": [],
+                       "507f1f77bcf86cd799439012": [],
+                   })) as mock_get:
+            result = adapter.fetch()
+
+        self.assertEqual([card["shortLink"] for card in result], ["recent", "old"])
+        self.assertEqual(result[1]["_actions"], [])
+        action_urls = [args[0][0] for args in mock_get.call_args_list if "/actions" in args[0][0]]
+        self.assertEqual(len(action_urls), 1)
+        self.assertIn("507f1f77bcf86cd799439011", action_urls[0])
 
 
 # ── build_adapter integration ─────────────────────────────────────────────────

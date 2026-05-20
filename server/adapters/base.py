@@ -132,5 +132,6 @@ def build_adapter(source: str, config: dict) -> Adapter:
             board_id          = config["board_id"],
             lists_in_progress = config.get("lists_in_progress", ""),
             lists_done        = config.get("lists_done", ""),
+            lookback_days     = config.get("lookback_days", 21),
         )
     raise ValueError(f"Unknown source: {source!r}. Supported: jira, trello")
