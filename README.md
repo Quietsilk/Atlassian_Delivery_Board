@@ -271,6 +271,8 @@ Cycle Time, Time to Market и Flow Efficiency считаются по стаби
 
 `flowSampleWindowDays` всегда сохраняется как `30` для всех режимов. `flowSampleMode` принимает значения: `rolling_30d`, `last_10`, `all_completed`, `empty`.
 
+Старые snapshots без `flowSampleSize`, `flowSampleWindowDays`, `flowSampleMode` остаются читаемыми в UI как legacy flow metrics. Для них sample sublabel показывает legacy-состояние, а flow delta скрывается, чтобы не сравнивать старую interval/all-time модель с новой rolling/fallback выборкой.
+
 Flow Efficiency value всегда рассчитывается по формуле `cycleTimeP50 / timeToMarketP50 × 100%`. Для снижения дневного шума delta в UI сравнивает текущее значение с baseline из последних 3 предыдущих снапшотов с `flowSampleSize ≥ 5`, а не с одним предыдущим снапшотом. Если текущий `flowSampleSize < 5`, delta скрывается.
 
 Если Jira sprint report временно недоступен, новый snapshot сохраняет последнюю валидную Sprint Completion-метрику и помечает её optional-полем `sprintCompletionStale: true`. При валидном sprint report поле не сохраняется. Остальные метрики snapshot обновляются по текущему sync.

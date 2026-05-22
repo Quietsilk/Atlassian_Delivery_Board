@@ -151,6 +151,8 @@ Key отображается как ссылка, если доступен URL 
 - Проценты (Sprint Completion, Reopened Rate): `±Xpp vs last`
 - Flow Efficiency: `±Xpp vs recent` — сравнение с baseline из последних 3 предыдущих снапшотов с `flowSampleSize ≥ 5`; скрывается если текущий `flowSampleSize < 5`
 
+Snapshots без `flowSample*` полей считаются legacy: sample sublabel показывает legacy-состояние, flow delta скрывается.
+
 **Insight** — детерминированный текст, рассчитывается в `buildInsight()` в App.jsx на основе `metrics + wipItems`. Цвет: `T.bad` / `T.warn` / `T.textMuted`.
 
 `getStatusColors(T, status)` → `{ fg, bg, border, stripe }`.

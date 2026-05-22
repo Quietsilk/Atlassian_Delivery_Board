@@ -32,7 +32,7 @@ function mergeHistoryWithLatest(history, latest) {
 /* delta helpers */
 
 function deltaFlow(cur, pre, unit, sampleSize) {
-  if (pre == null || pre === 0 || cur == null || sampleSize < 5) return null;
+  if (pre == null || pre === 0 || cur == null || sampleSize == null || sampleSize < 5) return null;
   const diff = cur - pre;
   if (Math.abs(diff) < 0.1) return null;
   const sign = diff > 0 ? "+" : "";
@@ -81,6 +81,7 @@ function flowEfficiencySublabel(last) {
 }
 
 function flowSampleSublabel(last) {
+  if (last.flowSampleMode === "legacy") return "Legacy flow metric";
   const n = last.flowSampleSize ?? 0;
   if (n <= 0 || last.flowSampleMode === "empty") return "No completed items";
   if (last.flowSampleMode === "last_10") return `P50 over last 10 · n=${n}`;
@@ -158,14 +159,14 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
   if (!snaps || snaps.length === 0) return null;
   const last = snaps[snaps.length - 1];
   const prev = snaps.length > 1 ? snaps[snaps.length - 2] : null;
-  const flowSampleSize = last.flowSampleSize ?? 0;
+  const flowSampleSize = last.flowSampleSize;
   const prevTooOld  = prev ? (Date.now() - new Date(prev.timestamp).getTime()) > 86_400_000 : true;
 
   const dFlow = (cur, pre, unit) => prevTooOld ? null : deltaFlow(cur, pre, unit, flowSampleSize);
   const dSnap = (cur, pre, lb)   => prevTooOld ? null : deltaSnap(cur, pre, lb);
   const dPct  = (cur, pre, lb)   => prevTooOld ? null : deltaPct(cur, pre, lb);
   const flowEfficiencyBaseline = recentPctBaseline(snaps, "flowEfficiency");
-  const dFlowEfficiency = flowSampleSize < 5
+  const dFlowEfficiency = flowSampleSize == null || flowSampleSize < 5
     ? null
     : deltaPctBaseline(last.flowEfficiency, flowEfficiencyBaseline, false, "recent");
 
