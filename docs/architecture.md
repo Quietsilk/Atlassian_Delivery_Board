@@ -28,7 +28,7 @@ server.py  (тонкий HTTP-роутер, порт 5678)
             │       │
             │       └── server/metrics.py
             │               ├── calculate_metrics(issues)   → structural KPIs
-            │               └── calculate_flow_metrics(completed) → P50/P85 cycle time + TTM
+            │               └── calculate_flow_metrics(completed sample) → P50/P85 cycle time + TTM
             │
             ├── server/storage.py      ← SQLite CRUD
             │       └── snapshots(id, project_key, timestamp, metrics_json)
@@ -50,8 +50,14 @@ server.py  (тонкий HTTP-роутер, порт 5678)
 **Инвариант 3 — `completedCount` кумулятивный.**
 Хранится нарастающим итогом. Throughput за период = `ΔcompletedCount`.
 
+**Инвариант 3a — Flow sample стабилен между sync.**
+Cycle Time, Time to Market и Flow Efficiency считаются по completed sample: rolling 30d при `n ≥ 10`, иначе последние 10 completed, иначе все completed. Throughput остаётся interval-based.
+
 **Инвариант 4 — Пустой result не сохраняется.**
 Если источник возвращает 0 задач, ingestion завершается ошибкой без INSERT.
+
+**Инвариант 4a — Частичный Jira changelog не сохраняется.**
+Если Jira changelog не загрузился хотя бы для одной задачи, ingestion завершается ошибкой без INSERT.
 
 **Инвариант 5 — Period без пересчёта.**
 `GET /history` фильтрует строки SQLite по полю `timestamp`. Метрики не пересчитываются.
@@ -110,11 +116,17 @@ Source API (Jira / Trello)
     Mapped Issue (dict)
             started_at, resolved_at, created_at
             │
-            ▼  calculate_metrics / calculate_flow_metrics
+            ├── calculate_metrics
+            ├── interval completed → throughput
+            └── rolling/fallback completed sample → calculate_flow_metrics
+            │
+            ▼
     Metrics dict
             cycleTimeP50, cycleTimeP85, timeToMarketP50, timeToMarketP85,
-            flowEfficiencyPercent, inProgressCount, sprintCompletionPercent,
-            sprintCompletionBasis, reopenedCount, reopenedRatePercent,
+            flowEfficiencyPercent, flowSampleSize, flowSampleWindowDays,
+            flowSampleMode, inProgressCount, sprintCompletionPercent,
+            sprintCompletionBasis, sprintCompletionStale (optional fallback-only),
+            reopenedCount, reopenedRatePercent,
             backlogAgingDays, completedCount, throughput, wipItems
             │
             ▼  save_snapshot → SQLite
@@ -162,6 +174,7 @@ Source API (Jira / Trello)
 handleSync()  — синкает все проекты параллельно
     │
     Promise.all(projects.map → POST /sync)
+    │   └── если source+project уже синкается: {ok:true, queued:false, alreadyRunning:true}
     │
     poll каждые 3s: GET /history + GET /latest  (для активного проекта)
     │

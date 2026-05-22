@@ -96,9 +96,9 @@ ai-delivery-analyst/
 ├── tests/
 │   ├── test_metrics.py                # 44 теста
 │   ├── test_storage.py                # 13 тестов
-│   ├── test_ingestion.py              # 16 тестов
-│   ├── test_ingestion_extended.py     # 34 теста
-│   ├── test_api.py                    # 17 тестов
+│   ├── test_ingestion.py              # 23 теста
+│   ├── test_ingestion_extended.py     # 36 тестов
+│   ├── test_api.py                    # 19 тестов
 │   ├── test_adapters_base.py          # 33 теста
 │   ├── test_adapters_trello.py        # 35 тестов
 │   └── test_scheduler.py              # 17 тестов
@@ -158,6 +158,9 @@ Light — тема по умолчанию. Переключение Light/Dark 
       "timeToMarketP50": 12.0,
       "timeToMarketP85": 62.2,
       "flowEfficiencyPercent": 41.7,
+      "flowSampleSize": 14,
+      "flowSampleWindowDays": 30,
+      "flowSampleMode": "rolling_30d",
       "completedCount": 147,
       "throughput": 3,
       "inProgressCount": 9,
@@ -213,9 +216,11 @@ Light — тема по умолчанию. Переключение Light/Dark 
 }
 ```
 
-`POST /sync` возвращает только `{ok, queued}`. UI считает синк успешным после появления нового snapshot `timestamp` в `/latest`.
+`POST /sync` возвращает только статус очереди: `{ok, queued}`. Если для той же пары `source + project` ingestion уже выполняется, endpoint возвращает `{ok: true, queued: false, alreadyRunning: true}` и не запускает второй поток. UI считает синк успешным после появления нового snapshot `timestamp` в `/latest`.
 
 Trello sync обрабатывает все карточки board. `lookbackDays` ограничивает только загрузку Trello action history для карточек, изменённых за последние N дней (`dateLastActivity`), чтобы не упираться в rate limit на больших boards; WIP, Backlog Aging, completedCount и wipItems остаются board-scoped. Допустимый диапазон: `1..365`, default `21`.
+
+Jira sync не сохраняет snapshot, если не удалось загрузить changelog хотя бы для одной задачи. Частичный changelog меняет `started_at` / `resolved_at`, поэтому такой sync завершается ошибкой вместо записи нестабильных метрик.
 
 ---
 
@@ -262,7 +267,13 @@ Trello sync обрабатывает все карточки board. `lookbackDay
 | **WIP** | Задачи в статусе In Progress | ≤ 5 | ≥ 15 |
 | **Backlog Aging** | Среднее кол-во дней в бэклоге | ≤ 14d | ≥ 30d |
 
-Flow Efficiency value всегда рассчитывается по формуле `cycleTimeP50 / timeToMarketP50 × 100%`. Для снижения дневного шума delta в UI сравнивает текущее значение с baseline из последних 3 предыдущих снапшотов с `throughput ≥ 5`, а не с одним предыдущим снапшотом. Если текущий `throughput < 5`, delta скрывается.
+Cycle Time, Time to Market и Flow Efficiency считаются по стабильной выборке завершённых задач, а не по задачам, закрытым между sync. Основная выборка — задачи, закрытые за последние 30 календарных дней. Если в 30-дневном окне меньше 10 завершённых задач, используется fallback на последние 10 завершённых задач. Если всего завершённых задач меньше 10, используются все завершённые задачи. Если завершённых задач нет, flow-метрики равны 0.
+
+`flowSampleWindowDays` всегда сохраняется как `30` для всех режимов. `flowSampleMode` принимает значения: `rolling_30d`, `last_10`, `all_completed`, `empty`.
+
+Flow Efficiency value всегда рассчитывается по формуле `cycleTimeP50 / timeToMarketP50 × 100%`. Для снижения дневного шума delta в UI сравнивает текущее значение с baseline из последних 3 предыдущих снапшотов с `flowSampleSize ≥ 5`, а не с одним предыдущим снапшотом. Если текущий `flowSampleSize < 5`, delta скрывается.
+
+Если Jira sprint report временно недоступен, новый snapshot сохраняет последнюю валидную Sprint Completion-метрику и помечает её optional-полем `sprintCompletionStale: true`. При валидном sprint report поле не сохраняется. Остальные метрики snapshot обновляются по текущему sync.
 
 ### WIP-детализация (StaleIssuesPanel)
 
@@ -297,9 +308,9 @@ Zero external network dependencies:
 |---|---|---|
 | `test_metrics.py` | 44 | `calculate_metrics`, `calculate_flow_metrics`, `_percentile`, `_parse_dt` |
 | `test_storage.py` | 13 | SQLite CRUD, иммутабельность, фильтрация по периоду |
-| `test_ingestion.py` | 16 | completedCount, flow metrics interval, sprintCompletion, wipItems |
-| `test_ingestion_extended.py` | 34 | WIP details, adapter path, ingestion errors |
-| `test_api.py` | 17 | HTTP handlers, 400/404/202 статусы, unsupported sources |
+| `test_ingestion.py` | 23 | completedCount, throughput interval, flow sample, sprintCompletion, wipItems, Jira changelog completeness |
+| `test_ingestion_extended.py` | 36 | WIP details, adapter path, ingestion errors |
+| `test_api.py` | 19 | HTTP handlers, 400/404/202 статусы, unsupported sources, sync dedupe |
 | `test_adapters_base.py` | 33 | Adapter ABC, retry/http helpers, Jira/Trello factory |
 | `test_adapters_trello.py` | 35 | Trello adapter fetch/normalize |
 | `test_scheduler.py` | 17 | Scheduler loop, project configs, intervals |
@@ -311,7 +322,7 @@ Zero external network dependencies:
 1. **UI read-only** — браузер только читает снапшоты, никогда не считает метрики
 2. **Иммутабельные снапшоты** — только INSERT в SQLite, никогда UPDATE/DELETE
 3. **`completedCount` = кумулятивный** — всего завершённых задач на момент синка
-4. **Flow metrics раздельно** — `calculate_metrics` возвращает структурные метрики; `calculate_flow_metrics(completed_items)` — P50/P85 flow-метрики
+4. **Flow metrics раздельно** — `calculate_metrics` возвращает структурные метрики; `calculate_flow_metrics(completed_items)` — P50/P85 flow-метрики по стабильной rolling/fallback выборке
 5. **`calculate_metrics` без period** — чистая функция, нет параметров cutoff/period; источник не знает об адаптере
 6. **Methodology KPI** — Scrum-проекты показывают `sprintCompletionPercent`; Kanban-проекты показывают `reopenedRatePercent`; unknown/invalid methodology показывает нейтральный `—`
 7. **Пустой result не сохраняется** — если источник вернул 0 задач, новый snapshot не создаётся
