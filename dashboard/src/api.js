@@ -3,6 +3,7 @@ const BASE = "http://localhost:5678";
 function normalizeSnapshot(snapshot) {
   if (!snapshot) return null;
   const metrics = snapshot.metrics || snapshot;
+  const hasFlowSample = Object.prototype.hasOwnProperty.call(metrics, "flowSampleSize");
   return {
     timestamp:       snapshot.timestamp || null,
     cycleTime:       metrics.cycleTimeP50         ?? metrics.cycleTimeDays    ?? metrics.cycleTime    ?? 0,
@@ -24,9 +25,9 @@ function normalizeSnapshot(snapshot) {
     wip:             metrics.inProgressCount        ?? metrics.wip              ?? 0,
     backlogAging:    metrics.backlogAgingDays        ?? metrics.backlogAging     ?? 0,
     throughput:      metrics.throughput             ?? 0,
-    flowSampleSize:  metrics.flowSampleSize          ?? 0,
-    flowSampleWindowDays: metrics.flowSampleWindowDays ?? 30,
-    flowSampleMode:  metrics.flowSampleMode          ?? "empty",
+    flowSampleSize:  hasFlowSample ? metrics.flowSampleSize : null,
+    flowSampleWindowDays: hasFlowSample ? (metrics.flowSampleWindowDays ?? 30) : null,
+    flowSampleMode:  hasFlowSample ? (metrics.flowSampleMode ?? "empty") : "legacy",
     wipItems:        metrics.wipItems               ?? [],
   };
 }
