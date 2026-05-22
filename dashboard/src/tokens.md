@@ -146,10 +146,10 @@ PROJ-1   Payment retry handling      IN PROGRESS  Alexey M.    14d
 Key отображается как ссылка, если доступен URL задачи. Age отображается lozenge-бейджем справа.
 
 **Delta** — формат зависит от типа метрики:
-- Flow (Cycle Time, TTM): `±Xd vs last` — скрывается если throughput < 5 или нет prev
+- Flow (Cycle Time, TTM): `±Xd vs last` — скрывается если `flowSampleSize < 5` или нет prev
 - Snapshot (WIP, Backlog): `+3 (−44%)` — абсолютное + относительное %
 - Проценты (Sprint Completion, Reopened Rate): `±Xpp vs last`
-- Flow Efficiency: `±Xpp vs recent` — сравнение с baseline из последних 3 предыдущих снапшотов с throughput ≥ 5; скрывается если текущий throughput < 5
+- Flow Efficiency: `±Xpp vs recent` — сравнение с baseline из последних 3 предыдущих снапшотов с `flowSampleSize ≥ 5`; скрывается если текущий `flowSampleSize < 5`
 
 **Insight** — детерминированный текст, рассчитывается в `buildInsight()` в App.jsx на основе `metrics + wipItems`. Цвет: `T.bad` / `T.warn` / `T.textMuted`.
 

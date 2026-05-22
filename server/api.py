@@ -16,6 +16,8 @@ import urllib.parse
 _TRELLO_LOOKBACK_DEFAULT = 21
 _TRELLO_LOOKBACK_MIN = 1
 _TRELLO_LOOKBACK_MAX = 365
+_SYNC_LOCK = threading.Lock()
+_SYNC_IN_PROGRESS = set()
 
 
 def _json_response(handler, code, data):
@@ -135,12 +137,22 @@ def handle_post_sync(handler, db_path, jira_credentials):
         return
 
     # ── Launch background ingestion thread ───────────────────────────────────
+    sync_key = (source, project.lower())
+    with _SYNC_LOCK:
+        if sync_key in _SYNC_IN_PROGRESS:
+            _json_response(handler, 202, {"ok": True, "queued": False, "alreadyRunning": True})
+            return
+        _SYNC_IN_PROGRESS.add(sync_key)
+
     def _run():
         from server.ingestion import run_ingestion_with_adapter
         try:
             run_ingestion_with_adapter(project, source, config, db_path)
         except Exception as e:
             print(f"[api] sync error for {project} ({source}): {e}")
+        finally:
+            with _SYNC_LOCK:
+                _SYNC_IN_PROGRESS.discard(sync_key)
 
     threading.Thread(target=_run, daemon=True).start()
     _json_response(handler, 202, {"ok": True, "queued": True})

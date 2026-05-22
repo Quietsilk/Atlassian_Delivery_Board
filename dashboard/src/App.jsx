@@ -31,8 +31,8 @@ function mergeHistoryWithLatest(history, latest) {
 
 /* delta helpers */
 
-function deltaFlow(cur, pre, unit, throughput) {
-  if (pre == null || pre === 0 || cur == null || throughput < 5) return null;
+function deltaFlow(cur, pre, unit, sampleSize) {
+  if (pre == null || pre === 0 || cur == null || sampleSize < 5) return null;
   const diff = cur - pre;
   if (Math.abs(diff) < 0.1) return null;
   const sign = diff > 0 ? "+" : "";
@@ -70,17 +70,22 @@ function deltaPctBaseline(cur, baseline, lowerBetter, label) {
 
 function recentPctBaseline(snaps, key, count = 3) {
   const previous = snaps.slice(0, -1)
-    .filter(s => s[key] != null && (s.throughput ?? 0) >= 5)
+    .filter(s => s[key] != null && (s.flowSampleSize ?? 0) >= 5)
     .slice(-count);
   if (previous.length === 0) return null;
   return previous.reduce((sum, s) => sum + s[key], 0) / previous.length;
 }
 
 function flowEfficiencySublabel(last) {
-  if ((last.cycleTime ?? 0) > 0 && (last.timeToMarket ?? 0) > 0) {
-    return `Active ${round1(last.cycleTime)}d / Total ${round1(last.timeToMarket)}d`;
-  }
-  return "Active / Total time";
+  return flowSampleSublabel(last);
+}
+
+function flowSampleSublabel(last) {
+  const n = last.flowSampleSize ?? 0;
+  if (n <= 0 || last.flowSampleMode === "empty") return "No completed items";
+  if (last.flowSampleMode === "last_10") return `P50 over last 10 · n=${n}`;
+  if (last.flowSampleMode === "all_completed") return `P50 over all done · n=${n}`;
+  return `P50 over ${last.flowSampleWindowDays ?? 30}d · n=${n}`;
 }
 
 /* insight helpers */
@@ -153,14 +158,14 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
   if (!snaps || snaps.length === 0) return null;
   const last = snaps[snaps.length - 1];
   const prev = snaps.length > 1 ? snaps[snaps.length - 2] : null;
-  const throughput  = last.throughput ?? 0;
+  const flowSampleSize = last.flowSampleSize ?? 0;
   const prevTooOld  = prev ? (Date.now() - new Date(prev.timestamp).getTime()) > 86_400_000 : true;
 
-  const dFlow = (cur, pre, unit) => prevTooOld ? null : deltaFlow(cur, pre, unit, throughput);
+  const dFlow = (cur, pre, unit) => prevTooOld ? null : deltaFlow(cur, pre, unit, flowSampleSize);
   const dSnap = (cur, pre, lb)   => prevTooOld ? null : deltaSnap(cur, pre, lb);
   const dPct  = (cur, pre, lb)   => prevTooOld ? null : deltaPct(cur, pre, lb);
   const flowEfficiencyBaseline = recentPctBaseline(snaps, "flowEfficiency");
-  const dFlowEfficiency = throughput < 5
+  const dFlowEfficiency = flowSampleSize < 5
     ? null
     : deltaPctBaseline(last.flowEfficiency, flowEfficiencyBaseline, false, "recent");
 
@@ -181,7 +186,7 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
   } else if (methodology === "scrum") {
     deliveryQualityKpi = {
       id: "sprintCompletion",
-      label: "Sprint Completion", sublabel: `${last.sprintCompletedCount ?? 0} of ${last.sprintCommittedCount ?? 0} committed`,
+      label: "Sprint Completion", sublabel: `${last.sprintCompletedCount ?? 0} of ${last.sprintCommittedCount ?? 0} committed${last.sprintCompletionStale ? " · previous report" : ""}`,
       value: sprintValue, unit: sprintCompletion == null ? null : "%",
       delta: dPct(sprintCompletion, prevSprintCompletion, false),
       insight: buildInsight("sprintCompletion", last, wipItems),
@@ -203,7 +208,7 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
   return [
     {
       id: "cycleTime",
-      label: "Cycle Time", sublabel: "In Progress → Done",
+      label: "Cycle Time", sublabel: flowSampleSublabel(last),
       value: round1(last.cycleTime ?? 0), unit: "d",
       delta: dFlow(last.cycleTime, prev?.cycleTime, "d"),
       insight: buildInsight("cycleTime", last, wipItems),
@@ -212,7 +217,7 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
     },
     {
       id: "timeToMarket",
-      label: "Time to Market", sublabel: "Created → Done",
+      label: "Time to Market", sublabel: flowSampleSublabel(last),
       value: round1(last.timeToMarket ?? 0), unit: "d",
       delta: dFlow(last.timeToMarket, prev?.timeToMarket, "d"),
       insight: buildInsight("timeToMarket", last, wipItems),

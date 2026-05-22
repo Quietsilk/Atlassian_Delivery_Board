@@ -16,6 +16,7 @@ function normalizeSnapshot(snapshot) {
     sprintAddedCount: metrics.sprintAddedCount ?? 0,
     sprintRemovedCount: metrics.sprintRemovedCount ?? 0,
     sprintCompletionBasis: metrics.sprintCompletionBasis ?? null,
+    sprintCompletionStale: metrics.sprintCompletionStale ?? false,
     sprintName:      metrics.sprintName             ?? null,
     reopenedCount:   metrics.reopenedCount          ?? 0,
     reopenedRate:    metrics.reopenedRatePercent    ?? metrics.reopenedRate ?? 0,
@@ -23,6 +24,9 @@ function normalizeSnapshot(snapshot) {
     wip:             metrics.inProgressCount        ?? metrics.wip              ?? 0,
     backlogAging:    metrics.backlogAgingDays        ?? metrics.backlogAging     ?? 0,
     throughput:      metrics.throughput             ?? 0,
+    flowSampleSize:  metrics.flowSampleSize          ?? 0,
+    flowSampleWindowDays: metrics.flowSampleWindowDays ?? 30,
+    flowSampleMode:  metrics.flowSampleMode          ?? "empty",
     wipItems:        metrics.wipItems               ?? [],
   };
 }

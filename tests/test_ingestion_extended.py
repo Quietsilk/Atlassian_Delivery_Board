@@ -1,6 +1,6 @@
 """Extended ingestion tests — wip_items, predictability, adapter path, error handling.
 
-Complements test_ingestion.py (which covers throughput/completedCount/interval logic).
+Complements test_ingestion.py (which covers throughput/completedCount/flow sample logic).
 Coverage targets:
   _compute_wip_items  — field extraction, sorting, cap, url, assignee variants
   _calc_predictability — committed/completed window logic
@@ -23,7 +23,7 @@ from server.ingestion import (
     run_ingestion_with_adapter,
 )
 from server.metrics import _map_issue
-from server.storage import init_db, get_latest
+from server.storage import init_db, get_latest, save_snapshot
 
 
 def tmp_db():
@@ -359,6 +359,68 @@ class TestRunIngestionWithAdapter(unittest.TestCase):
         with patch("server.adapters.build_adapter", return_value=adapter):
             with self.assertRaises(ConnectionError):
                 run_ingestion_with_adapter("PROJ", "trello", {}, self.db)
+
+    def test_jira_sprint_completion_falls_back_to_previous_valid_report(self):
+        previous_metrics = {
+            "sprintCompletionPercent": 75.0,
+            "sprintCommittedCount": 8,
+            "sprintCompletedCount": 6,
+            "sprintAddedCount": 1,
+            "sprintRemovedCount": 0,
+            "sprintCompletionBasis": "start_commitment",
+            "sprintName": "Sprint 21",
+            "sprintStartDate": "2026-05-18T00:00:00Z",
+            "sprintCompleteDate": "2026-05-29T18:00:00Z",
+        }
+        save_snapshot("PROJ", previous_metrics, self.db)
+        unavailable = {
+            "sprintCompletionPercent": None,
+            "sprintCommittedCount": 0,
+            "sprintCompletedCount": 0,
+            "sprintAddedCount": 0,
+            "sprintRemovedCount": 0,
+            "sprintName": None,
+            "sprintStartDate": None,
+            "sprintCompleteDate": None,
+        }
+
+        with patch("server.adapters.build_adapter",
+                   return_value=self._mock_adapter([self._canonical_done_issue()])), \
+             patch("server.ingestion._fetch_jira_sprint_completion", return_value=unavailable):
+            metrics = run_ingestion_with_adapter(
+                "PROJ", "jira",
+                {"base_url": "https://j.test", "email": "u", "api_token": "tok"},
+                self.db,
+            )
+
+        self.assertEqual(metrics["sprintCompletionPercent"], 75.0)
+        self.assertEqual(metrics["sprintName"], "Sprint 21")
+        self.assertTrue(metrics["sprintCompletionStale"])
+
+    def test_jira_sprint_completion_uses_new_valid_report(self):
+        save_snapshot("PROJ", {"sprintCompletionPercent": 75.0}, self.db)
+        current = {
+            "sprintCompletionPercent": 52.0,
+            "sprintCommittedCount": 25,
+            "sprintCompletedCount": 13,
+            "sprintAddedCount": 0,
+            "sprintRemovedCount": 0,
+            "sprintCompletionBasis": "start_commitment",
+            "sprintName": "Sprint 22",
+        }
+
+        with patch("server.adapters.build_adapter",
+                   return_value=self._mock_adapter([self._canonical_done_issue()])), \
+             patch("server.ingestion._fetch_jira_sprint_completion", return_value=current):
+            metrics = run_ingestion_with_adapter(
+                "PROJ", "jira",
+                {"base_url": "https://j.test", "email": "u", "api_token": "tok"},
+                self.db,
+            )
+
+        self.assertEqual(metrics["sprintCompletionPercent"], 52.0)
+        self.assertEqual(metrics["sprintName"], "Sprint 22")
+        self.assertNotIn("sprintCompletionStale", metrics)
 
 
 if __name__ == "__main__":

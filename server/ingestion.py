@@ -1,7 +1,7 @@
 """Ingestion pipeline: fetch_jira → calculate_metrics → save_snapshot.
 
-Flow metrics use the interval [prev_snapshot_ts, now] so they are
-independent of sync frequency (Step 10).
+Throughput uses the interval [prev_snapshot_ts, now]. Flow metrics use a
+stable completed-issue sample so frequent syncs do not swing P50/P85.
 """
 
 import json
@@ -20,6 +20,8 @@ from server.storage import save_snapshot, get_latest
 
 
 PAGE_SIZE = 50
+FLOW_SAMPLE_WINDOW_DAYS = 30
+FLOW_SAMPLE_MIN_COMPLETED = 10
 
 
 def _jira_request(url, auth, body=None):
@@ -65,14 +67,26 @@ def fetch_jira(base_url, email, api_token, jql):
             if len(values) == 100:
                 print(f"  [warn] {key}: changelog at 100-entry limit — history may be truncated")
             return key, values
-        except Exception:
-            return key, []
+        except Exception as e:
+            return key, e
 
     print(f"  Fetching changelogs for {len(all_issues)} issues (parallel)…")
     changelogs = {}
+    failed_changelogs = []
     with ThreadPoolExecutor(max_workers=10) as pool:
         for key, values in pool.map(_fetch_changelog, [i["key"] for i in all_issues]):
+            if isinstance(values, Exception):
+                failed_changelogs.append(key)
+                continue
             changelogs[key] = values
+
+    if failed_changelogs:
+        sample = ", ".join(failed_changelogs[:5])
+        suffix = "…" if len(failed_changelogs) > 5 else ""
+        raise RuntimeError(
+            f"Jira changelog fetch failed for {len(failed_changelogs)} issue(s): "
+            f"{sample}{suffix}; snapshot was not saved"
+        )
 
     browse_base = base_url.rstrip("/")
     for issue in all_issues:
@@ -225,6 +239,40 @@ def _fetch_jira_sprint_completion(base_url, auth, project_key, issues):
     return result
 
 
+_SPRINT_METRIC_KEYS = (
+    "sprintCompletionPercent",
+    "sprintCommittedCount",
+    "sprintCompletedCount",
+    "sprintAddedCount",
+    "sprintRemovedCount",
+    "sprintCompletionBasis",
+    "sprintName",
+    "sprintStartDate",
+    "sprintCompleteDate",
+)
+
+
+def _stabilize_sprint_metrics(project_key, db_path, sprint_metrics):
+    """Keep the last valid sprint block if Jira sprint report is temporarily unavailable."""
+    if not sprint_metrics or sprint_metrics.get("sprintCompletionPercent") is not None:
+        return sprint_metrics
+
+    previous = get_latest(project_key, db_path)
+    if not previous:
+        return sprint_metrics
+
+    previous_metrics = previous.get("metrics") or {}
+    if previous_metrics.get("sprintCompletionPercent") is None:
+        return sprint_metrics
+
+    stabilized = dict(sprint_metrics)
+    for key in _SPRINT_METRIC_KEYS:
+        if key in previous_metrics:
+            stabilized[key] = previous_metrics[key]
+    stabilized["sprintCompletionStale"] = True
+    return stabilized
+
+
 # ── WIP items ────────────────────────────────────────────────────────────────
 
 def _compute_wip_items(issues, mapped):
@@ -293,6 +341,49 @@ def _get_completed_in_interval(mapped, since_ts):
     return result
 
 
+def _select_flow_sample(mapped, now=None):
+    """Select a stable completed-issue sample for Cycle/TTM/Flow metrics."""
+    now = now or datetime.now(timezone.utc)
+    window_start = now - timedelta(days=FLOW_SAMPLE_WINDOW_DAYS)
+
+    completed = []
+    for m in mapped:
+        if not m["resolved_at"]:
+            continue
+        try:
+            resolved = _parse_dt(m["resolved_at"])
+            if resolved.tzinfo is None:
+                resolved = resolved.replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+        completed.append((resolved, m))
+
+    if not completed:
+        return [], {
+            "flowSampleSize": 0,
+            "flowSampleWindowDays": FLOW_SAMPLE_WINDOW_DAYS,
+            "flowSampleMode": "empty",
+        }
+
+    completed.sort(key=lambda item: item[0], reverse=True)
+    rolling = [m for resolved, m in completed if resolved >= window_start]
+    if len(rolling) >= FLOW_SAMPLE_MIN_COMPLETED:
+        sample = rolling
+        mode = "rolling_30d"
+    elif len(completed) >= FLOW_SAMPLE_MIN_COMPLETED:
+        sample = [m for _, m in completed[:FLOW_SAMPLE_MIN_COMPLETED]]
+        mode = "last_10"
+    else:
+        sample = [m for _, m in completed]
+        mode = "all_completed"
+
+    return sample, {
+        "flowSampleSize": len(sample),
+        "flowSampleWindowDays": FLOW_SAMPLE_WINDOW_DAYS,
+        "flowSampleMode": mode,
+    }
+
+
 # ── Step 8: predictability (kept as approximation) ──────────────────────────
 
 def _calc_predictability(mapped):
@@ -337,7 +428,7 @@ def _calc_predictability(mapped):
 # ── Shared pipeline ───────────────────────────────────────────────────────────
 
 def _run_pipeline(project_key, issues, db_path, extra_metrics=None):
-    """map → structural metrics → interval flow metrics → save snapshot."""
+    """map → structural metrics → stable flow sample → save snapshot."""
     mapped = [_map_issue(issue) for issue in issues]
 
     metrics = calculate_metrics(issues, mapped=mapped)
@@ -348,9 +439,9 @@ def _run_pipeline(project_key, issues, db_path, extra_metrics=None):
     completed_interval = _get_completed_in_interval(mapped, since_ts)
     metrics["throughput"] = len(completed_interval)
 
-    completed_all = [m for m in mapped if m["resolved_at"]]
-    flow_source   = completed_interval if completed_interval else completed_all
+    flow_source, flow_sample_meta = _select_flow_sample(mapped)
     metrics.update(calculate_flow_metrics(flow_source))
+    metrics.update(flow_sample_meta)
 
     metrics["predictabilityPercent"] = _calc_predictability(mapped)
     metrics["wipItems"]              = _compute_wip_items(issues, mapped)
@@ -372,6 +463,7 @@ def run_ingestion(project_key, base_url, email, api_token, jql, db_path="snapsho
     if not issues:
         raise ValueError("Jira query returned no issues; snapshot was not saved")
     sprint_metrics = _fetch_jira_sprint_completion(base_url.rstrip("/"), auth, project_key, issues)
+    sprint_metrics = _stabilize_sprint_metrics(project_key, db_path, sprint_metrics)
     return _run_pipeline(project_key, issues, db_path, extra_metrics=sprint_metrics)
 
 
@@ -402,5 +494,6 @@ def run_ingestion_with_adapter(project_key, source, config, db_path="snapshots.d
             project_key,
             issues,
         )
+        extra_metrics = _stabilize_sprint_metrics(project_key, db_path, extra_metrics)
 
     return _run_pipeline(project_key, issues, db_path, extra_metrics=extra_metrics)
