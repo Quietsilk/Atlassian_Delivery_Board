@@ -1,22 +1,22 @@
-# AI Delivery Analyst Dashboard
+# Дашборд AI Delivery Analyst
 
-React/Vite dashboard for the `react-redesign` branch.
+Интерфейс на React 19 и Vite 8. Работает с локальным защищённым API и не хранит учётные данные Jira/Trello.
 
-## Run
+## Запуск
 
 ```bash
 npm run dev
 ```
 
-The dashboard runs on Vite and reads the backend at `http://localhost:5678`.
+Vite запускается на `http://127.0.0.1:5173` и проксирует `/api` в сервер на `http://127.0.0.1:5678`.
 
-Sync is considered complete only when `/latest` returns a snapshot with a new `timestamp`. AI analysis is optional and does not block completion.
+Синхронизация считается завершённой только после появления нового `timestamp` в `/api/latest`. Получение ответа `202 queued` само по себе не означает обновление данных.
 
-The sidebar is closed by default on page load.
+При первом открытии пользователь вводит `ADA_ACCESS_TOKEN`; сервер создаёт HttpOnly-сессию. После входа интерфейс загружает публичные серверные профили и отправляет на синхронизацию только их ID.
 
-## Data Contract
+## Контракт данных
 
-Backend snapshots are returned as:
+Сервер возвращает снапшоты в формате:
 
 ```json
 {
@@ -34,9 +34,9 @@ Backend snapshots are returned as:
 }
 ```
 
-`src/api.js` normalizes those backend fields for the React UI:
+`src/api.js` нормализует поля сервера для React-интерфейса:
 
-| Backend field | UI field |
+| Поле сервера | Поле интерфейса |
 |---|---|
 | `cycleTimeP50` | `cycleTime` |
 | `timeToMarketP50` | `timeToMarket` |
@@ -45,6 +45,15 @@ Backend snapshots are returned as:
 | `inProgressCount` | `wip` |
 | `backlogAgingDays` | `backlogAging` |
 
-The UI displays 6 KPI cards: Cycle Time, Time to Market, Flow Efficiency, Reopened, WIP, Backlog Aging.
+Интерфейс показывает шесть KPI: Cycle Time, Time to Market, Flow Efficiency, методологический KPI, WIP и Backlog Aging.
 
-KPI values are based on the latest snapshot. History is used for deltas and sparklines.
+Значения KPI берутся из последнего снапшота. История используется для дельт. В WIP-таблице отображаются только Task/Bug; Epic исключаются, старые задачи находятся сверху.
+
+## Состояние браузера
+
+В localStorage сохраняются только:
+
+- `ada:activeProjectId` — активный профиль;
+- `ada:theme` — тема оформления.
+
+Старые ключи с учётными данными и конфигурацией проектов удаляются при запуске.

@@ -1,26 +1,26 @@
-# Security
+# Безопасность
 
-## Trust model
+## Модель доверия
 
-AI Delivery Analyst is a local, single-user service. It binds only to an explicit loopback address. Other operating-system users are considered untrusted and must not be able to read the application's `.env`, database, browser session, or process environment. Processes running under the same OS account are trusted; stronger isolation requires a separate OS account or container boundary.
+AI Delivery Analyst — локальный однопользовательский сервис, который слушает только явный loopback-адрес. Другие пользователи операционной системы считаются недоверенными и не должны иметь доступ к `.env`, базе данных, браузерной сессии или окружению процесса. Процессы под тем же системным пользователем считаются доверенными; для более строгой изоляции нужен отдельный пользователь ОС или контейнер.
 
-The service is not designed for direct Internet or LAN exposure. A reverse proxy does not turn the current access-token flow into multi-user authentication.
+Сервис не предназначен для прямой публикации в Интернет или LAN. Reverse proxy не превращает текущую схему access token в многопользовательскую аутентификацию.
 
-## Secrets and sessions
+## Секреты и сессии
 
-- Store `ADA_ACCESS_TOKEN`, Jira/Trello credentials, and optional integration tokens only in the ignored `.env` file with mode `0600`.
-- Browser requests contain only a profile ID. Source credentials, JQL, and board IDs remain in server memory.
-- Login exchanges `ADA_ACCESS_TOKEN` for an in-memory, `HttpOnly`, `SameSite=Strict` session cookie. Sessions expire after eight hours and are lost on restart.
-- Never put credentials in URLs, source control, logs, screenshots, documentation, or issue attachments.
-- Rotate a credential immediately if it has been exposed. Rotation is an operator action and is not performed automatically by the application.
+- `ADA_ACCESS_TOKEN`, учётные данные Jira/Trello и токены интеграций хранятся только в исключённом из Git файле `.env` с правами `0600`.
+- Браузерные запросы содержат только ID профиля. Учётные данные источников, JQL и ID досок остаются в памяти сервера.
+- Вход обменивает `ADA_ACCESS_TOKEN` на сессионную cookie `HttpOnly`, `SameSite=Strict`. Сессия действует восемь часов и теряется при перезапуске.
+- Учётные данные нельзя помещать в URL, Git, логи, скриншоты, документацию и вложения задач.
+- Раскрытый секрет необходимо немедленно заменить. Ротацию выполняет оператор; приложение не делает это автоматически.
 
-## Network and ingestion controls
+## Сетевые ограничения и загрузка
 
-- `HOST` must be loopback.
-- CORS origins are allowlisted. Jira destinations must be HTTPS Atlassian Cloud origins or explicit `ADA_ALLOWED_JIRA_HOSTS` entries.
-- JSON request bodies require `application/json`, `Content-Length`, a complete JSON object, and are limited to 64 KiB with a read timeout.
-- HTTP and scheduled syncs share a bounded queue. Jira/Trello item limits and ingestion deadlines fail closed: no partial snapshot is saved.
+- `HOST` должен быть loopback-адресом.
+- CORS origins ограничены allowlist. Jira должна использовать HTTPS-origin Atlassian Cloud или точный хост из `ADA_ALLOWED_JIRA_HOSTS`.
+- Тело JSON-запроса требует `application/json`, `Content-Length` и полный JSON-объект; размер ограничен 64 КиБ, чтение имеет timeout.
+- HTTP и планировщик используют общую ограниченную очередь. Лимиты Jira/Trello и дедлайн работают по принципу fail-closed: частичный снапшот не сохраняется.
 
-## Reporting
+## Сообщение об уязвимости
 
-Report suspected vulnerabilities privately to the repository owner. Include the affected revision, reproduction steps, and impact. Do not include live credentials or customer data in the report.
+Сообщайте о предполагаемых уязвимостях приватно владельцу репозитория. Укажите затронутую ревизию, шаги воспроизведения и влияние. Не включайте действующие секреты и данные клиентов.
