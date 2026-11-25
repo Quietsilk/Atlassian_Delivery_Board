@@ -10,6 +10,8 @@ Canonical issue shape:
         "created":        "<ISO datetime>",
         "resolutiondate": "<ISO datetime | null>",
         "status":         {"name": "<string>"},
+        "issuetype":      {"name": "<string>"} | null,
+        "labels":         ["<string>", ...],
     },
     "changelog": {
         "histories": [

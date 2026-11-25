@@ -1,16 +1,37 @@
-const BASE = "http://localhost:5678";
+const BASE = "/api";
+
+async function request(path, options = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    credentials: "include",
+    ...options,
+    headers: options.body ? { "Content-Type": "application/json", ...(options.headers || {}) } : options.headers,
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const error = new Error(payload.error || `HTTP ${res.status}`);
+    error.status = res.status;
+    throw error;
+  }
+  return payload;
+}
+
+export async function fetchSession() { return request("/session"); }
+export async function login(accessToken) {
+  return request("/login", { method: "POST", body: JSON.stringify({ accessToken }) });
+}
+export async function logout() { return request("/logout", { method: "POST", body: "{}" }); }
 
 function normalizeSnapshot(snapshot) {
   if (!snapshot) return null;
   const metrics = snapshot.metrics || snapshot;
   const hasFlowSample = Object.prototype.hasOwnProperty.call(metrics, "flowSampleSize");
   return {
-    timestamp:       snapshot.timestamp || null,
-    cycleTime:       metrics.cycleTimeP50         ?? metrics.cycleTimeDays    ?? metrics.cycleTime    ?? 0,
-    cycleTimeP85:    metrics.cycleTimeP85          ?? 0,
-    timeToMarket:    metrics.timeToMarketP50       ?? metrics.timeToMarketDays ?? metrics.timeToMarket ?? 0,
-    timeToMarketP85: metrics.timeToMarketP85       ?? 0,
-    flowEfficiency:  metrics.flowEfficiencyPercent ?? metrics.flowEfficiency   ?? 0,
+    timestamp: snapshot.timestamp || null,
+    cycleTime: metrics.cycleTimeP50 ?? metrics.cycleTimeDays ?? metrics.cycleTime ?? 0,
+    cycleTimeP85: metrics.cycleTimeP85 ?? 0,
+    timeToMarket: metrics.timeToMarketP50 ?? metrics.timeToMarketDays ?? metrics.timeToMarket ?? 0,
+    timeToMarketP85: metrics.timeToMarketP85 ?? 0,
+    flowEfficiency: metrics.flowEfficiencyPercent ?? metrics.flowEfficiency ?? 0,
     sprintCompletion: metrics.sprintCompletionPercent ?? metrics.sprintCompletion ?? null,
     sprintCommittedCount: metrics.sprintCommittedCount ?? 0,
     sprintCompletedCount: metrics.sprintCompletedCount ?? 0,
@@ -18,66 +39,44 @@ function normalizeSnapshot(snapshot) {
     sprintRemovedCount: metrics.sprintRemovedCount ?? 0,
     sprintCompletionBasis: metrics.sprintCompletionBasis ?? null,
     sprintCompletionStale: metrics.sprintCompletionStale ?? false,
-    sprintName:      metrics.sprintName             ?? null,
-    reopenedCount:   metrics.reopenedCount          ?? 0,
-    reopenedRate:    metrics.reopenedRatePercent    ?? metrics.reopenedRate ?? 0,
-    completedCount:  metrics.completedCount         ?? 0,
-    wip:             metrics.inProgressCount        ?? metrics.wip              ?? 0,
-    backlogAging:    metrics.backlogAgingDays        ?? metrics.backlogAging     ?? 0,
-    throughput:      metrics.throughput             ?? 0,
-    flowSampleSize:  hasFlowSample ? metrics.flowSampleSize : null,
+    sprintName: metrics.sprintName ?? null,
+    reopenedCount: metrics.reopenedCount ?? 0,
+    reopenedRate: metrics.reopenedRatePercent ?? metrics.reopenedRate ?? 0,
+    completedCount: metrics.completedCount ?? 0,
+    wip: metrics.inProgressCount ?? metrics.wip ?? 0,
+    backlogAging: metrics.backlogAgingDays ?? metrics.backlogAging ?? 0,
+    throughput: metrics.throughput ?? 0,
+    flowSampleSize: hasFlowSample ? metrics.flowSampleSize : null,
     flowSampleWindowDays: hasFlowSample ? (metrics.flowSampleWindowDays ?? 30) : null,
-    flowSampleMode:  hasFlowSample ? (metrics.flowSampleMode ?? "empty") : "legacy",
-    wipItems:        metrics.wipItems               ?? [],
+    flowSampleMode: hasFlowSample ? (metrics.flowSampleMode ?? "empty") : "legacy",
+    wipItems: metrics.wipItems ?? [],
   };
 }
 
 export async function fetchLatest(project) {
-  const res = await fetch(`${BASE}/latest?project=${encodeURIComponent(project)}`);
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  const body = await res.json();
-  if (!body.ok) throw new Error(body.error || "Server error");
-  return normalizeSnapshot(body.snapshot);
+  try {
+    const body = await request(`/latest?project=${encodeURIComponent(project)}`);
+    return normalizeSnapshot(body.snapshot);
+  } catch (error) {
+    if (error.status === 404) return null;
+    throw error;
+  }
 }
 
 export async function fetchHistory(project) {
-  const res = await fetch(`${BASE}/history?project=${encodeURIComponent(project)}`);
-  if (!res.ok) return [];
-  const body = await res.json();
+  const body = await request(`/history?project=${encodeURIComponent(project)}`);
   return (body.snapshots || []).map(normalizeSnapshot).filter(Boolean);
 }
 
-/**
- * POST /sync — source-aware.
- *
- * @param {string} project  - project key / label
- * @param {string} source   - "jira" | "trello"
- * @param {object} creds    - saved credentials for the active source (from useCredentials)
- * @param {string} [jql]    - optional JQL override (Jira only)
- */
-export async function postSync({ project, source = "jira", creds = {}, jql }) {
-  const body = { project, source };
+export async function fetchProfiles() {
+  const body = await request("/profiles");
+  return body.profiles || [];
+}
 
-  if (source === "jira") {
-    body.baseUrl  = creds.baseUrl;
-    body.email    = creds.email;
-    body.apiToken = creds.apiToken;
-    // Auto-generate JQL from project label if not provided
-    body.jql      = jql || `project = "${project.toUpperCase().replace(/\s+/g, "-")}" ORDER BY updated DESC`;
-  } else if (source === "trello") {
-    body.apiKey          = creds.apiKey;
-    body.token           = creds.token;
-    body.boardId         = creds.boardId;
-    body.listsInProgress = creds.listsInProgress || "";
-    body.listsDone       = creds.listsDone       || "";
-  }
+export async function postSyncAll(profileIds) {
+  return request("/sync-all", { method: "POST", body: JSON.stringify({ profileIds }) });
+}
 
-  const res = await fetch(`${BASE}/sync`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error("Sync failed: " + res.status);
-  return res.json();
+export async function validateProfile(profileId) {
+  return request("/validate-profile", { method: "POST", body: JSON.stringify({ profileId }) });
 }

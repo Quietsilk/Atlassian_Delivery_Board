@@ -7,7 +7,7 @@ import unittest
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from server.storage import init_db, save_snapshot, get_latest, get_history, get_previous_snapshot
+from server.storage import init_db, save_snapshot, get_latest, get_history, get_previous_snapshot, list_projects
 
 
 def tmp_db():
@@ -109,6 +109,29 @@ class TestGetHistory(unittest.TestCase):
             save_snapshot("PROJ", {"throughput": i}, self.db)
         history = get_history("PROJ", db_path=self.db)
         self.assertEqual(len(history), 5)
+
+
+class TestListProjects(unittest.TestCase):
+    def setUp(self):
+        self.db = tmp_db()
+        init_db(self.db)
+
+    def tearDown(self):
+        os.unlink(self.db)
+
+    def test_empty_when_no_snapshots(self):
+        self.assertEqual(list_projects(self.db), [])
+
+    def test_returns_projects_with_counts_and_latest_timestamp(self):
+        save_snapshot("A", METRICS_A, self.db)
+        save_snapshot("B", METRICS_B, self.db)
+        save_snapshot("A", {"throughput": 9}, self.db)
+
+        projects = list_projects(self.db)
+
+        self.assertEqual([p["project"] for p in projects], ["A", "B"])
+        self.assertEqual(projects[0]["snapshotCount"], 2)
+        self.assertIsNotNone(projects[0]["latestTimestamp"])
 
 
 class TestGetPreviousSnapshot(unittest.TestCase):

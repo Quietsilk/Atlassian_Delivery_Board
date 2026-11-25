@@ -17,6 +17,9 @@ Card creation timestamp is encoded in the first 8 hex chars of card.id
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+import os
+import time
+from urllib.parse import urlencode
 
 from server.adapters.base import (
     Adapter, CANONICAL_STARTED, CANONICAL_DONE,
@@ -27,6 +30,14 @@ _BASE = "https://api.trello.com/1"
 _MAX_ACTIONS = 1000
 _DEFAULT_LOOKBACK_DAYS = 21
 _MAX_WORKERS = 3
+
+
+def _positive_env_int(name, default):
+    try:
+        value = int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
 
 
 def _created_from_id(card_id: str) -> str:
@@ -100,23 +111,41 @@ class TrelloAdapter(Adapter):
         self._in_prog  = _parse_list_names(lists_in_progress) or _DEFAULT_IN_PROGRESS
         self._done     = _parse_list_names(lists_done)        or _DEFAULT_DONE
         self._lookback_days = max(int(lookback_days or _DEFAULT_LOOKBACK_DAYS), 1)
-        self._auth_qs  = f"key={api_key}&token={token}"
+        self._headers = {
+            "Authorization": (
+                f'OAuth oauth_consumer_key="{api_key}", oauth_token="{token}"'
+            ),
+            "Accept": "application/json",
+        }
 
     # ── Fetch ────────────────────────────────────────────────────────────────
 
     def fetch(self) -> list:
+        deadline = time.monotonic() + _positive_env_int(
+            "ADA_INGESTION_DEADLINE_SECONDS", 300
+        )
+
+        def require_time():
+            if time.monotonic() >= deadline:
+                raise TimeoutError("Trello ingestion deadline exceeded; snapshot was not saved")
+
         # Fetch all cards (including archived) with member info
         cards = _with_retry(lambda: _http_get(
             f"{_BASE}/boards/{self.board_id}/cards"
-            f"?filter=all&members=true&{self._auth_qs}",
-            headers={},
+            f"?{urlencode({'filter': 'all', 'members': 'true'})}",
+            headers=self._headers,
         ))
+        require_time()
+        max_cards = _positive_env_int("ADA_MAX_TRELLO_CARDS", 5000)
+        if len(cards) > max_cards:
+            raise RuntimeError("Trello card limit exceeded; snapshot was not saved")
         cutoff = datetime.now(timezone.utc) - timedelta(days=self._lookback_days)
         # Fetch list names to resolve idList → list name
         lists = _with_retry(lambda: _http_get(
-            f"{_BASE}/boards/{self.board_id}/lists?{self._auth_qs}",
-            headers={},
+            f"{_BASE}/boards/{self.board_id}/lists",
+            headers=self._headers,
         ))
+        require_time()
         list_names = {lst["id"]: lst["name"] for lst in lists}
         recent_ids = {
             card["id"] for card in cards
@@ -125,23 +154,28 @@ class TrelloAdapter(Adapter):
         print(f"  [trello] {len(cards)} cards, fetching actions for {len(recent_ids)} changed in last {self._lookback_days}d…")
 
         def _fetch_actions(card):
+            require_time()
             if card["id"] not in recent_ids:
                 card["_actions"] = []
                 card["_listNames"] = list_names
                 return card
             actions = _with_retry(lambda: _http_get(
                 f"{_BASE}/cards/{card['id']}/actions"
-                f"?filter=updateCard:idList&limit={_MAX_ACTIONS}&{self._auth_qs}",
-                headers={},
+                f"?{urlencode({'filter': 'updateCard:idList', 'limit': _MAX_ACTIONS})}",
+                headers=self._headers,
             ))
             if len(actions) >= _MAX_ACTIONS:
-                print(f"  [trello] [warn] {card['id']}: actions at {_MAX_ACTIONS} limit — history may be truncated")
+                raise RuntimeError(
+                    "Trello action limit reached; snapshot was not saved"
+                )
             card["_actions"]   = actions
             card["_listNames"] = list_names
             return card
 
         with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
             enriched = list(pool.map(_fetch_actions, cards))
+
+        require_time()
 
         print(f"  [trello] enriched {len(enriched)} cards")
         return enriched
@@ -226,6 +260,8 @@ class TrelloAdapter(Adapter):
                 "created":        _created_from_id(card["id"]),
                 "resolutiondate": resolution_date,
                 "status":         {"name": current_status},
+                "issuetype":      None,
+                "labels":         _label_names(card),
                 "assignee":       {"displayName": assignee} if assignee else None,
             },
             "changelog": {"histories": histories},

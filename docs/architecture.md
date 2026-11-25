@@ -1,194 +1,88 @@
 # Architecture
 
-## Обзор
+## Runtime
 
-```
-Browser (UI — read-only)
-    │
-    ├── GET  /latest?project=KEY       ← читает последний снапшот
-    ├── GET  /history?project=KEY      ← читает историю
-    └── POST /sync  { project, source, creds, jql }  ← запускает ингест в фоне
-            │
-            ▼
-server.py  (тонкий HTTP-роутер, порт 5678)
-            │
-            ├── server/api.py          ← handle_get_latest, handle_get_history, handle_post_sync
-            │
-            ├── server/ingestion.py    ← _run_pipeline() — общий; run_ingestion (Jira) / run_ingestion_with_adapter
-            │       │
-            │       ├── fetch_jira()  — Jira-specific
-            │       │       ├── POST /rest/api/3/search/jql  (пагинация, PAGE_SIZE=50)
-            │       │       └── GET  /rest/api/3/issue/{key}/changelog  (параллельно, 10 потоков)
-            │       │       └── GET  Jira Agile sprint report для Sprint Completion
-            │       │
-            │       ├── server/adapters/  — Jira / Trello
-            │       │       ├── base.py    Adapter ABC + build_adapter() + HTTP helpers
-            │       │       ├── jira.py    JiraAdapter (канонический формат)
-            │       │       └── trello.py  TrelloAdapter (REST → canonical)
-            │       │
-            │       └── server/metrics.py
-            │               ├── calculate_metrics(issues)   → structural KPIs
-            │               └── calculate_flow_metrics(completed sample) → P50/P85 cycle time + TTM
-            │
-            ├── server/storage.py      ← SQLite CRUD
-            │       └── snapshots(id, project_key, timestamp, metrics_json)
-            │
-            └── server/scheduler.py   ← daemon-поток, запускает run_ingestion по расписанию
-                    └── SYNC_INTERVAL_SECONDS (default 3600)
+AI Delivery Analyst is a local, single-process application:
+
+```text
+React 19 dashboard
+    |
+    | /api/* + HttpOnly session cookie
+    v
+server.py (loopback HTTP server)
+    |-- server/api.py              request validation and authenticated handlers
+    |-- server/security.py         login sessions and bounded JSON parser
+    |-- server/profiles.py         validated server-side source profiles
+    |-- server/sync_coordinator.py shared bounded queue
+    |-- server/scheduler.py        periodic enqueue into the same queue
+    |-- server/ingestion.py        Jira fetch, metrics, snapshot write
+    |-- server/adapters/           Jira/Trello canonical adapters
+    `-- server/storage.py          immutable SQLite snapshots
 ```
 
----
+The dashboard never receives source credentials, JQL, or Trello board IDs. It receives public profile metadata and submits only `profileId`/`profileIds`.
 
-## Архитектурные инварианты
+## Authentication boundary
 
-**Инвариант 1 — UI read-only.**
-Браузер никогда не инициирует расчёт метрик. Он только читает сохранённые снапшоты. Метрики считаются один раз при ingestion и сохраняются.
+1. `POST /api/login` accepts `ADA_ACCESS_TOKEN` and creates an in-memory session.
+2. The browser receives an `HttpOnly`, `SameSite=Strict` cookie; the token is not returned or persisted by the frontend.
+3. All profile, snapshot, validation, and sync endpoints require the session.
+4. Login attempts are rate-limited per client address.
+5. `HOST` must be loopback; allowed browser origins are explicit.
 
-**Инвариант 2 — Иммутабельные снапшоты.**
-Каждый запуск ingestion создаёт новую строку в SQLite. Никаких UPDATE/DELETE.
+Other OS users are untrusted. Processes running as the same OS user are inside the trust boundary. See `SECURITY.md`.
 
-**Инвариант 3 — `completedCount` кумулятивный.**
-Хранится нарастающим итогом. Throughput за период = `ΔcompletedCount`.
+## API
 
-**Инвариант 3a — Flow sample стабилен между sync.**
-Cycle Time, Time to Market и Flow Efficiency считаются по completed sample: rolling 30d при `n ≥ 10`, иначе последние 10 completed, иначе все completed. Throughput остаётся interval-based.
-
-**Инвариант 4 — Пустой result не сохраняется.**
-Если источник возвращает 0 задач, ingestion завершается ошибкой без INSERT.
-
-**Инвариант 4a — Частичный Jira changelog не сохраняется.**
-Если Jira changelog не загрузился хотя бы для одной задачи, ingestion завершается ошибкой без INSERT.
-
-**Инвариант 5 — Period без пересчёта.**
-`GET /history` фильтрует строки SQLite по полю `timestamp`. Метрики не пересчитываются.
-
-**Инвариант 6 — `calculate_metrics` без `period`.**
-Функция `calculate_metrics(issues)` не принимает `cutoff`/`period`. Это чистая функция.
-
-**Инвариант 7 — Адаптер-инвариант.**
-Все адаптеры возвращают один canonical issue shape; `calculate_metrics()` не знает об источнике.
-
-**Инвариант 8 — `wipItems` в каждом снапшоте.**
-Список in-progress задач рассчитывается при ingestion и хранится вместе с метриками. Если источник даёт URL задачи, элемент содержит `url`.
-
----
-
-## SQLite-схема
-
-```sql
-CREATE TABLE snapshots (
-    id           INTEGER PRIMARY KEY,
-    project_key  TEXT NOT NULL,
-    timestamp    TEXT NOT NULL,   -- ISO 8601
-    metrics_json TEXT NOT NULL    -- JSON: cycleTimeP50, inProgressCount, sprintCompletionPercent, …
-);
-```
-
-Данные только добавляются (INSERT). История хранится бессрочно.
-
----
-
-## Пакет server/
-
-| Модуль | Экспортирует | Назначение |
+| Method | Path | Contract |
 |---|---|---|
-| `metrics.py` | `calculate_metrics(issues, mapped)`, `calculate_flow_metrics(completed)` | Чистые функции, нет side-эффектов |
-| `storage.py` | `init_db`, `save_snapshot`, `get_latest`, `get_history` | SQLite CRUD |
-| `ingestion.py` | `run_ingestion(…)`, `run_ingestion_with_adapter(…)` | fetch → `_run_pipeline` → save |
-| `api.py` | `handle_get_latest`, `handle_get_history`, `handle_post_sync` | HTTP handlers |
-| `scheduler.py` | `start_scheduler(projects, db_path, interval)` | Daemon-поток |
-| `adapters/base.py` | `Adapter`, `build_adapter(source, config)` | ABC + фабрика + HTTP helpers |
-| `adapters/{jira,trello}.py` | `*Adapter` | fetch + normalize → canonical; Trello action history ограничен `lookbackDays` (`1..365`, default `21`) по `dateLastActivity`, Trello workflow может определяться labels |
+| `POST` | `/api/login` | `{accessToken}` -> session cookie |
+| `POST` | `/api/logout` | invalidate current session |
+| `GET` | `/api/session` | authenticated state only |
+| `GET` | `/api/profiles` | public profile metadata |
+| `GET` | `/api/latest?project=KEY` | latest immutable snapshot |
+| `GET` | `/api/history?project=KEY&period=30d` | snapshot history |
+| `GET` | `/api/projects` | project keys present in SQLite |
+| `POST` | `/api/validate-profile` | `{profileId}`; Jira `/myself` check |
+| `POST` | `/api/sync` | `{profileId}` or `{profileIds}` |
+| `POST` | `/api/sync-all` | one atomic batch, optional `{profileIds}` |
+| `GET` | `/api/sync-status` | active and queued profile IDs |
 
----
+JSON POST bodies must be `application/json` objects with a valid `Content-Length`. The parser enforces a 64 KiB limit and a five-second read timeout. Stable failures are `400`, `408`, `411`, `413`, and `415`.
 
-## Слои данных
+Legacy unprefixed routes remain temporary aliases for local compatibility; frontend code uses `/api` only.
 
-```
-Source API (Jira / Trello)
-            │
-            ▼  Adapter.fetch_and_normalize()
-    Canonical Issue (dict)
-            fields: { created, resolutiondate, status: {name}, summary, assignee }
-            changelog: { histories: [ { created, items: [ {field, fromString, toString} ] } ] }
-            │
-            ▼  _map_issue(issue)
-    Mapped Issue (dict)
-            started_at, resolved_at, created_at
-            │
-            ├── calculate_metrics
-            ├── interval completed → throughput
-            └── rolling/fallback completed sample → calculate_flow_metrics
-            │
-            ▼
-    Metrics dict
-            cycleTimeP50, cycleTimeP85, timeToMarketP50, timeToMarketP85,
-            flowEfficiencyPercent, flowSampleSize, flowSampleWindowDays,
-            flowSampleMode, inProgressCount, sprintCompletionPercent,
-            sprintCompletionBasis, sprintCompletionStale (optional fallback-only),
-            reopenedCount, reopenedRatePercent,
-            backlogAgingDays, completedCount, throughput, wipItems
-            │
-            ▼  save_snapshot → SQLite
-    Browser (UI)  KpiCard × 6 + StaleIssuesPanel
-```
+## Profiles and sync
 
----
+`ADA_PROFILES` is a JSON array. A profile owns source, project key, methodology, query/board configuration, and a reference to server-side credentials. Credentials are shared environment values and are never accepted from the browser.
 
-## Frontend (React 19 + Vite)
+HTTP and scheduler calls use the same `SyncCoordinator`:
 
-Запускается на порту 5173 (dev) или раздаётся через server.py (prod).
+- queue size and workers are bounded;
+- duplicate queued/running profile IDs are deduplicated;
+- Sync All is admitted atomically, so a full batch is accepted or rejected;
+- worker errors contain profile/source and exception type, not credentials;
+- each successful ingestion writes one immutable snapshot.
 
-### Компоненты
+## Fail-closed ingestion
 
-| Компонент | Назначение |
+Jira issue/page caps, Trello card caps, action/changelog caps, request failures, empty source results, and the global ingestion deadline abort the run before `save_snapshot`. Partial source data must never replace a valid snapshot.
+
+The ingestion deadline is cooperative between bounded network calls; each outbound request also has its own timeout.
+
+## Data and metrics
+
+SQLite is the durable snapshot store. Rows are append-only. The frontend reads metrics; it does not calculate source truth. Metric definitions remain in `server/metrics.py` and must not change without explicit approval.
+
+Jira and Trello normalize into one canonical issue shape before metric calculation. WIP details include only Task/Bug items; Epics are excluded. In-progress items are displayed oldest first.
+
+## Frontend state
+
+The browser persists only presentation state:
+
+| Key | Value |
 |---|---|
-| `App.jsx` | Root: layout, sync-flow с поллингом, multi-project tabs |
-| `KpiCard.jsx` | Compact KPI gadget: status badge в заголовке, value + delta, insight, progress bar |
-| `Sidebar.jsx` | Source picker, credentials form, demo data |
-| `StaleIssuesPanel.jsx` | Jira backlog-like issue list для WIP-задач: quick filters, status groups, aging/blocker индикаторы |
+| `ada:activeProjectId` | active server profile ID |
+| `ada:theme` | light/dark preference |
 
-### Хуки
-
-| Хук | Назначение |
-|---|---|
-| `useTheme` | dark/light mode → `T` (токены), `toggleTheme` → localStorage (`ada:theme`) |
-| `useCredentials` | Multi-source creds → localStorage (`ada:source`, `ada:creds-v2`) |
-| `useProjects` | Multi-project tabs + methodology → localStorage (`ada:projects-v3`, `ada:activeId`) |
-
-### LocalStorage-ключи
-
-| Ключ | Содержимое |
-|---|---|
-| `ada:theme` | `"dark"` / `"light"` |
-| `ada:source` | `"jira"` / `"trello"` |
-| `ada:creds-v2` | JSON: `{ jira:{baseUrl,email,apiToken}, trello:{apiKey,token,boardId} }` |
-| `ada:projects-v3` | JSON: массив `{id, label, source, methodology, jql}` |
-| `ada:activeId` | ID активного проекта |
-
-`methodology` поддерживает только `"scrum"` и `"kanban"`. Любое другое значение считается unknown и даёт нейтральный KPI-slot `—`.
-
-### Sync flow
-
-```
-handleSync()  — синкает все проекты параллельно
-    │
-    Promise.all(projects.map → POST /sync)
-    │   └── если source+project уже синкается: {ok:true, queued:false, alreadyRunning:true}
-    │
-    poll каждые 3s: GET /history + GET /latest  (для активного проекта)
-    │
-    ├── новый snapshot timestamp → setSyncState("done")
-    └── 20 попыток × 3s = 60s timeout → setSyncState("error")
-```
-
----
-
-## Статусная модель
-
-```python
-STARTED = {"in progress", "selected for development", "в работе", "in development"}
-DONE    = {"done", "closed", "resolved", "выполнено", "complete"}
-```
-
-Все сравнения case-insensitive (`.lower()`). Пользовательский маппинг статусов в UI не поддерживается.
+Legacy credential/project localStorage keys are removed on startup.

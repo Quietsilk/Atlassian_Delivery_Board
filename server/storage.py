@@ -78,6 +78,28 @@ def get_history(project_key, period=None, db_path=_DEFAULT_DB):
     return [{"timestamp": r[0], "metrics": json.loads(r[1])} for r in rows]
 
 
+def list_projects(db_path=_DEFAULT_DB):
+    """Return projects that have at least one snapshot, newest first."""
+    con = sqlite3.connect(db_path)
+    rows = con.execute(
+        """
+        SELECT project_key, COUNT(*), MAX(timestamp), MAX(id)
+        FROM snapshots
+        GROUP BY project_key
+        ORDER BY MAX(id) DESC
+        """
+    ).fetchall()
+    con.close()
+    return [
+        {
+            "project": row[0],
+            "snapshotCount": row[1],
+            "latestTimestamp": row[2],
+        }
+        for row in rows
+    ]
+
+
 def get_previous_snapshot(project_key, db_path=_DEFAULT_DB):
     """Return the second-most-recent snapshot for a project, or None."""
     con = sqlite3.connect(db_path)
@@ -90,4 +112,3 @@ def get_previous_snapshot(project_key, db_path=_DEFAULT_DB):
         return None
     row = rows[1]
     return {"timestamp": row[0], "metrics": json.loads(row[1])}
-

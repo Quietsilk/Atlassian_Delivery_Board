@@ -133,7 +133,7 @@ Status отображается lozenge-бейджем справа в заго�
 
 ### StaleIssuesPanel
 
-StaleIssuesPanel отображается как плоский Jira backlog-like issue list без внешней рамки панели. Над таблицей отображаются quick filters: `All`, `Aging`, `Blocked`, `Unassigned`; строки группируются по текущему статусу.
+StaleIssuesPanel отображается как плоский Jira backlog-like issue list без внешней рамки панели. Над таблицей отображаются quick filters: `All`, `Aging`, `Blocked`, `Unassigned`; строки всегда отсортированы по возрасту, самые старые задачи сверху.
 
 ```text
 All 5   Aging 3   Blocked 2   Unassigned 0

@@ -34,7 +34,8 @@ def tmp_db():
 
 
 def make_issue(key="T-1", status="In Progress", created="2024-01-01T00:00:00Z",
-               resolutiondate=None, transitions=None, assignee=None, summary=None):
+               resolutiondate=None, transitions=None, assignee=None, summary=None,
+               issue_type=None, labels=None):
     histories = []
     for t in (transitions or []):
         histories.append({
@@ -49,6 +50,8 @@ def make_issue(key="T-1", status="In Progress", created="2024-01-01T00:00:00Z",
             "resolutiondate": resolutiondate,
             "assignee": assignee,
             "summary": summary or f"Issue {key}",
+            "issuetype": {"name": issue_type} if issue_type else None,
+            "labels": labels or [],
         },
         "changelog": {"histories": histories},
     }
@@ -96,8 +99,44 @@ class TestComputeWipItems(unittest.TestCase):
     def test_wip_item_has_all_required_fields(self):
         mapped = [_map_issue(IN_PROGRESS)]
         item = _compute_wip_items([IN_PROGRESS], mapped)[0]
-        for field in ("key", "title", "assignee", "daysInProgress", "status", "url", "blockedReason"):
+        for field in ("key", "title", "issueType", "assignee", "daysInProgress", "status", "url", "blockedReason"):
             self.assertIn(field, item, f"Missing field: {field}")
+
+    def test_task_issue_type_is_included(self):
+        issue = make_issue(
+            key="T-1", status="In Progress", issue_type="Task",
+            transitions=[{"date": "2024-01-02T00:00:00Z", "from": "To Do", "to": "In Progress"}],
+        )
+        mapped = [_map_issue(issue)]
+        result = _compute_wip_items([issue], mapped)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["issueType"], "Task")
+
+    def test_bug_issue_type_is_included(self):
+        issue = make_issue(
+            key="BUG-1", status="In Progress", issue_type="Bug",
+            transitions=[{"date": "2024-01-02T00:00:00Z", "from": "To Do", "to": "In Progress"}],
+        )
+        mapped = [_map_issue(issue)]
+        result = _compute_wip_items([issue], mapped)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["issueType"], "Bug")
+
+    def test_epic_issue_type_is_excluded(self):
+        issue = make_issue(
+            key="EPIC-1", status="In Progress", issue_type="Epic",
+            transitions=[{"date": "2024-01-02T00:00:00Z", "from": "To Do", "to": "In Progress"}],
+        )
+        mapped = [_map_issue(issue)]
+        self.assertEqual(_compute_wip_items([issue], mapped), [])
+
+    def test_story_issue_type_is_excluded(self):
+        issue = make_issue(
+            key="STORY-1", status="In Progress", issue_type="Story",
+            transitions=[{"date": "2024-01-02T00:00:00Z", "from": "To Do", "to": "In Progress"}],
+        )
+        mapped = [_map_issue(issue)]
+        self.assertEqual(_compute_wip_items([issue], mapped), [])
 
     def test_assignee_dict_displayname_extracted(self):
         issue = make_issue(
@@ -151,11 +190,28 @@ class TestComputeWipItems(unittest.TestCase):
         result = _compute_wip_items([IN_PROGRESS], mapped)
         self.assertIsNone(result[0]["url"])
 
-    def test_blocked_reason_is_always_none(self):
-        # blockedReason is set by Jira-specific logic; ingestion always stores None
+    def test_blocked_reason_is_none_without_blocked_signal(self):
         mapped = [_map_issue(IN_PROGRESS)]
         result = _compute_wip_items([IN_PROGRESS], mapped)
         self.assertIsNone(result[0]["blockedReason"])
+
+    def test_blocked_reason_from_status(self):
+        issue = make_issue(
+            key="T-blocked", status="Blocked", issue_type="Task",
+            transitions=[{"date": "2024-01-02T00:00:00Z", "from": "To Do", "to": "In Progress"}],
+        )
+        mapped = [_map_issue(issue)]
+        result = _compute_wip_items([issue], mapped)
+        self.assertEqual(result[0]["blockedReason"], "Status: Blocked")
+
+    def test_blocked_reason_from_label(self):
+        issue = make_issue(
+            key="T-label", status="In Progress", issue_type="Task", labels=["external-blocker"],
+            transitions=[{"date": "2024-01-02T00:00:00Z", "from": "To Do", "to": "In Progress"}],
+        )
+        mapped = [_map_issue(issue)]
+        result = _compute_wip_items([issue], mapped)
+        self.assertEqual(result[0]["blockedReason"], "Label: external-blocker")
 
     def test_sorted_by_days_in_progress_descending(self):
         old = make_issue(
@@ -367,7 +423,7 @@ class TestRunIngestionWithAdapter(unittest.TestCase):
             "sprintCompletedCount": 6,
             "sprintAddedCount": 1,
             "sprintRemovedCount": 0,
-            "sprintCompletionBasis": "start_commitment",
+            "sprintCompletionBasis": "final_scope",
             "sprintName": "Sprint 21",
             "sprintStartDate": "2026-05-18T00:00:00Z",
             "sprintCompleteDate": "2026-05-29T18:00:00Z",
@@ -405,7 +461,7 @@ class TestRunIngestionWithAdapter(unittest.TestCase):
             "sprintCompletedCount": 13,
             "sprintAddedCount": 0,
             "sprintRemovedCount": 0,
-            "sprintCompletionBasis": "start_commitment",
+            "sprintCompletionBasis": "final_scope",
             "sprintName": "Sprint 22",
         }
 

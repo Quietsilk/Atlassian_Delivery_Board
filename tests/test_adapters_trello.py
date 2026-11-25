@@ -300,6 +300,21 @@ class TestTrelloAdapterFetch(unittest.TestCase):
         self.assertIn("_actions", result[0])
         self.assertIn("_listNames", result[0])
 
+    def test_fetch_keeps_credentials_out_of_urls(self):
+        cards = [_make_card()]
+        lists = [{"id": "list1", "name": "In Progress"}]
+
+        with patch("server.adapters.trello._http_get",
+                   side_effect=self._mock_http(cards, lists)) as mock_get:
+            self.adapter.fetch()
+
+        for call in mock_get.call_args_list:
+            url = call.args[0]
+            headers = call.kwargs["headers"]
+            self.assertNotIn("key=", url)
+            self.assertNotIn("token=", url)
+            self.assertIn("Authorization", headers)
+
     def test_list_names_attached_to_cards(self):
         cards = [_make_card()]
         lists = [{"id": "list1", "name": "In Progress"}]
@@ -321,19 +336,36 @@ class TestTrelloAdapterFetch(unittest.TestCase):
 
         self.assertEqual(result[0]["_actions"], actions)
 
-    def test_warns_when_actions_at_limit(self):
+    def test_fails_closed_when_actions_reach_limit(self):
         actions = [_make_action("2024-01-01T00:00:00Z", "To Do", "In Progress")] * 1000
         cards = [_make_card()]
         lists = [{"id": "list1", "name": "In Progress"}]
 
         with patch("server.adapters.trello._http_get",
                    side_effect=self._mock_http(cards, lists, {"507f1f77bcf86cd799439011": actions})):
-            import io
-            from contextlib import redirect_stdout
-            buf = io.StringIO()
-            with redirect_stdout(buf):
+            with self.assertRaisesRegex(RuntimeError, "action limit"):
                 self.adapter.fetch()
-        self.assertIn("warn", buf.getvalue())
+
+    def test_fails_closed_when_card_limit_exceeded(self):
+        cards = [_make_card(), _make_card(card_id="507f1f77bcf86cd799439012")]
+        lists = [{"id": "list1", "name": "In Progress"}]
+
+        with patch.dict(os.environ, {"ADA_MAX_TRELLO_CARDS": "1"}), \
+             patch("server.adapters.trello._http_get",
+                   side_effect=self._mock_http(cards, lists)):
+            with self.assertRaisesRegex(RuntimeError, "card limit"):
+                self.adapter.fetch()
+
+    def test_fails_closed_after_deadline(self):
+        cards = [_make_card()]
+        lists = [{"id": "list1", "name": "In Progress"}]
+
+        with patch("server.adapters.trello.time.monotonic", side_effect=[0, 2]), \
+             patch.dict(os.environ, {"ADA_INGESTION_DEADLINE_SECONDS": "1"}), \
+             patch("server.adapters.trello._http_get",
+                   side_effect=self._mock_http(cards, lists)):
+            with self.assertRaisesRegex(TimeoutError, "deadline"):
+                self.adapter.fetch()
 
     def test_empty_board_returns_empty_list(self):
         with patch("server.adapters.trello._http_get",

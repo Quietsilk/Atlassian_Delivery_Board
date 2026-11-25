@@ -1,75 +1,54 @@
-import { useState, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-const LS_KEY        = "ada:projects-v3";
-const LS_ACTIVE_KEY = "ada:activeId";
+const LS_ACTIVE_KEY = "ada:activeProjectId";
+const LEGACY_KEYS = ["ada:creds-v2", "ada:projects-v2", "ada:projects-v3", "ada:source"];
 
-function normalizeProject(p) {
-  const source = p.source || "jira";
-  return { ...p, source, methodology: p.methodology || (source === "trello" ? "kanban" : "scrum") };
-}
-
-function load() {
-  try {
-    const v3 = JSON.parse(localStorage.getItem(LS_KEY));
-    if (v3) return v3.map(normalizeProject);
-    // Migrate from v2 — add default source
-    const v2 = JSON.parse(localStorage.getItem("ada:projects-v2"));
-    if (v2?.length) {
-      const migrated = v2.map(normalizeProject);
-      localStorage.setItem(LS_KEY, JSON.stringify(migrated));
-      return migrated;
-    }
-    return [];
-  } catch { return []; }
-}
-function save(v) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(v)); } catch { /* ignore storage errors */ }
-}
 function loadActiveId() {
-  try { return localStorage.getItem(LS_ACTIVE_KEY) || null; } catch { return null; }
+  try { return localStorage.getItem(LS_ACTIVE_KEY); } catch { return null; }
 }
-function saveActiveId(id) {
-  try {
-    if (id) localStorage.setItem(LS_ACTIVE_KEY, id);
-    else     localStorage.removeItem(LS_ACTIVE_KEY);
-  } catch { /* ignore storage errors */ }
+
+function clearLegacyStorage() {
+  try { LEGACY_KEYS.forEach(key => localStorage.removeItem(key)); } catch { /* unavailable storage */ }
 }
 
 export function useProjects() {
-  const [projects, setProjects] = useState(() => load());
-  const [activeId, setActiveIdState] = useState(() => {
-    const saved  = loadActiveId();
-    const loaded = load();
-    // restore saved activeId only if the project still exists
-    return (saved && loaded.find(p => p.id === saved)) ? saved : (loaded[0]?.id || null);
-  });
+  const [projects, setProjectsState] = useState([]);
+  const [activeId, setActiveIdState] = useState(loadActiveId);
+
+  const setProfiles = useCallback((profiles) => {
+    clearLegacyStorage();
+    const next = (profiles || []).map(profile => ({
+      id: profile.id,
+      profileId: profile.id,
+      label: profile.label || profile.project,
+      projectKey: profile.project,
+      source: profile.source,
+      methodology: profile.methodology,
+      issueBaseUrl: profile.issueBaseUrl || null,
+    }));
+    setProjectsState(next);
+    setActiveIdState(current => {
+      const selected = next.some(item => item.id === current) ? current : (next[0]?.id || null);
+      try {
+        if (selected) localStorage.setItem(LS_ACTIVE_KEY, selected);
+        else localStorage.removeItem(LS_ACTIVE_KEY);
+      } catch { /* unavailable storage */ }
+      return selected;
+    });
+  }, []);
 
   const setActiveId = useCallback((id) => {
     setActiveIdState(id);
-    saveActiveId(id);
+    try {
+      if (id) localStorage.setItem(LS_ACTIVE_KEY, id);
+      else localStorage.removeItem(LS_ACTIVE_KEY);
+    } catch { /* unavailable storage */ }
   }, []);
 
-  const addProject = useCallback((label, source, jql, methodology) => {
-    const id = "p-" + Date.now();
-    const p = normalizeProject({ id, label, source: source || "jira", methodology, jql: jql || `project = "${label}" ORDER BY updated DESC` });
-    setProjects(prev => { const next = [...prev, p]; save(next); return next; });
-    setActiveId(id);
-    return id;
-  }, [setActiveId]);
+  const active = useMemo(
+    () => projects.find(project => project.id === activeId) || null,
+    [projects, activeId],
+  );
 
-  const removeProject = useCallback((id) => {
-    setProjects(prev => {
-      const next = prev.filter(p => p.id !== id);
-      save(next);
-      return next;
-    });
-    const nextId = activeId === id
-      ? (projects.find(p => p.id !== id)?.id || null)
-      : activeId;
-    setActiveId(nextId);
-  }, [projects, activeId, setActiveId]);
-
-  const active = projects.find(p => p.id === activeId) || null;
-
-  return { projects, activeId, setActiveId, active, addProject, removeProject };
+  return { projects, activeId, setActiveId, active, setProfiles };
 }

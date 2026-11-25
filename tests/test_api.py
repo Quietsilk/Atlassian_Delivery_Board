@@ -1,71 +1,106 @@
-"""Tests for server.api — HTTP endpoints (no metrics calls)."""
+"""Security and contract tests for the authenticated HTTP API."""
 
-import sys
-import os
+import http.client
+import http.server
 import json
-import sqlite3
-import time
-import unittest
+import os
 import tempfile
 import threading
-import urllib.request
+import unittest
 import urllib.error
-import http.server
+import urllib.request
 from unittest.mock import patch
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from server import api
+from server.security import AuthManager
 from server.storage import init_db, save_snapshot
-from server import api as api_module
+from server.sync_coordinator import QueueFullError
 
 
-def tmp_db():
-    f = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-    f.close()
-    init_db(f.name)
-    return f.name
+METRICS = {"throughput": 5, "inProgressCount": 2, "backlogSize": 1}
 
 
-METRICS = {"cycleTimeDays": 3.0, "timeToMarketDays": 6.0, "throughput": 5,
-           "flowEfficiencyPercent": 50.0, "backlogSize": 1, "inProgressCount": 2,
-           "sprintCompletionPercent": 75.0}
+class FakeCoordinator:
+    def __init__(self):
+        self.calls = []
+        self.full = False
+
+    def enqueue(self, profiles):
+        if self.full:
+            raise QueueFullError("sync queue is full")
+        ids = [profile["id"] for profile in profiles]
+        self.calls.append(ids)
+        return ids, []
+
+    def status(self):
+        return {"active": [], "queued": []}
+
+
+PROFILES = {
+    "proj": {
+        "id": "proj", "label": "Project", "project_key": "PROJ",
+        "source": "jira", "methodology": "scrum",
+        "issue_base_url": "https://company.atlassian.net",
+        "config": {
+            "base_url": "https://company.atlassian.net",
+            "email": "user@example.com", "api_token": "test-token",
+            "jql": "project=PROJ",
+        },
+    },
+}
 
 
 class ApiHandler(http.server.BaseHTTPRequestHandler):
-    """Minimal handler that wires server.api functions."""
     db_path = None
-    jira_credentials = {}
+    auth = AuthManager("test-access-token")
+    profiles = PROFILES
+    coordinator = FakeCoordinator()
 
     def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin",  "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.end_headers()
+        api.handle_options(self)
 
     def do_GET(self):
-        path = self.path.split("?")[0]
-        if path == "/latest":
-            api_module.handle_get_latest(self, self.__class__.db_path)
-        elif path == "/history":
-            api_module.handle_get_history(self, self.__class__.db_path)
+        path = self.path.split("?", 1)[0]
+        routes = {
+            "/api/session": lambda: api.handle_get_session(self, self.auth),
+            "/api/profiles": lambda: api.handle_get_profiles(self, self.profiles, self.auth),
+            "/api/projects": lambda: api.handle_get_projects(self, self.db_path, self.auth),
+            "/api/latest": lambda: api.handle_get_latest(self, self.db_path, self.auth),
+            "/api/history": lambda: api.handle_get_history(self, self.db_path, self.auth),
+            "/api/sync-status": lambda: api.handle_get_sync_status(self, self.coordinator, self.auth),
+        }
+        route = routes.get(path)
+        if route:
+            route()
         else:
             self.send_response(404); self.end_headers()
 
     def do_POST(self):
-        if self.path == "/sync":
-            api_module.handle_post_sync(self, self.__class__.db_path, self.__class__.jira_credentials)
+        routes = {
+            "/api/login": lambda: api.handle_post_login(self, self.auth),
+            "/api/logout": lambda: api.handle_post_logout(self, self.auth),
+            "/api/sync": lambda: api.handle_post_sync(self, self.profiles, self.coordinator, self.auth),
+            "/api/sync-all": lambda: api.handle_post_sync_all(self, self.profiles, self.coordinator, self.auth),
+            "/api/validate-profile": lambda: api.handle_post_validate_profile(self, self.profiles, self.auth),
+        }
+        route = routes.get(self.path)
+        if route:
+            route()
         else:
             self.send_response(404); self.end_headers()
 
-    def log_message(self, *a): pass  # silence test output
+    def log_message(self, *_args):
+        pass
 
 
-class TestApiEndpoints(unittest.TestCase):
+class TestApi(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.db = tmp_db()
+        temp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        temp.close()
+        cls.db = temp.name
+        init_db(cls.db)
         save_snapshot("PROJ", METRICS, cls.db)
-
         ApiHandler.db_path = cls.db
         cls.server = http.server.HTTPServer(("127.0.0.1", 0), ApiHandler)
         cls.port = cls.server.server_address[1]
@@ -75,248 +110,169 @@ class TestApiEndpoints(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.server.shutdown()
+        cls.server.server_close()
         os.unlink(cls.db)
+
+    def setUp(self):
+        ApiHandler.auth = AuthManager("test-access-token")
+        ApiHandler.coordinator = FakeCoordinator()
+        self.cookie = self._login()
 
     def _url(self, path):
         return f"http://127.0.0.1:{self.port}{path}"
 
-    def setUp(self):
-        with api_module._SYNC_LOCK:
-            api_module._SYNC_IN_PROGRESS.clear()
-
-    def tearDown(self):
-        with api_module._SYNC_LOCK:
-            api_module._SYNC_IN_PROGRESS.clear()
-
-    def _post_jira_sync(self, project="PROJ"):
-        payload = json.dumps({
-            "project": project, "baseUrl": "https://j.test",
-            "email": "u@t.com", "apiToken": "tok", "jql": f"project={project}",
-        }).encode()
-        req = urllib.request.Request(
-            self._url("/sync"), data=payload,
-            headers={"Content-Type": "application/json"}, method="POST",
+    def _request(self, path, *, body=None, cookie=True, content_type="application/json", origin=None):
+        headers = {"Content-Type": content_type}
+        if cookie and getattr(self, "cookie", None):
+            headers["Cookie"] = self.cookie
+        if origin:
+            headers["Origin"] = origin
+        data = json.dumps(body).encode() if isinstance(body, (dict, list)) else body
+        return urllib.request.Request(
+            self._url(path), data=data, headers=headers,
+            method="POST" if body is not None else "GET",
         )
-        return urllib.request.urlopen(req)
 
-    def _wait_for_no_sync_in_progress(self, timeout=1):
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            with api_module._SYNC_LOCK:
-                if not api_module._SYNC_IN_PROGRESS:
-                    return True
-            time.sleep(0.01)
-        return False
+    def _login(self):
+        req = self._request("/api/login", body={"accessToken": "test-access-token"}, cookie=False)
+        with urllib.request.urlopen(req) as response:
+            self.assertTrue(json.loads(response.read())["ok"])
+            header = response.headers["Set-Cookie"]
+        self.assertIn("HttpOnly", header)
+        self.assertIn("SameSite=Strict", header)
+        self.assertIn("Path=/", header)
+        return header.split(";", 1)[0]
 
-    def test_get_latest_returns_snapshot(self):
-        with urllib.request.urlopen(self._url("/latest?project=PROJ")) as r:
-            body = json.loads(r.read())
-        self.assertTrue(body["ok"])
-        self.assertEqual(body["snapshot"]["metrics"]["throughput"], 5)
+    def test_session_does_not_return_capability_token(self):
+        with urllib.request.urlopen(self._request("/api/session")) as response:
+            body = json.loads(response.read())
+        self.assertTrue(body["authenticated"])
+        self.assertNotIn("token", body)
 
-    def test_get_latest_404_for_unknown_project(self):
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            urllib.request.urlopen(self._url("/latest?project=UNKNOWN"))
-        self.assertEqual(ctx.exception.code, 404)
-
-    def test_get_latest_400_without_project_param(self):
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            urllib.request.urlopen(self._url("/latest"))
-        self.assertEqual(ctx.exception.code, 400)
-
-    def test_get_history_returns_list(self):
-        with urllib.request.urlopen(self._url("/history?project=PROJ")) as r:
-            body = json.loads(r.read())
-        self.assertTrue(body["ok"])
-        self.assertIsInstance(body["snapshots"], list)
-        self.assertEqual(len(body["snapshots"]), 1)
-
-    def test_get_history_with_period(self):
-        with urllib.request.urlopen(self._url("/history?project=PROJ&period=30d")) as r:
-            body = json.loads(r.read())
-        self.assertTrue(body["ok"])
-        # Recent snapshot must appear in 30d window
-        self.assertEqual(len(body["snapshots"]), 1)
-
-    def test_get_history_400_without_project(self):
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            urllib.request.urlopen(self._url("/history"))
-        self.assertEqual(ctx.exception.code, 400)
-
-    def test_post_sync_returns_202_queued(self):
-        with patch("server.ingestion.run_ingestion_with_adapter", return_value={}):
-            with self._post_jira_sync() as r:
-                body = json.loads(r.read())
-                self.assertEqual(r.status, 202)
-        self.assertTrue(body["ok"])
-        self.assertTrue(body["queued"])
-
-    def test_sync_does_not_return_metrics(self):
-        with patch("server.ingestion.run_ingestion_with_adapter", return_value={}):
-            with self._post_jira_sync() as r:
-                body = json.loads(r.read())
-        self.assertNotIn("metrics", body)
-        self.assertNotIn("cycleTimeDays", body)
-
-    def test_post_sync_dedupes_same_source_and_project_while_running(self):
-        started = threading.Event()
-        release = threading.Event()
-        calls = []
-
-        def fake_ingestion(project, source, config, db_path):
-            calls.append((project, source))
-            started.set()
-            release.wait(timeout=2)
-
-        with patch("server.ingestion.run_ingestion_with_adapter", side_effect=fake_ingestion):
-            with self._post_jira_sync("PROJ") as r:
-                first_body = json.loads(r.read())
-                self.assertEqual(r.status, 202)
-            self.assertTrue(started.wait(timeout=1))
-
-            with self._post_jira_sync("PROJ") as r:
-                second_body = json.loads(r.read())
-                self.assertEqual(r.status, 202)
-
-            release.set()
-            self.assertTrue(self._wait_for_no_sync_in_progress())
-
-        self.assertTrue(first_body["queued"])
-        self.assertFalse(second_body["queued"])
-        self.assertTrue(second_body["alreadyRunning"])
-        self.assertEqual(calls, [("PROJ", "jira")])
-
-    def test_post_sync_allows_new_run_after_previous_finishes(self):
-        first_done = threading.Event()
-        calls = []
-
-        def fake_ingestion(project, source, config, db_path):
-            calls.append((project, source))
-            first_done.set()
-
-        with patch("server.ingestion.run_ingestion_with_adapter", side_effect=fake_ingestion):
-            with self._post_jira_sync("PROJ") as r:
-                first_body = json.loads(r.read())
-                self.assertEqual(r.status, 202)
-            self.assertTrue(first_done.wait(timeout=1))
-            self.assertTrue(self._wait_for_no_sync_in_progress())
-
-            with self._post_jira_sync("PROJ") as r:
-                second_body = json.loads(r.read())
-                self.assertEqual(r.status, 202)
-            self.assertTrue(self._wait_for_no_sync_in_progress())
-
-        self.assertTrue(first_body["queued"])
-        self.assertTrue(second_body["queued"])
-        self.assertEqual(calls, [("PROJ", "jira"), ("PROJ", "jira")])
-
-    def test_post_sync_rejects_unsupported_source(self):
-        payload = json.dumps({
-            "project": "PROJ",
-            "source": "asana",
-            "accessToken": "tok",
-            "projectGid": "gid",
-        }).encode()
-        req = urllib.request.Request(
-            self._url("/sync"), data=payload,
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
+    def test_invalid_login_is_rejected(self):
+        req = self._request("/api/login", body={"accessToken": "wrong"}, cookie=False)
+        with self.assertRaises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(req)
-        self.assertEqual(ctx.exception.code, 400)
-        body = json.loads(ctx.exception.read())
-        self.assertIn("supported: jira, trello", body["error"])
+        self.assertEqual(error.exception.code, 403)
 
-    def test_post_sync_missing_project_returns_400(self):
-        payload = json.dumps({"source": "jira"}).encode()
-        req = urllib.request.Request(
-            self._url("/sync"), data=payload,
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
+    def test_read_endpoint_requires_authentication(self):
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(self._request("/api/projects", cookie=False))
+        self.assertEqual(error.exception.code, 401)
+
+    def test_profiles_never_return_credentials_or_jql(self):
+        with urllib.request.urlopen(self._request("/api/profiles")) as response:
+            raw = response.read().decode()
+            body = json.loads(raw)
+        self.assertEqual(body["profiles"][0]["id"], "proj")
+        for forbidden in ("api_token", "test-token", "email", "jql"):
+            self.assertNotIn(forbidden, raw)
+
+    def test_snapshot_endpoints_work_when_authenticated(self):
+        with urllib.request.urlopen(self._request("/api/latest?project=PROJ")) as response:
+            latest = json.loads(response.read())
+        with urllib.request.urlopen(self._request("/api/history?project=PROJ")) as response:
+            history = json.loads(response.read())
+        self.assertEqual(latest["snapshot"]["metrics"]["throughput"], 5)
+        self.assertEqual(len(history["snapshots"]), 1)
+
+    def test_sync_accepts_profile_id_only(self):
+        with urllib.request.urlopen(self._request("/api/sync", body={"profileId": "proj"})) as response:
+            body = json.loads(response.read())
+        self.assertEqual(body["queued"], ["proj"])
+        self.assertEqual(ApiHandler.coordinator.calls, [["proj"]])
+
+    def test_sync_rejects_unknown_profile(self):
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(self._request("/api/sync", body={"profileId": "unknown"}))
+        self.assertEqual(error.exception.code, 404)
+
+    def test_sync_all_is_one_atomic_enqueue(self):
+        with urllib.request.urlopen(self._request("/api/sync-all", body={"profileIds": ["proj"]})) as response:
+            body = json.loads(response.read())
+        self.assertEqual(body["queued"], ["proj"])
+        self.assertEqual(ApiHandler.coordinator.calls, [["proj"]])
+
+    def test_sync_queue_full_returns_429(self):
+        ApiHandler.coordinator.full = True
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(self._request("/api/sync-all", body={"profileIds": ["proj"]}))
+        self.assertEqual(error.exception.code, 429)
+
+    def test_non_object_json_is_rejected(self):
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(self._request("/api/sync", body=["proj"]))
+        self.assertEqual(error.exception.code, 400)
+
+    def test_invalid_json_is_rejected(self):
+        req = self._request("/api/sync", body=b"{", cookie=True)
+        with self.assertRaises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(req)
-        self.assertEqual(ctx.exception.code, 400)
-        body = json.loads(ctx.exception.read())
-        self.assertIn("project is required", body["error"])
+        self.assertEqual(error.exception.code, 400)
 
-    def test_post_sync_jira_missing_api_token_returns_400(self):
-        payload = json.dumps({
-            "project": "PROJ", "source": "jira",
-            "baseUrl": "https://j.test", "email": "u@t.com",
-            # apiToken intentionally omitted
-            "jql": "project=PROJ",
-        }).encode()
-        req = urllib.request.Request(
-            self._url("/sync"), data=payload,
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
+    def test_wrong_content_type_is_rejected(self):
+        req = self._request("/api/sync", body=b"{}", content_type="text/plain")
+        with self.assertRaises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(req)
-        self.assertEqual(ctx.exception.code, 400)
-        body = json.loads(ctx.exception.read())
-        self.assertIn("jira requires", body["error"])
+        self.assertEqual(error.exception.code, 415)
 
-    def test_post_sync_jira_missing_jql_returns_400(self):
-        payload = json.dumps({
-            "project": "PROJ", "source": "jira",
-            "baseUrl": "https://j.test", "email": "u@t.com", "apiToken": "tok",
-            # jql intentionally omitted
-        }).encode()
-        req = urllib.request.Request(
-            self._url("/sync"), data=payload,
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
+    def test_oversized_body_is_rejected_without_reading(self):
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=2)
+        connection.putrequest("POST", "/api/sync")
+        connection.putheader("Content-Type", "application/json")
+        connection.putheader("Cookie", self.cookie)
+        connection.putheader("Content-Length", str(64 * 1024 + 1))
+        connection.endheaders()
+        response = connection.getresponse()
+        self.assertEqual(response.status, 413)
+        connection.close()
+
+    def test_missing_content_length_returns_411(self):
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=2)
+        connection.putrequest("POST", "/api/sync")
+        connection.putheader("Content-Type", "application/json")
+        connection.putheader("Cookie", self.cookie)
+        connection.endheaders()
+        response = connection.getresponse()
+        self.assertEqual(response.status, 411)
+        connection.close()
+
+    def test_disallowed_origin_is_rejected(self):
+        req = self._request("/api/sync", body={"profileId": "proj"}, origin="https://evil.example")
+        with self.assertRaises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(req)
-        self.assertEqual(ctx.exception.code, 400)
+        self.assertEqual(error.exception.code, 403)
 
-    def _post_trello_sync(self, lookback_days):
-        payload = {
-            "project": "PROJ", "source": "trello",
-            "apiKey": "key", "token": "tok", "boardId": "board",
+    def test_jira_base_url_allowlist(self):
+        self.assertEqual(
+            api._validate_jira_base_url("https://company.atlassian.net/"),
+            "https://company.atlassian.net",
+        )
+        for value in ("http://company.atlassian.net", "https://localhost", "https://evil.example"):
+            with self.assertRaises(ValueError):
+                api._validate_jira_base_url(value)
+
+    def test_validate_profile_redacts_auth_errors(self):
+        error = urllib.error.HTTPError("url", 401, "Unauthorized", {}, None)
+        with patch("server.api._validate_jira_credentials", side_effect=error):
+            with urllib.request.urlopen(self._request("/api/validate-profile", body={"profileId": "proj"})) as response:
+                body = json.loads(response.read())
+        self.assertFalse(body["ok"])
+        self.assertEqual(body["error"], "Jira credentials are invalid")
+
+    def test_validate_profile_does_not_return_account_metadata(self):
+        account = {
+            "accountId": "private-id",
+            "displayName": "Private Name",
+            "emailAddress": "private@example.com",
         }
-        if lookback_days != "__omit__":
-            payload["lookbackDays"] = lookback_days
-        req = urllib.request.Request(
-            self._url("/sync"), data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
-        return urllib.request.urlopen(req)
+        with patch("server.api._validate_jira_credentials", return_value=account):
+            with urllib.request.urlopen(self._request(
+                "/api/validate-profile", body={"profileId": "proj"}
+            )) as response:
+                body = json.loads(response.read())
+        self.assertEqual(body, {"ok": True})
 
-    def test_post_sync_trello_invalid_lookback_string_returns_400(self):
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            self._post_trello_sync("abc")
-        self.assertEqual(ctx.exception.code, 400)
-        body = json.loads(ctx.exception.read())
-        self.assertIn("lookbackDays", body["error"])
-
-    def test_post_sync_trello_zero_lookback_returns_400(self):
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            self._post_trello_sync(0)
-        self.assertEqual(ctx.exception.code, 400)
-
-    def test_post_sync_trello_negative_lookback_returns_400(self):
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            self._post_trello_sync(-1)
-        self.assertEqual(ctx.exception.code, 400)
-
-    def test_post_sync_trello_too_large_lookback_returns_400(self):
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            self._post_trello_sync(366)
-        self.assertEqual(ctx.exception.code, 400)
-
-    def test_post_sync_trello_valid_custom_lookback_passed_to_adapter(self):
-        captured = {}
-
-        def fake_ingestion(project, source, config, db_path):
-            captured.update(config)
-
-        with patch("server.ingestion.run_ingestion_with_adapter", side_effect=fake_ingestion):
-            with self._post_trello_sync(42) as r:
-                body = json.loads(r.read())
-                self.assertEqual(r.status, 202)
-        self.assertTrue(body["ok"])
-        self.assertEqual(captured["lookback_days"], 42)
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    unittest.main()
