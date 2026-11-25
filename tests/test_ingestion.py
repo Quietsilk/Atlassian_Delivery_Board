@@ -137,7 +137,7 @@ class TestRunIngestion(unittest.TestCase):
             "sprintCompletedCount": 3,
             "sprintAddedCount": 1,
             "sprintRemovedCount": 0,
-            "sprintCompletionBasis": "start_commitment",
+            "sprintCompletionBasis": "final_scope",
             "sprintName": "Sprint 1",
             "sprintStartDate": "2024-01-01T00:00:00Z",
             "sprintCompleteDate": "2024-01-14T00:00:00Z",
@@ -315,6 +315,7 @@ class TestFetchJiraChangelogCompleteness(unittest.TestCase):
                         "resolutiondate": "2024-01-02T00:00:00Z",
                         "assignee": None,
                         "project": {"key": "PROJ"},
+                        "labels": [],
                     },
                 },
                 {
@@ -326,6 +327,7 @@ class TestFetchJiraChangelogCompleteness(unittest.TestCase):
                         "resolutiondate": None,
                         "assignee": None,
                         "project": {"key": "PROJ"},
+                        "labels": [],
                     },
                 },
             ],
@@ -347,8 +349,11 @@ class TestFetchJiraChangelogCompleteness(unittest.TestCase):
                 fetch_jira("https://j.test", "u", "t", "project=PROJ")
 
     def test_fetch_jira_attaches_changelogs_when_all_fetches_succeed(self):
+        search_bodies = []
+
         def fake_jira_request(url, auth, body=None):
             if url.endswith("/rest/api/3/search/jql"):
+                search_bodies.append(body)
                 return self._search_page()
             if url.endswith("/issue/PROJ-1/changelog?maxResults=100"):
                 return {"values": [{"created": "2024-01-02T00:00:00Z", "items": []}]}
@@ -362,10 +367,39 @@ class TestFetchJiraChangelogCompleteness(unittest.TestCase):
         self.assertEqual(len(issues), 2)
         self.assertEqual(len(issues[0]["changelog"]["histories"]), 1)
         self.assertEqual(issues[0]["browseUrl"], "https://j.test/browse/PROJ-1")
+        self.assertIn("issuetype", search_bodies[0]["fields"])
+        self.assertIn("labels", search_bodies[0]["fields"])
+
+    def test_fetch_jira_fails_closed_at_changelog_limit(self):
+        def fake_jira_request(url, auth, body=None):
+            if url.endswith("/rest/api/3/search/jql"):
+                return self._search_page()
+            if "/changelog?maxResults=100" in url:
+                return {"values": [{"created": "2024-01-02T00:00:00Z"}] * 100}
+            raise AssertionError(f"Unexpected URL: {url}")
+
+        with patch("server.ingestion._jira_request", side_effect=fake_jira_request):
+            with self.assertRaisesRegex(RuntimeError, "snapshot was not saved"):
+                fetch_jira("https://j.test", "u", "t", "project=PROJ")
+
+    def test_fetch_jira_fails_closed_when_issue_limit_exceeded(self):
+        with patch.dict(os.environ, {"ADA_MAX_JIRA_ISSUES": "1"}), \
+             patch("server.ingestion._jira_request", return_value=self._search_page()):
+            with self.assertRaisesRegex(RuntimeError, "issue limit"):
+                fetch_jira("https://j.test", "u", "t", "project=PROJ")
+
+    def test_fetch_jira_fails_closed_on_ambiguous_pagination(self):
+        page = self._search_page()
+        page["isLast"] = False
+        page.pop("nextPageToken", None)
+
+        with patch("server.ingestion._jira_request", return_value=page):
+            with self.assertRaisesRegex(RuntimeError, "ambiguously"):
+                fetch_jira("https://j.test", "u", "t", "project=PROJ")
 
 
 class TestSprintCompletionFromReport(unittest.TestCase):
-    def test_counts_completed_from_initial_commitment(self):
+    def test_counts_completed_from_final_scope(self):
         report = {"contents": {
             "completedIssues": [{"key": "PROJ-1"}, {"key": "PROJ-2"}, {"key": "PROJ-3"}],
             "issuesNotCompletedInCurrentSprint": [{"key": "PROJ-4"}],
@@ -376,13 +410,13 @@ class TestSprintCompletionFromReport(unittest.TestCase):
         result = _sprint_completion_from_report(report)
 
         self.assertEqual(result["sprintCommittedCount"], 4)
-        self.assertEqual(result["sprintCompletedCount"], 2)
+        self.assertEqual(result["sprintCompletedCount"], 3)
         self.assertEqual(result["sprintAddedCount"], 1)
         self.assertEqual(result["sprintRemovedCount"], 1)
-        self.assertEqual(result["sprintCompletionBasis"], "start_commitment")
-        self.assertEqual(result["sprintCompletionPercent"], 50.0)
+        self.assertEqual(result["sprintCompletionBasis"], "final_scope")
+        self.assertEqual(result["sprintCompletionPercent"], 75.0)
 
-    def test_empty_commitment_uses_final_scope(self):
+    def test_added_completed_items_count_in_final_scope(self):
         result = _sprint_completion_from_report({"contents": {
             "completedIssues": [{"key": "PROJ-1"}],
             "issuesNotCompletedInCurrentSprint": [{"key": "PROJ-2"}, {"key": "PROJ-3"}],

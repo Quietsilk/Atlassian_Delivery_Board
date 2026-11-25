@@ -19,41 +19,32 @@ def _get_interval():
         return _DEFAULT_INTERVAL
 
 
-def _run_loop(projects, db_path, interval, stop_event):
-    """Core loop: sleep → ingest for each project, repeat."""
-    from server.ingestion import run_ingestion
+def _run_loop(profiles, coordinator, interval, stop_event):
+    """Core loop: sleep, then enqueue every configured profile."""
     while not stop_event.is_set():
         stop_event.wait(interval)
         if stop_event.is_set():
             break
-        for p in projects:
-            try:
-                run_ingestion(
-                    p["project_key"],
-                    p["base_url"],
-                    p["email"],
-                    p["api_token"],
-                    p["jql"],
-                    db_path,
-                )
-            except Exception as e:
-                print(f"[scheduler] error for {p['project_key']}: {e}")
+        try:
+            coordinator.enqueue(profiles)
+        except Exception as error:
+            print(f"[scheduler] enqueue error: {type(error).__name__}")
 
 
-def start_scheduler(projects, db_path, interval=None):
+def start_scheduler(profiles, coordinator, interval=None):
     """Start background ingestion loop. Returns (thread, stop_event).
 
-    projects: list of dicts with keys: project_key, base_url, email, api_token, jql
+    profiles: validated server-side profiles
     """
     if interval is None:
         interval = _get_interval()
     stop_event = threading.Event()
     thread = threading.Thread(
         target=_run_loop,
-        args=(projects, db_path, interval, stop_event),
+        args=(profiles, coordinator, interval, stop_event),
         daemon=True,
         name="scheduler",
     )
     thread.start()
-    print(f"[scheduler] started — interval {interval}s, {len(projects)} project(s)")
+    print(f"[scheduler] started — interval {interval}s, {len(profiles)} profile(s)")
     return thread, stop_event

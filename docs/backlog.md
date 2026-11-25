@@ -9,7 +9,7 @@
 ## Метрики и аналитика
 
 - [ ] Aging WIP — задачи в In Progress дольше threshold
-- [ ] Blocked issues — детектирование по метке или статусу
+- [x] Blocked issues — детектирование по Jira/Trello метке или статусу
 - [ ] Сравнение периодов (30d vs предыдущие 30d) на основе снапшотов
 - [ ] Story points в метриках (velocity, scope completion)
 - [x] Methodology KPI: Scrum показывает Sprint Completion, Kanban показывает Reopened Rate
@@ -17,7 +17,7 @@
 ## Инфраструктура
 
 - [ ] Docker-образ для деплоя
-- [ ] Конфигурация PROJECTS через UI (сейчас только через env)
+- [ ] Админ-интерфейс для `ADA_PROFILES` (сейчас профили меняются только в `.env`; credentials в UI не допускаются)
 - [ ] Экспорт истории снапшотов в CSV / PDF
 
 ## Интеграции
@@ -28,7 +28,7 @@
 
 ## Готово ✅
 
-- [x] **React+Vite дашборд** (май 2026): `dashboard/` на ветке `react-redesign` — KpiCard, AIPanel, Sidebar, Sparkline, TweaksPanel, useCredentials, useProjects
+- [x] **React+Vite дашборд** (май 2026): KpiCard, Sidebar, StaleIssuesPanel, useProjects, useTheme
 - [x] React API mapping: `src/api.js` нормализует backend `metrics_json` в UI-поля для `buildKpis()`
 - [x] Переключение проектов в React-дашборде сбрасывает snapshots/analysis при смене activeId
 - [x] Sync flow: React завершает синк только по новому snapshot timestamp; backend не сохраняет пустой Jira-result
@@ -38,10 +38,13 @@
 - [x] Tab switch: переключение проекта автоматически загружает данные
 - [x] Архитектурный рефакторинг (апрель 2026): `server/` пакет, SQLite, read-only UI, регрессионное покрытие
 - [x] Persistent storage: SQLite снапшоты, иммутабельные строки, история бессрочно
-- [x] Background scheduler: daemon-поток, `PROJECTS` env, `SYNC_INTERVAL_SECONDS`
-- [x] Auto-sync + polling: GET /latest → 404 → POST /sync → poll 3s → auto-refresh
+- [x] Background scheduler: daemon-поток, `ADA_PROFILES`, общая bounded queue, `SYNC_INTERVAL_SECONDS`
+- [x] Initial-load sync + polling: `GET /api/latest` → 404 → `POST /api/sync` → poll 3s → auto-refresh
 - [x] Read-only UI: браузер только читает GET /latest и GET /history
-- [x] POST /sync → 202 queued (без метрик в ответе)
+- [x] `POST /api/sync` и атомарный `/api/sync-all` → 202 queued (без метрик в ответе)
+- [x] Credentials вынесены из браузера в server-side profiles; legacy localStorage очищается
+- [x] Access-token login + HttpOnly session cookie; все data/sync endpoints требуют auth
+- [x] Fail-closed caps/deadline для Jira/Trello ingestion
 - [x] Flow Efficiency (5-я KPI, формула: cycleTime/timeToMarket×100, кап 100%)
 - [x] Lead Time → Time to Market (rename везде: server, JSON, HTML, тесты)
 - [x] UX overhaul: KPI-акценты, collapsible sidebar, empty state
