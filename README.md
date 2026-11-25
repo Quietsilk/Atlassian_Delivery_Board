@@ -1,13 +1,24 @@
 # Atlassian Delivery Board
 
-Локальный delivery-дашборд для Jira и Trello. Сервер синхронизирует настроенные профили, рассчитывает метрики по changelog/history и сохраняет иммутабельные SQLite-снапшоты. React-интерфейс читает готовые метрики и не получает credentials источников.
+Локальный дашборд поставки для Jira и Trello. Сервер синхронизирует настроенные профили, рассчитывает метрики по истории изменений и сохраняет неизменяемые SQLite-снапшоты. React-интерфейс читает готовые метрики и не получает учётные данные источников.
 
-## Quick start
+## Что делает
+
+1. Забирает задачи из настроенных Jira-проектов и Trello-досок.
+2. Загружает историю статусов и нормализует источники в единый формат.
+3. Рассчитывает Cycle Time, Time to Market, Flow Efficiency, методологический KPI, WIP и Backlog Aging.
+4. Сохраняет снапшот метрик и список незавершённых задач в SQLite.
+5. Показывает актуальность данных, стареющие и заблокированные задачи.
+6. Обновляет проекты вручную или по расписанию через общую ограниченную очередь.
+
+Если источник вернул пустые или неполные данные, снапшот не сохраняется. Последний валидный результат остаётся доступным в дашборде.
+
+## Быстрый запуск
 
 ```bash
 cp .env.example .env
 chmod 600 .env
-# Заполнить ADA_ACCESS_TOKEN, Jira/Trello credentials и ADA_PROFILES.
+# Заполнить ADA_ACCESS_TOKEN, учётные данные Jira/Trello и ADA_PROFILES.
 
 cd dashboard
 npm ci
@@ -16,9 +27,9 @@ cd ..
 python3 server.py
 ```
 
-Production UI: `http://127.0.0.1:5678/`.
+Готовый интерфейс: `http://127.0.0.1:5678/`.
 
-Для frontend-разработки запустите backend и отдельно:
+Для разработки интерфейса запустите сервер и отдельно Vite:
 
 ```bash
 cd dashboard
@@ -26,112 +37,150 @@ npm run dev
 # http://127.0.0.1:5173/
 ```
 
-При первом открытии UI запрашивает `ADA_ACCESS_TOKEN`. После успешного входа сервер выдаёт HttpOnly session cookie. Jira/Trello credentials и конфигурация запросов остаются только на сервере.
+При первом открытии интерфейс запрашивает `ADA_ACCESS_TOKEN`. После успешного входа сервер выдаёт сессионную cookie с флагами `HttpOnly` и `SameSite=Strict`. Учётные данные Jira/Trello и конфигурация запросов остаются только на сервере.
 
-## Configuration
+## Стек
+
+- Python 3.9+ без внешних runtime-зависимостей.
+- SQLite для неизменяемой истории снапшотов.
+- React 19 и Vite 8 для интерфейса.
+- Jira Cloud REST API и Jira Agile API.
+- Trello REST API.
+
+## Настройка
 
 Основные переменные:
 
-| Variable | Purpose | Default |
+| Переменная | Назначение | По умолчанию |
 |---|---|---|
-| `ADA_ACCESS_TOKEN` | обязательный локальный секрет входа | required |
+| `ADA_ACCESS_TOKEN` | обязательный локальный секрет входа | обязательно |
 | `ADA_PROFILES` | JSON-массив серверных профилей | `[]` |
-| `JIRA_BASE_URL` | Jira HTTPS origin | required for Jira |
-| `JIRA_EMAIL` | Jira account email | required for Jira |
-| `JIRA_API_TOKEN` | Jira API token | required for Jira |
-| `TRELLO_API_KEY`, `TRELLO_TOKEN` | Trello server credentials | required for Trello |
-| `DB_PATH` | SQLite path | `snapshots.db` |
-| `SYNC_INTERVAL_SECONDS` | scheduler interval | `3600` |
-| `ADA_SYNC_WORKERS` | sync workers | `2` |
-| `ADA_SYNC_QUEUE_SIZE` | max queued/running profile jobs | `32` |
-| `ADA_MAX_JIRA_ISSUES` | Jira issue cap | `2000` |
-| `ADA_MAX_JIRA_PAGES` | Jira search page cap | `50` |
-| `ADA_MAX_TRELLO_CARDS` | Trello card cap | `5000` |
-| `ADA_INGESTION_DEADLINE_SECONDS` | cooperative run deadline | `300` |
-| `ADA_ALLOWED_ORIGINS` | browser CORS allowlist | local `:5173`, `:5678` |
-| `ADA_ALLOWED_JIRA_HOSTS` | exact self-hosted Jira hosts | none |
+| `JIRA_BASE_URL` | HTTPS-origin Jira | обязательно для Jira |
+| `JIRA_EMAIL` | email учётной записи Jira | обязательно для Jira |
+| `JIRA_API_TOKEN` | API-токен Jira | обязательно для Jira |
+| `TRELLO_API_KEY`, `TRELLO_TOKEN` | серверные учётные данные Trello | обязательно для Trello |
+| `DB_PATH` | путь к SQLite | `snapshots.db` |
+| `SYNC_INTERVAL_SECONDS` | интервал планировщика, секунды | `3600` |
+| `ADA_SYNC_WORKERS` | количество обработчиков синхронизации | `2` |
+| `ADA_SYNC_QUEUE_SIZE` | максимум ожидающих и выполняемых профилей | `32` |
+| `ADA_MAX_JIRA_ISSUES` | лимит задач Jira за синхронизацию | `2000` |
+| `ADA_MAX_JIRA_PAGES` | лимит страниц поиска Jira | `50` |
+| `ADA_MAX_TRELLO_CARDS` | лимит карточек Trello | `5000` |
+| `ADA_INGESTION_DEADLINE_SECONDS` | общий дедлайн загрузки, секунды | `300` |
+| `ADA_ALLOWED_ORIGINS` | разрешённые browser-origin | локальные `:5173`, `:5678` |
+| `ADA_ALLOWED_JIRA_HOSTS` | точный список self-hosted Jira | пусто |
 
-Jira profile example, kept on one line in `.env`:
+Пример Jira-профиля; в `.env` значение хранится одной строкой:
 
 ```json
 [{"id":"dev","label":"Development","source":"jira","project_key":"DEV","methodology":"scrum","jql":"project = DEV ORDER BY created DESC"}]
 ```
 
-Trello profiles use `source: "trello"` and include `board_id`; credentials remain in `TRELLO_API_KEY` and `TRELLO_TOKEN`.
+Профили Trello используют `source: "trello"` и содержат `board_id`; секреты остаются в `TRELLO_API_KEY` и `TRELLO_TOKEN`.
 
-`.env` and `snapshots.db` are ignored. Keep `.env` mode `0600`; never commit, log, or paste its values.
+`.env` и `snapshots.db` исключены из Git. Права `.env` должны быть `0600`; значения нельзя коммитить, логировать или вставлять в задачи и документацию.
 
 ## API
 
-The frontend uses `/api` routes only:
+Интерфейс использует только маршруты `/api`:
 
-| Method | Path | Purpose |
+| Метод | Путь | Назначение |
 |---|---|---|
-| `POST` | `/api/login` | access token -> HttpOnly session |
-| `POST` | `/api/logout` | revoke current session |
-| `GET` | `/api/session` | authenticated state |
-| `GET` | `/api/profiles` | public profile metadata |
-| `GET` | `/api/latest?project=KEY` | latest snapshot |
-| `GET` | `/api/history?project=KEY` | snapshot history |
-| `GET` | `/api/projects` | project keys in SQLite |
-| `POST` | `/api/validate-profile` | validate configured Jira profile |
-| `POST` | `/api/sync` | enqueue one or more profile IDs |
-| `POST` | `/api/sync-all` | atomically enqueue selected/all profiles |
-| `GET` | `/api/sync-status` | active and queued profile IDs |
+| `POST` | `/api/login` | обмен access token на HttpOnly-сессию |
+| `POST` | `/api/logout` | завершить текущую сессию |
+| `GET` | `/api/session` | состояние аутентификации |
+| `GET` | `/api/profiles` | публичные данные серверных профилей |
+| `GET` | `/api/latest?project=KEY` | последний снапшот |
+| `GET` | `/api/history?project=KEY` | история снапшотов |
+| `GET` | `/api/projects` | проекты, присутствующие в SQLite |
+| `POST` | `/api/validate-profile` | проверить настроенный Jira-профиль |
+| `POST` | `/api/sync` | поставить выбранные профили в очередь |
+| `POST` | `/api/sync-all` | атомарно поставить набор профилей в очередь |
+| `GET` | `/api/sync-status` | выполняемые и ожидающие профили |
 
-Example sync body:
+Пример тела запроса синхронизации:
 
 ```json
 {"profileId":"dev"}
 ```
 
-The server accepts JSON objects only, requires `Content-Length`, limits bodies to 64 KiB, and enforces a read timeout. Browser requests never contain credentials, JQL, or board IDs.
+Сервер принимает только JSON-объекты, требует `Content-Length`, ограничивает тело 64 КиБ и контролирует таймаут чтения. Браузерные запросы не содержат учётных данных, JQL или идентификаторов досок.
 
-## Sync model
+## Модель синхронизации
 
-Manual sync and scheduler share one bounded `SyncCoordinator`. Duplicate profile jobs are deduplicated. Sync All is one atomic queue operation: the entire batch is admitted or rejected with `429`.
+Ручная синхронизация и планировщик используют общий ограниченный `SyncCoordinator`. Повторные задания одного профиля объединяются. Sync All выполняет одну атомарную операцию: весь набор принимается либо целиком отклоняется с `429`.
 
-Ingestion fails closed. Empty results, failed Jira changelogs, source caps, Trello action caps, request errors, or deadline expiry do not create a snapshot. A UI sync is complete only when the active project receives a new snapshot timestamp.
+Загрузка работает по принципу fail-closed. Пустой результат, недоступная история Jira, превышение лимитов, ошибки запросов или дедлайн не создают снапшот. Интерфейс считает синхронизацию успешной только после появления нового timestamp активного проекта.
 
-## Metrics
+## Метрики
 
-All metrics are calculated server-side from canonical Jira/Trello issues:
+Все метрики рассчитываются на сервере по каноническому представлению задач Jira/Trello:
 
-| Metric | Definition |
+| Метрика | Определение |
 |---|---|
-| Cycle Time | P50/P85 from latest start to Done |
-| Time to Market | P50/P85 from creation to Done |
-| Flow Efficiency | `cycleTimeP50 / timeToMarketP50 * 100`, capped at 100% |
-| Sprint Completion | Scrum: completed tasks / final scope of latest closed sprint |
+| Cycle Time | P50/P85 от последнего старта до Done |
+| Time to Market | P50/P85 от создания до Done |
+| Flow Efficiency | `cycleTimeP50 / timeToMarketP50 * 100`, максимум 100% |
+| Sprint Completion | Scrum: завершённые задачи / финальный scope последнего закрытого спринта |
 | Reopened Rate | Kanban: reopened / completed |
-| WIP | current in-progress tasks |
-| Backlog Aging | average age of backlog items |
+| WIP | текущие задачи в работе |
+| Backlog Aging | средний возраст задач в бэклоге |
 
-Flow metrics use completed issues from the latest 30 days. If fewer than 10 exist, the fallback is the latest 10 completed issues, then all completed issues. Existing formulas and status mappings are product contracts and require explicit approval to change.
+Flow-метрики используют завершённые задачи за последние 30 дней. Если их меньше 10, берутся последние 10 завершённых задач, а затем все доступные завершённые задачи. Формулы и маппинг статусов являются продуктовыми контрактами и меняются только после явного согласования.
 
-`StaleIssuesPanel` includes Task/Bug issues only, excludes Epics, and sorts oldest in-progress work first. Jira blocking is inferred from blocked-like statuses/labels; Trello uses workflow labels/list history.
+`StaleIssuesPanel` включает только Task/Bug, исключает Epic и показывает самые старые задачи сверху. Блокировка Jira определяется по статусам и меткам; Trello использует workflow-метки и историю списков.
 
-## Project layout
+### Статусная модель
 
-```text
-server.py                    local HTTP entry point
-server/api.py                authenticated API handlers
-server/security.py           sessions and JSON request reader
-server/profiles.py           server-side profile validation
-server/sync_coordinator.py   shared bounded queue
-server/scheduler.py          periodic enqueue
-server/ingestion.py          fetch, metrics, snapshot write
-server/adapters/             Jira/Trello normalization
-server/storage.py            SQLite snapshots
-dashboard/src/               React 19 UI
-tests/                       stdlib unittest regression suite
-docs/architecture.md         detailed runtime contracts
-SECURITY.md                  trust model and secret handling
+```python
+STARTED = {"in progress", "selected for development", "в работе", "in development"}
+DONE = {"done", "closed", "resolved", "выполнено", "complete"}
 ```
 
-Browser localStorage is limited to `ada:activeProjectId` and `ada:theme`. Legacy credential/project keys are removed at startup.
+Сравнение выполняется без учёта регистра. Для нестандартного workflow статусы необходимо добавить в `server/metrics.py`; этот риск зафиксирован в `docs/risks.md`.
 
-## Verification
+### Актуальность и WIP
+
+В шапке отображается возраст последнего снапшота: обычное состояние до 30 минут, предупреждение после 30 минут и критичное состояние после двух часов. Успешный ответ очереди не обновляет этот индикатор — нужен новый снапшот.
+
+В WIP-таблице доступны фильтры All, Aging, Blocked и Unassigned. Возраст считается от последнего перехода в рабочий статус; задачи сортируются от самых старых к новым.
+
+## Источники данных
+
+| Источник | Данные | Ограничения |
+|---|---|---|
+| Jira | поиск по JQL, changelog, Agile sprint report | доступен Sprint Completion; base URL проходит allowlist |
+| Trello | карточки, списки, действия перемещения | нет Sprint Completion; глубина истории действий ограничена профилем |
+
+Оба адаптера возвращают единый формат задачи. `server/metrics.py` не зависит от конкретного источника.
+
+## Дизайн интерфейса
+
+Цвета, типографика, радиусы и переходы находятся в `dashboard/src/tokens.js`; пояснения — в `dashboard/src/tokens.md`. Светлая тема используется по умолчанию, переключение темы сохраняется в localStorage.
+
+Основной экран содержит шесть KPI-карточек и постоянно доступную WIP-таблицу. Для Scrum четвёртая карточка показывает Sprint Completion, для Kanban — Reopened Rate.
+
+## Структура проекта
+
+```text
+server.py                    локальная HTTP-точка входа
+server/api.py                аутентифицированные API handlers
+server/security.py           сессии и ограниченный JSON reader
+server/profiles.py           проверка серверных профилей
+server/sync_coordinator.py   общая ограниченная очередь
+server/scheduler.py          постановка заданий по расписанию
+server/ingestion.py          загрузка, метрики, запись снапшота
+server/adapters/             нормализация Jira/Trello
+server/storage.py            SQLite-снапшоты
+dashboard/src/               интерфейс React 19
+tests/                       регрессионные unittest-тесты
+docs/architecture.md         подробные архитектурные контракты
+SECURITY.md                  модель доверия и работа с секретами
+```
+
+В localStorage остаются только `ada:activeProjectId` и `ada:theme`. Старые ключи с учётными данными и конфигурацией проектов удаляются при запуске.
+
+## Проверка
 
 ```bash
 python3 -m unittest discover -s tests
@@ -144,8 +193,8 @@ npm audit --audit-level=high
 npm audit --omit=dev --audit-level=high
 ```
 
-CI also rejects tracked `.env`, database/key files, Atlassian token markers, and private-key headers.
+Регрессионный набор содержит 229 тестов. CI также отклоняет tracked `.env`, базы данных, файлы ключей, маркеры Atlassian-токенов и заголовки приватных ключей.
 
-## Security boundary
+## Граница безопасности
 
-The server is intentionally loopback-only and single-user. Other OS users are untrusted; processes under the same OS account are trusted. This is not a public/LAN multi-user service. See [SECURITY.md](SECURITY.md) for the complete model.
+Сервер намеренно работает только на loopback и рассчитан на одного пользователя. Другие пользователи ОС считаются недоверенными, процессы под тем же системным пользователем входят в доверенную зону. Это не публичный и не многопользовательский LAN-сервис. Полная модель описана в [SECURITY.md](SECURITY.md).

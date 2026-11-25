@@ -1,88 +1,88 @@
-# Architecture
+# Архитектура
 
-## Runtime
+## Выполнение
 
-AI Delivery Analyst is a local, single-process application:
+AI Delivery Analyst — локальное однопроцессное приложение:
 
 ```text
 React 19 dashboard
     |
     | /api/* + HttpOnly session cookie
     v
-server.py (loopback HTTP server)
-    |-- server/api.py              request validation and authenticated handlers
-    |-- server/security.py         login sessions and bounded JSON parser
-    |-- server/profiles.py         validated server-side source profiles
-    |-- server/sync_coordinator.py shared bounded queue
-    |-- server/scheduler.py        periodic enqueue into the same queue
-    |-- server/ingestion.py        Jira fetch, metrics, snapshot write
-    |-- server/adapters/           Jira/Trello canonical adapters
-    `-- server/storage.py          immutable SQLite snapshots
+server.py (локальный HTTP server)
+    |-- server/api.py              проверка запросов и защищённые handlers
+    |-- server/security.py         вход, сессии и ограниченный JSON parser
+    |-- server/profiles.py         проверенные серверные профили
+    |-- server/sync_coordinator.py общая ограниченная очередь
+    |-- server/scheduler.py        постановка заданий по расписанию
+    |-- server/ingestion.py        Jira fetch, метрики и запись снапшота
+    |-- server/adapters/           канонические адаптеры Jira/Trello
+    `-- server/storage.py          неизменяемые SQLite-снапшоты
 ```
 
-The dashboard never receives source credentials, JQL, or Trello board IDs. It receives public profile metadata and submits only `profileId`/`profileIds`.
+Дашборд не получает учётные данные источников, JQL или ID Trello-досок. Он получает публичные поля профилей и отправляет только `profileId`/`profileIds`.
 
-## Authentication boundary
+## Граница аутентификации
 
-1. `POST /api/login` accepts `ADA_ACCESS_TOKEN` and creates an in-memory session.
-2. The browser receives an `HttpOnly`, `SameSite=Strict` cookie; the token is not returned or persisted by the frontend.
-3. All profile, snapshot, validation, and sync endpoints require the session.
-4. Login attempts are rate-limited per client address.
-5. `HOST` must be loopback; allowed browser origins are explicit.
+1. `POST /api/login` принимает `ADA_ACCESS_TOKEN` и создаёт сессию в памяти.
+2. Браузер получает cookie `HttpOnly`, `SameSite=Strict`; токен не возвращается и не сохраняется интерфейсом.
+3. Endpoints профилей, снапшотов, проверки и синхронизации требуют сессию.
+4. Попытки входа ограничены по адресу клиента.
+5. `HOST` должен быть loopback; browser origins задаются явным allowlist.
 
-Other OS users are untrusted. Processes running as the same OS user are inside the trust boundary. See `SECURITY.md`.
+Другие пользователи ОС считаются недоверенными. Процессы того же системного пользователя находятся внутри границы доверия. Подробнее в `SECURITY.md`.
 
 ## API
 
-| Method | Path | Contract |
+| Метод | Путь | Контракт |
 |---|---|---|
 | `POST` | `/api/login` | `{accessToken}` -> session cookie |
-| `POST` | `/api/logout` | invalidate current session |
-| `GET` | `/api/session` | authenticated state only |
-| `GET` | `/api/profiles` | public profile metadata |
-| `GET` | `/api/latest?project=KEY` | latest immutable snapshot |
-| `GET` | `/api/history?project=KEY&period=30d` | snapshot history |
-| `GET` | `/api/projects` | project keys present in SQLite |
-| `POST` | `/api/validate-profile` | `{profileId}`; Jira `/myself` check |
+| `POST` | `/api/logout` | завершить текущую сессию |
+| `GET` | `/api/session` | только состояние аутентификации |
+| `GET` | `/api/profiles` | публичные поля профилей |
+| `GET` | `/api/latest?project=KEY` | последний неизменяемый снапшот |
+| `GET` | `/api/history?project=KEY&period=30d` | история снапшотов |
+| `GET` | `/api/projects` | ключи проектов в SQLite |
+| `POST` | `/api/validate-profile` | `{profileId}`; проверка Jira `/myself` |
 | `POST` | `/api/sync` | `{profileId}` or `{profileIds}` |
-| `POST` | `/api/sync-all` | one atomic batch, optional `{profileIds}` |
-| `GET` | `/api/sync-status` | active and queued profile IDs |
+| `POST` | `/api/sync-all` | один атомарный набор, опционально `{profileIds}` |
+| `GET` | `/api/sync-status` | выполняемые и ожидающие profile ID |
 
-JSON POST bodies must be `application/json` objects with a valid `Content-Length`. The parser enforces a 64 KiB limit and a five-second read timeout. Stable failures are `400`, `408`, `411`, `413`, and `415`.
+Тело POST должно быть JSON-объектом `application/json` с корректным `Content-Length`. Parser ограничивает размер 64 КиБ и чтение пятью секундами. Стабильные ошибки: `400`, `408`, `411`, `413`, `415`.
 
-Legacy unprefixed routes remain temporary aliases for local compatibility; frontend code uses `/api` only.
+Старые маршруты без префикса временно сохранены для локальной совместимости; интерфейс использует только `/api`.
 
-## Profiles and sync
+## Профили и синхронизация
 
-`ADA_PROFILES` is a JSON array. A profile owns source, project key, methodology, query/board configuration, and a reference to server-side credentials. Credentials are shared environment values and are never accepted from the browser.
+`ADA_PROFILES` — JSON-массив. Профиль определяет источник, ключ проекта, методологию и параметры запроса/доски. Учётные данные берутся из серверного окружения и не принимаются от браузера.
 
-HTTP and scheduler calls use the same `SyncCoordinator`:
+HTTP и планировщик используют один `SyncCoordinator`:
 
-- queue size and workers are bounded;
-- duplicate queued/running profile IDs are deduplicated;
-- Sync All is admitted atomically, so a full batch is accepted or rejected;
-- worker errors contain profile/source and exception type, not credentials;
-- each successful ingestion writes one immutable snapshot.
+- размер очереди и число workers ограничены;
+- повторные profile ID среди ожидающих и выполняемых объединяются;
+- Sync All принимается атомарно: весь набор принимается или отклоняется;
+- ошибки worker содержат профиль, источник и тип исключения, но не секреты;
+- каждая успешная загрузка записывает один неизменяемый снапшот.
 
-## Fail-closed ingestion
+## Загрузка по принципу fail-closed
 
-Jira issue/page caps, Trello card caps, action/changelog caps, request failures, empty source results, and the global ingestion deadline abort the run before `save_snapshot`. Partial source data must never replace a valid snapshot.
+Лимиты задач и страниц Jira, карточек Trello, истории действий, ошибки запросов, пустой результат и общий дедлайн останавливают выполнение до `save_snapshot`. Частичные данные не могут заменить валидный снапшот.
 
-The ingestion deadline is cooperative between bounded network calls; each outbound request also has its own timeout.
+Общий дедлайн проверяется между ограниченными сетевыми вызовами; у каждого исходящего запроса также есть собственный timeout.
 
-## Data and metrics
+## Данные и метрики
 
-SQLite is the durable snapshot store. Rows are append-only. The frontend reads metrics; it does not calculate source truth. Metric definitions remain in `server/metrics.py` and must not change without explicit approval.
+SQLite — постоянное хранилище снапшотов. Строки только добавляются. Интерфейс читает метрики и не рассчитывает источник истины. Определения метрик находятся в `server/metrics.py` и меняются только после явного согласования.
 
-Jira and Trello normalize into one canonical issue shape before metric calculation. WIP details include only Task/Bug items; Epics are excluded. In-progress items are displayed oldest first.
+Jira и Trello нормализуются в единый формат до расчёта метрик. WIP включает только Task/Bug; Epic исключаются. Самые старые задачи в работе отображаются первыми.
 
-## Frontend state
+## Состояние интерфейса
 
-The browser persists only presentation state:
+Браузер сохраняет только состояние отображения:
 
-| Key | Value |
+| Ключ | Значение |
 |---|---|
-| `ada:activeProjectId` | active server profile ID |
-| `ada:theme` | light/dark preference |
+| `ada:activeProjectId` | ID активного серверного профиля |
+| `ada:theme` | выбранная светлая/тёмная тема |
 
-Legacy credential/project localStorage keys are removed on startup.
+Старые localStorage-ключи с учётными данными и проектами удаляются при запуске.
