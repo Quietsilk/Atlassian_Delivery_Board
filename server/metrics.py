@@ -110,8 +110,8 @@ def calculate_metrics(issues, mapped=None):
 
     Accepts an optional pre-computed mapped list (Step 1 optimization).
     Flow metrics (cycle time, TTM, flow efficiency) are NOT computed here —
-    they are interval-based and computed by the ingestion layer via
-    calculate_flow_metrics(completed_in_interval).
+    they are computed by the ingestion layer via calculate_flow_metrics()
+    over a stable completed-issue sample.
 
     Returns a dict with:
         backlogSize, inProgressCount, backlogAgingDays

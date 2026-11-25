@@ -28,46 +28,49 @@ function issueHref(item, issueBaseUrl) {
   return null;
 }
 
-function statusRank(status) {
-  const normalized = (status || "").toLowerCase();
-  if (normalized.includes("selected")) return 0;
-  if (normalized.includes("progress")) return 1;
-  if (normalized.includes("review")) return 2;
-  if (normalized.includes("block")) return 3;
-  return 4;
+const DETAIL_ALLOWED_ISSUE_TYPES = new Set([
+  "task", "задача",
+  "bug", "баг", "defect", "дефект",
+]);
+
+function isDetailIssueType(item) {
+  const issueType = String(item.issueType || "").trim().toLowerCase();
+  if (!issueType) return true;
+  return DETAIL_ALLOWED_ISSUE_TYPES.has(issueType);
 }
+
+const headerCellStyle = {
+  justifySelf: "stretch",
+  textAlign: "left",
+};
+
+const ageHeaderCellStyle = {
+  justifySelf: "end",
+  minWidth: 46,
+  textAlign: "center",
+};
 
 export default function StaleIssuesPanel({ items = [], threshold = 5, issueBaseUrl = null }) {
   const T = useT();
   const [filter, setFilter] = useState("all");
+  const detailItems = items.filter(isDetailIssueType);
 
-  const stale   = items.filter(i => i.daysInProgress >= threshold);
-  const blocked = items.filter(i => i.blockedReason);
-  const unassigned = items.filter(i => !i.assignee);
-  const filtered = items.filter(item => {
+  const stale   = detailItems.filter(i => i.daysInProgress >= threshold);
+  const blocked = detailItems.filter(i => i.blockedReason);
+  const unassigned = detailItems.filter(i => !i.assignee);
+  const filtered = detailItems.filter(item => {
     if (filter === "aging") return item.daysInProgress >= threshold;
     if (filter === "blocked") return Boolean(item.blockedReason);
     if (filter === "unassigned") return !item.assignee;
     return true;
   });
   const sorted  = [...filtered].sort((a, b) => {
-    const rank = statusRank(a.status) - statusRank(b.status);
-    if (rank !== 0) return rank;
-    return b.daysInProgress - a.daysInProgress;
-  });
-  const groups = sorted.reduce((acc, item) => {
-    const status = item.status || "Unknown";
-    if (!acc[status]) acc[status] = [];
-    acc[status].push(item);
-    return acc;
-  }, {});
-  const groupNames = Object.keys(groups).sort((a, b) => {
-    const rank = statusRank(a) - statusRank(b);
-    if (rank !== 0) return rank;
-    return a.localeCompare(b);
+    const age = (b.daysInProgress ?? 0) - (a.daysInProgress ?? 0);
+    if (age !== 0) return age;
+    return String(a.key || "").localeCompare(String(b.key || ""));
   });
   const filters = [
-    { key: "all", label: "All", count: items.length },
+    { key: "all", label: "All", count: detailItems.length },
     { key: "aging", label: "Aging", count: stale.length },
     { key: "blocked", label: "Blocked", count: blocked.length },
     { key: "unassigned", label: "Unassigned", count: unassigned.length },
@@ -104,7 +107,7 @@ export default function StaleIssuesPanel({ items = [], threshold = 5, issueBaseU
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: "0.7rem", color: T.textFaint }}>{items.length} issues</span>
+          <span style={{ fontSize: "0.7rem", color: T.textFaint }}>{detailItems.length} issues</span>
         </div>
       </div>
 
@@ -132,8 +135,8 @@ export default function StaleIssuesPanel({ items = [], threshold = 5, issueBaseU
       <div style={{ animation: `fadeIn ${transition.normal} ease` }}>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "92px minmax(220px, 1fr) 110px 120px 86px",
-            gap: 12,
+            gridTemplateColumns: "92px minmax(220px, 1fr) 140px 140px 86px",
+            gap: 16,
             padding: "8px 10px",
             borderBottom: `1px solid ${T.borderSub}`,
             borderTop: `1px solid ${T.borderSub}`,
@@ -144,11 +147,11 @@ export default function StaleIssuesPanel({ items = [], threshold = 5, issueBaseU
             letterSpacing: font.tracking.wide,
             textTransform: "uppercase",
           }}>
-            <span>Key</span>
-            <span>Summary</span>
-            <span>Status</span>
-            <span>Assignee</span>
-            <span style={{ textAlign: "right" }}>Age</span>
+            <span style={headerCellStyle}>Key</span>
+            <span style={headerCellStyle}>Summary</span>
+            <span style={headerCellStyle}>Status</span>
+            <span style={headerCellStyle}>Assignee</span>
+            <span style={ageHeaderCellStyle}>Age</span>
           </div>
 
           {sorted.length === 0 && (
@@ -158,31 +161,15 @@ export default function StaleIssuesPanel({ items = [], threshold = 5, issueBaseU
           )}
 
           <div style={{ maxHeight: "min(42vh, 420px)", overflowY: "auto", overscrollBehavior: "contain" }}>
-            {groupNames.map(status => (
-              <div key={status}>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "9px 10px 5px",
-                  color: T.textMuted,
-                  fontSize: font.size.xxs,
-                  fontWeight: 700,
-                  letterSpacing: font.tracking.wide,
-                  textTransform: "uppercase",
-                }}>
-                  <span>{status}</span>
-                  <span style={{ color: T.textFaint }}>{groups[status].length}</span>
-                </div>
-                {groups[status].map((item, i) => {
+            {sorted.map((item, i) => {
                   const href = issueHref(item, issueBaseUrl);
                   const RowTag = href ? "a" : "div";
                   return (
                   <RowTag key={item.key + i} href={href || undefined} target={href ? "_blank" : undefined} rel={href ? "noreferrer" : undefined} style={{
                     display: "grid",
-                    gridTemplateColumns: "92px minmax(220px, 1fr) 110px 120px 86px",
+                    gridTemplateColumns: "92px minmax(220px, 1fr) 140px 140px 86px",
                     alignItems: "center",
-                    gap: 12,
+                    gap: 16,
                     padding: "9px 10px",
                     borderBottom: `1px solid ${T.borderSub}`,
                     color: "inherit", textDecoration: "none",
@@ -243,8 +230,6 @@ export default function StaleIssuesPanel({ items = [], threshold = 5, issueBaseU
                   </RowTag>
                   );
                 })}
-              </div>
-            ))}
           </div>
       </div>
     </div>

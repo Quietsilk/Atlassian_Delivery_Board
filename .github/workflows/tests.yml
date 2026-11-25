@@ -1,14 +1,58 @@
 name: Tests
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
 
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install pytest
-      - run: python3 -m pytest tests/ -v
+      - name: Python tests
+        run: python3 -m unittest discover -s tests
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: dashboard
+        run: npm ci
+      - name: Frontend lint
+        working-directory: dashboard
+        run: npm run lint
+      - name: Frontend build
+        working-directory: dashboard
+        run: npm run build
+      - name: Dependency audit
+        working-directory: dashboard
+        run: |
+          npm audit --audit-level=high
+          npm audit --omit=dev --audit-level=high
+
+      - name: Reject tracked runtime secrets and data
+        shell: bash
+        run: |
+          forbidden=$(git ls-files | grep -E '(^|/)(\.env($|\.)|snapshots\.db$|.*\.(pem|p12|pfx|key)$)' | grep -v -E '(^|/)\.env\.example$' || true)
+          if [ -n "$forbidden" ]; then
+            echo "Forbidden tracked files:"
+            echo "$forbidden"
+            exit 1
+          fi
+          secret_pattern='AT''ATT3|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE'' KEY-----'
+          if git grep -I -n -E "$secret_pattern" -- ':!.env.example'; then
+            echo "Potential secret material found in tracked files"
+            exit 1
+          fi

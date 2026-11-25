@@ -3,11 +3,10 @@ import Sidebar from "./components/Sidebar";
 import KpiCard from "./components/KpiCard";
 import StaleIssuesPanel from "./components/StaleIssuesPanel";
 
-import { useCredentials } from "./hooks/useCredentials";
 import { useProjects } from "./hooks/useProjects";
 import { useTheme } from "./hooks/useTheme";
 import { ThemeContext } from "./context/ThemeContext";
-import { fetchLatest, fetchHistory, postSync } from "./api";
+import { fetchLatest, fetchHistory, fetchProfiles, fetchSession, login, logout, postSyncAll } from "./api";
 import { DEMO_HISTORY } from "./demo";
 import { font, radius, transition } from "./tokens";
 
@@ -31,8 +30,8 @@ function mergeHistoryWithLatest(history, latest) {
 
 /* delta helpers */
 
-function deltaFlow(cur, pre, unit, throughput) {
-  if (pre == null || pre === 0 || cur == null || throughput < 5) return null;
+function deltaFlow(cur, pre, unit, sampleSize) {
+  if (pre == null || pre === 0 || cur == null || sampleSize == null || sampleSize < 5) return null;
   const diff = cur - pre;
   if (Math.abs(diff) < 0.1) return null;
   const sign = diff > 0 ? "+" : "";
@@ -57,7 +56,36 @@ function deltaPct(cur, pre, lowerBetter) {
   const diff = cur - pre;
   if (Math.abs(diff) < 0.5) return null;
   const sign = diff > 0 ? "+" : "";
-  return { text: `${sign}${round1(diff)}% vs last`, good: lowerBetter ? diff < 0 : diff > 0 };
+  return { text: `${sign}${round1(diff)}pp vs last`, good: lowerBetter ? diff < 0 : diff > 0 };
+}
+
+function deltaPctBaseline(cur, baseline, lowerBetter, label) {
+  if (baseline == null || cur == null) return null;
+  const diff = cur - baseline;
+  if (Math.abs(diff) < 0.5) return null;
+  const sign = diff > 0 ? "+" : "";
+  return { text: `${sign}${round1(diff)}pp vs ${label}`, good: lowerBetter ? diff < 0 : diff > 0 };
+}
+
+function recentPctBaseline(snaps, key, count = 3) {
+  const previous = snaps.slice(0, -1)
+    .filter(s => s[key] != null && (s.flowSampleSize ?? 0) >= 5)
+    .slice(-count);
+  if (previous.length === 0) return null;
+  return previous.reduce((sum, s) => sum + s[key], 0) / previous.length;
+}
+
+function flowEfficiencySublabel(last) {
+  return flowSampleSublabel(last);
+}
+
+function flowSampleSublabel(last) {
+  if (last.flowSampleMode === "legacy") return "Legacy flow metric";
+  const n = last.flowSampleSize ?? 0;
+  if (n <= 0 || last.flowSampleMode === "empty") return "No completed items";
+  if (last.flowSampleMode === "last_10") return `P50 over last 10 · n=${n}`;
+  if (last.flowSampleMode === "all_completed") return `P50 over all done · n=${n}`;
+  return `P50 over ${last.flowSampleWindowDays ?? 30}d · n=${n}`;
 }
 
 /* insight helpers */
@@ -90,7 +118,7 @@ function buildInsight(key, last, wipItems) {
       return { text: "Normal lead time", level: "neutral" };
     }
     case "flowEfficiency": {
-      if (flowEff < 20) return { text: "Too much waiting", level: "bad" };
+      if (flowEff < 20) return { text: "Waiting dominates", level: "bad" };
       if (flowEff < 40) return { text: "Moderate delays", level: "warn" };
       return { text: "Healthy flow", level: "neutral" };
     }
@@ -130,12 +158,16 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
   if (!snaps || snaps.length === 0) return null;
   const last = snaps[snaps.length - 1];
   const prev = snaps.length > 1 ? snaps[snaps.length - 2] : null;
-  const throughput  = last.throughput ?? 0;
+  const flowSampleSize = last.flowSampleSize;
   const prevTooOld  = prev ? (Date.now() - new Date(prev.timestamp).getTime()) > 86_400_000 : true;
 
-  const dFlow = (cur, pre, unit) => prevTooOld ? null : deltaFlow(cur, pre, unit, throughput);
+  const dFlow = (cur, pre, unit) => prevTooOld ? null : deltaFlow(cur, pre, unit, flowSampleSize);
   const dSnap = (cur, pre, lb)   => prevTooOld ? null : deltaSnap(cur, pre, lb);
   const dPct  = (cur, pre, lb)   => prevTooOld ? null : deltaPct(cur, pre, lb);
+  const flowEfficiencyBaseline = recentPctBaseline(snaps, "flowEfficiency");
+  const dFlowEfficiency = flowSampleSize == null || flowSampleSize < 5
+    ? null
+    : deltaPctBaseline(last.flowEfficiency, flowEfficiencyBaseline, false, "recent");
 
   const sprintCompletion = last.sprintCompletion;
   const prevSprintCompletion = prev?.sprintCompletion;
@@ -154,12 +186,12 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
   } else if (methodology === "scrum") {
     deliveryQualityKpi = {
       id: "sprintCompletion",
-      label: "Sprint Completion", sublabel: `${last.sprintCompletedCount ?? 0} of ${last.sprintCommittedCount ?? 0} committed`,
+      label: "Sprint Completion", sublabel: `${last.sprintCompletedCount ?? 0} of ${last.sprintCommittedCount ?? 0} scope${last.sprintCompletionStale ? " · previous report" : ""}`,
       value: sprintValue, unit: sprintCompletion == null ? null : "%",
       delta: dPct(sprintCompletion, prevSprintCompletion, false),
       insight: buildInsight("sprintCompletion", last, wipItems),
       status: sprintCompletion == null ? "neutral" : sprintCompletion >= 85 ? "good" : sprintCompletion >= 65 ? "warn" : "bad",
-      barMax: 100, tooltip: "% of tasks from sprint-start commitment completed by the latest closed sprint",
+      barMax: 100, tooltip: "% of final sprint scope completed by the latest closed sprint",
     };
   } else {
     deliveryQualityKpi = {
@@ -176,7 +208,7 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
   return [
     {
       id: "cycleTime",
-      label: "Cycle Time", sublabel: "In Progress → Done",
+      label: "Cycle Time", sublabel: flowSampleSublabel(last),
       value: round1(last.cycleTime ?? 0), unit: "d",
       delta: dFlow(last.cycleTime, prev?.cycleTime, "d"),
       insight: buildInsight("cycleTime", last, wipItems),
@@ -185,7 +217,7 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
     },
     {
       id: "timeToMarket",
-      label: "Time to Market", sublabel: "Created → Done",
+      label: "Time to Market", sublabel: flowSampleSublabel(last),
       value: round1(last.timeToMarket ?? 0), unit: "d",
       delta: dFlow(last.timeToMarket, prev?.timeToMarket, "d"),
       insight: buildInsight("timeToMarket", last, wipItems),
@@ -194,9 +226,9 @@ function buildKpis(snaps, wipItems, methodology = "unknown") {
     },
     {
       id: "flowEfficiency",
-      label: "Flow Efficiency", sublabel: "Active / Total time",
+      label: "Flow Efficiency", sublabel: flowEfficiencySublabel(last),
       value: round1(last.flowEfficiency ?? 0), unit: "%",
-      delta: dPct(last.flowEfficiency, prev?.flowEfficiency, false),
+      delta: dFlowEfficiency,
       insight: buildInsight("flowEfficiency", last, wipItems),
       status: last.flowEfficiency == null ? "neutral" : last.flowEfficiency >= 40 ? "good" : last.flowEfficiency > 15 ? "warn" : "bad",
       barMax: 100, tooltip: "% of total lead time the item was actively worked on",
@@ -305,23 +337,50 @@ function ThemeToggle({ mode, onToggle, T }) {
   );
 }
 
+function AccessGate({ state, error, onLogin, T }) {
+  const [accessToken, setAccessToken] = useState("");
+  const submit = async (event) => {
+    event.preventDefault();
+    if (accessToken) await onLogin(accessToken);
+  };
+  return (
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: T.bg, color: T.text, fontFamily: font.family.sans }}>
+      <form onSubmit={submit} style={{ width: 320, padding: 20, border: `1px solid ${T.border}`, borderRadius: radius.card, background: T.bgCard }}>
+        <div style={{ fontSize: font.size.md, fontWeight: 700, marginBottom: 14 }}>Atlassian Delivery Board</div>
+        <label style={{ display: "block", fontSize: font.size.xs, color: T.textMuted, marginBottom: 5 }}>Local access token</label>
+        <input
+          autoFocus
+          type="password"
+          value={accessToken}
+          onChange={event => setAccessToken(event.target.value)}
+          disabled={state === "loading"}
+          style={{ width: "100%", height: 34, border: `1px solid ${T.borderHi}`, borderRadius: radius.input, background: T.bgInput, color: T.text, padding: "0 9px", outline: "none" }}
+        />
+        {error && <div style={{ marginTop: 8, fontSize: font.size.xs, color: T.bad }}>{error}</div>}
+        <button type="submit" disabled={!accessToken || state === "loading"} style={{ width: "100%", height: 34, marginTop: 12, border: 0, borderRadius: radius.md, background: T.brand, color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+          Sign in
+        </button>
+      </form>
+    </div>
+  );
+}
+
 /* ─── App ──────────────────────────────────────────────────────────────────── */
 
 export default function App() {
   const { mode, T, toggleTheme } = useTheme();
-  const creds = useCredentials();
-  const { projects, activeId, setActiveId, active, addProject, removeProject } = useProjects();
+  const { projects, activeId, setActiveId, active, setProfiles } = useProjects();
 
+  const [authState, setAuthState] = useState("checking");
+  const [authError, setAuthError] = useState(null);
   const [snapshots,   setSnapshots]   = useState([]);
   const [syncState,   setSyncState]   = useState("idle");
   const [syncError,   setSyncError]   = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [newLabel,    setNewLabel]    = useState("");
-  const [newMethodology, setNewMethodology] = useState("");
 
   const latestTsRef = useRef(null);
   const pollRef     = useRef(null);
-  const activeKey      = active?.label || null;
+  const activeKey      = active?.projectKey || null;
   const latestSnapshot = snapshots.at(-1) || null;
   const wipItems       = latestSnapshot?.wipItems || [];
 
@@ -331,12 +390,46 @@ export default function App() {
     document.documentElement.dataset.theme = mode;
   }, [T.bg, mode]);
 
+  useEffect(() => {
+    fetchSession()
+      .then(session => setAuthState(session.authenticated ? "authenticated" : "anonymous"))
+      .catch(() => setAuthState("anonymous"));
+  }, []);
+
+  const handleLogin = useCallback(async (accessToken) => {
+    setAuthState("loading"); setAuthError(null);
+    try {
+      await login(accessToken);
+      setAuthState("authenticated");
+    } catch (error) {
+      setAuthState("anonymous"); setAuthError(error.message);
+    }
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try { await logout(); } catch { /* session may already be gone */ }
+    setProfiles([]); setSnapshots([]); setAuthState("anonymous");
+  }, [setProfiles]);
+
   const resetBoard = useCallback(() => {
     setSnapshots([]); setSyncState("idle"); setSyncError(null);
   }, []);
 
   useEffect(() => {
-    if (!activeKey) return;
+    if (authState !== "authenticated") return;
+    let cancelled = false;
+    fetchProfiles()
+      .then(serverProfiles => {
+        if (!cancelled) setProfiles(serverProfiles);
+      })
+      .catch(error => {
+        if (!cancelled && error.status === 401) setAuthState("anonymous");
+      });
+    return () => { cancelled = true; };
+  }, [authState, setProfiles]);
+
+  useEffect(() => {
+    if (authState !== "authenticated" || !activeKey) return;
     let cancelled = false;
     Promise.all([fetchHistory(activeKey), fetchLatest(activeKey)])
       .then(([history, latest]) => {
@@ -347,16 +440,11 @@ export default function App() {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [activeKey]);
+  }, [activeKey, authState]);
 
   useEffect(() => { latestTsRef.current = snapshots.at(-1)?.timestamp ?? null; }, [snapshots]);
 
-  const canSync = projects.length > 0 && projects.some(p => {
-    const c = creds.savedCreds[p.source] || {};
-    return p.source === "jira"
-      ? !!(c.baseUrl && c.email && c.apiToken)
-      : !!(c.apiKey && c.token && c.boardId);
-  });
+  const canSync = projects.length > 0;
 
   const handleSync = useCallback(async () => {
     if (!projects.length) return;
@@ -364,14 +452,12 @@ export default function App() {
     clearTimeout(pollRef.current);
     setSyncState("syncing"); setSyncError(null);
     try {
-      await Promise.all(projects.map(p =>
-        postSync({ project: p.label, source: p.source || creds.source, creds: creds.savedCreds[p.source] || creds.currentCreds, jql: p.jql })
-      ));
+      await postSyncAll(projects.map(project => project.profileId));
       if (!active) { setSyncState("done"); return; }
       let attempts = 0;
       const poll = async () => {
         try {
-          const [history, latest] = await Promise.all([fetchHistory(active.label), fetchLatest(active.label)]);
+          const [history, latest] = await Promise.all([fetchHistory(active.projectKey), fetchLatest(active.projectKey)]);
           const merged = mergeHistoryWithLatest(history, latest);
           const latestTs = latest?.timestamp || merged.at(-1)?.timestamp || null;
           if (latestTs && latestTs !== previousTimestamp) {
@@ -385,7 +471,7 @@ export default function App() {
       };
       poll();
     } catch (e) { setSyncState("error"); setSyncError(e.message); }
-  }, [active, projects, creds]);
+  }, [active, projects]);
 
   useEffect(() => () => clearTimeout(pollRef.current), []);
 
@@ -393,17 +479,16 @@ export default function App() {
     setSnapshots(DEMO_HISTORY); setSyncState("demo");
   }, []);
 
-  const handleAddProject = useCallback(() => {
-    const label = newLabel.trim();
-    if (!label) return;
-    const jql = `project = "${label.toUpperCase().replace(/\s+/g, "-")}" ORDER BY updated DESC`;
-    const methodology = newMethodology || (creds.source === "trello" ? "kanban" : "scrum");
-    resetBoard(); addProject(label, creds.source, jql, methodology); setNewLabel("");
-  }, [newLabel, addProject, resetBoard, creds.source, newMethodology]);
-
   const kpis    = buildKpis(snapshots, wipItems, active?.methodology);
   const hasData = kpis != null;
-  const defaultMethodology = creds.source === "trello" ? "kanban" : "scrum";
+
+  if (authState !== "authenticated") {
+    return (
+      <ThemeContext.Provider value={T}>
+        <AccessGate state={authState} error={authError} onLogin={handleLogin} T={T} />
+      </ThemeContext.Provider>
+    );
+  }
 
   return (
     <ThemeContext.Provider value={T}>
@@ -419,7 +504,7 @@ export default function App() {
           ::-webkit-scrollbar-track { background: transparent; }
         `}</style>
 
-        {sidebarOpen && <Sidebar creds={creds} onDemo={handleDemo} />}
+        {sidebarOpen && <Sidebar profiles={projects} onDemo={handleDemo} onLogout={handleLogout} />}
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
@@ -453,21 +538,9 @@ export default function App() {
                         {p.methodology}
                       </span>
                     )}
-                    {p.id === activeId && (
-                      <span onClick={e => { e.stopPropagation(); resetBoard(); removeProject(p.id); }} style={{ marginLeft: 2, opacity: 0.4, fontSize: "0.7rem" }}>✕</span>
-                    )}
                   </button>
                 );
               })}
-              <div style={{ display: "flex", gap: 4, marginLeft: 6, paddingLeft: 8, borderLeft: `1px solid ${T.borderSub}` }}>
-                <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddProject()}
-                  placeholder="Project" style={{ height: 30, borderRadius: radius.input, border: `1px solid ${T.border}`, background: T.bgInput, color: T.text, padding: "0 8px", fontSize: "0.73rem", outline: "none", width: 96, fontFamily: "inherit" }} />
-                <select value={newMethodology || defaultMethodology} onChange={e => setNewMethodology(e.target.value)} style={{ height: 30, borderRadius: radius.input, border: `1px solid ${T.border}`, background: T.bgInput, color: T.textLabel, padding: "0 6px", fontSize: "0.73rem", outline: "none", fontFamily: "inherit" }}>
-                  <option value="scrum">Scrum</option>
-                  <option value="kanban">Kanban</option>
-                </select>
-                <button onClick={handleAddProject} style={{ height: 30, padding: "0 10px", border: "none", borderRadius: radius.input, background: T.brand, color: "#fff", fontSize: "0.73rem", fontWeight: 700, cursor: "pointer" }}>+</button>
-              </div>
             </div>
 
             {/* Right side */}
@@ -511,13 +584,13 @@ export default function App() {
               <StaleIssuesPanel
                 items={wipItems}
                 threshold={5}
-                issueBaseUrl={creds.source === "jira" ? creds.currentCreds?.baseUrl : null}
+                issueBaseUrl={active?.issueBaseUrl || null}
               />
             )}
 
             {active && !hasData && syncState === "idle" && (
               <div style={{ padding: "12px 16px", borderRadius: radius.card, background: T.brandBg, border: `1px solid ${T.brandBdr}`, fontSize: "0.8rem", color: T.textMuted, lineHeight: 1.6 }}>
-                Open the sidebar, connect a source and click <strong style={{ color: T.textSec }}>↻ Sync</strong> — or load demo data.
+                Click <strong style={{ color: T.textSec }}>↻ Sync</strong> to update this configured profile, or load demo data.
               </div>
             )}
           </div>

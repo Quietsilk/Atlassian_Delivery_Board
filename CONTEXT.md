@@ -1,156 +1,75 @@
-# AI Delivery Analyst — Project Context
+# AI Delivery Analyst - Project Context
 
-Стартовый контекст для AI-агента. Актуально на апрель 2026.
-
----
+Актуально на 25 ноября 2026 года.
 
 ## Repository
 
-https://github.com/Quietsilk/AI-Delivery-Analyst
+`https://github.com/Quietsilk/Atlassian_Delivery_Board`
 
-## Стек
+Рабочая ветка: `dev`; изменения переходят в `main` только после review/approval.
 
-Python 3.9+ · stdlib only · SQLite · Jira Cloud REST API · OpenAI Responses API (o4-mini) · React 18 + Vite (dashboard/)
+## Stack
 
----
+Python 3.9+ (stdlib), SQLite, Jira Cloud REST API, Trello REST API, React 19, Vite 8.
 
-## Архитектура
+## Current architecture
 
-Три слоя:
+- `server.py`: loopback-only HTTP router and static frontend server.
+- `server/security.py`: access-token login, in-memory HttpOnly sessions, bounded JSON reader.
+- `server/profiles.py`: validates `ADA_PROFILES`; keeps credentials/JQL/board configuration server-side.
+- `server/sync_coordinator.py`: bounded queue shared by HTTP and scheduler.
+- `server/ingestion.py`: source fetch, canonical mapping, metrics, immutable snapshot write.
+- `server/storage.py`: SQLite CRUD.
+- `dashboard/`: authenticated React dashboard; sends profile IDs only.
 
-**`server.py`** — тонкий HTTP-роутер:
-- `GET /` → `dashboard/dist/index.html` если собран; иначе redirect → `localhost:5173`
-- `GET /latest?project=KEY` → последний снапшот из SQLite
-- `GET /history?project=KEY` → история снапшотов
-- `POST /sync` → запускает `run_ingestion` в фоновом потоке → `{ok, queued}`
+The browser never stores Jira/Trello credentials. It persists only `ada:activeProjectId` and `ada:theme`.
 
-**`server/`** — пакет с бизнес-логикой:
+## Required configuration
 
-| Модуль | Ключевые экспорты |
-|---|---|
-| `metrics.py` | `calculate_metrics(issues, mapped=None)` → структурные метрики; `calculate_flow_metrics(completed_items)` → P50/P85; `_map_issue`, `_percentile`, `_parse_dt` |
-| `storage.py` | `init_db`, `save_snapshot`, `get_latest`, `get_history`, `get_previous_snapshot` |
-| `ingestion.py` | `run_ingestion(...)`, `_get_completed_in_interval(mapped, since_ts)` |
-| `api.py` | `handle_get_latest`, `handle_get_history`, `handle_post_sync` |
-| `scheduler.py` | `start_scheduler(projects, db_path, interval)` |
-
-**`dashboard/`** — React 18 + Vite дашборд:
-- Dev: `cd dashboard && npm run dev` → `http://localhost:5173`
-- Prod: `cd dashboard && npm run build` → `dist/` раздаётся через `server.py GET /`
-- Jira credentials → localStorage (`ada:baseUrl`, `ada:email`, `ada:token`)
-- Multi-project табы → localStorage (`ada:projects-v2`, `ada:activeId`)
-- 6 KPI-карточек (3×2 сетка): Cycle Time · Time to Market · Flow Efficiency · Reopened · WIP · Backlog Aging
-- Sparklines, delta %, P85, статус-бары (good/warn/bad), AI Insights panel
-- Demo-кнопка в сайдбаре (всегда доступна без синка)
-- Компоненты: `KpiCard`, `AIPanel`, `Sidebar`, `Sparkline`, `TweaksPanel`
-- Хуки: `useCredentials`, `useProjects`
-- Дизайн-токены: `src/tokens.js`
-
----
-
-## Архитектурные инварианты
-
-1. **UI read-only** — браузер только читает снапшоты, никогда не считает метрики
-2. **Иммутабельные снапшоты** — только INSERT в SQLite, никогда UPDATE/DELETE
-3. **`throughput` (бэкенд) = интервальный** — кол-во resolved с `timestamp` предыдущего снапшота; 0 если нет предыдущего (не отображается в UI)
-4. **`completedCount` = кумулятивный** — всего завершённых на момент синка; хранится в каждом снапшоте
-5. **Flow metrics раздельно** — `calculate_metrics` → только `backlogSize, inProgressCount, completedCount, reopenedCount, backlogAgingDays`; `calculate_flow_metrics` → `cycleTimeP50/P85, timeToMarketP50/P85, flowEfficiencyPercent`
-7. **Period фильтр удалён из UI** — `GET /history` без параметра; KPI всегда из последнего снапшота; агрегация по периоду не применяется
-8. **`calculate_metrics` без period** — нет параметров cutoff/period в сигнатуре
-
----
-
-## Статусы Jira
-
-```python
-STARTED = {"in progress", "selected for development", "в работе", "in development"}
-DONE    = {"done", "closed", "resolved", "выполнено", "complete"}
+```text
+ADA_ACCESS_TOKEN=<random local secret>
+JIRA_BASE_URL=https://company.atlassian.net
+JIRA_EMAIL=<account email>
+JIRA_API_TOKEN=<api token>
+ADA_PROFILES=[{"id":"dev","label":"Development","source":"jira","project_key":"DEV","methodology":"scrum","jql":"project = DEV"}]
 ```
 
-Все сравнения case-insensitive. Changelog запрашивается для всех задач.
+Keep `.env` ignored and mode `0600`. `HOST` must remain loopback. See `.env.example` and `SECURITY.md` for all limits and trust assumptions.
 
----
+## API flow
 
-## Переменные окружения
+1. `POST /api/login` exchanges `ADA_ACCESS_TOKEN` for an HttpOnly session cookie.
+2. `GET /api/profiles` returns public profile metadata only.
+3. `POST /api/sync` or `/api/sync-all` enqueues profile IDs.
+4. Scheduler enqueues the same profiles through the same coordinator.
+5. UI polls authenticated snapshot endpoints and treats a new timestamp as success.
 
-| Переменная | Назначение | Дефолт |
-|---|---|---|
-| `DB_PATH` | Путь к SQLite-файлу | `snapshots.db` |
-| `SYNC_INTERVAL_SECONDS` | Интервал фонового синка | `3600` |
-| `PROJECTS` | JSON-массив проектов для планировщика | `[]` |
-| `OPENAI_API_KEY` | AI-анализ (опционально) | — |
-| `TELEGRAM_BOT_TOKEN` | Legacy Telegram (опционально) | — |
-| `TELEGRAM_CHAT_ID` | Legacy Telegram (опционально) | — |
+## Invariants
 
----
+1. Snapshot rows are append-only.
+2. Metric formulas and source workflow mappings are preserved unless explicitly approved.
+3. Empty or partial source data is never saved.
+4. Jira/Trello caps and ingestion deadlines fail closed.
+5. Sync All admission is atomic; duplicate profile jobs are deduplicated.
+6. Task/Bug WIP is sorted oldest first; Epics are excluded.
+7. Credentials never appear in browser storage, URLs, API responses, logs, docs, or Git.
 
-## Тесты
-
-77 тестов в 4 файлах, stdlib unittest, zero deps:
+## Verification
 
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s tests
+cd dashboard
+npm ci
+npm run lint
+npm run build
+npm audit --audit-level=high
 ```
 
-| Файл | Тестов |
-|---|---|
-| `tests/test_metrics.py` | 44 |
-| `tests/test_storage.py` | 13 |
-| `tests/test_ingestion.py` | 12 |
-| `tests/test_api.py` | 8 |
+CI runs the same regression checks plus forbidden-file and secret-pattern guards.
 
----
+## Known constraints
 
-## Известные ограничения
-
-- STARTED/DONE статусы захардкожены в `server/metrics.py` (не конфигурируются через UI)
-- Один JQL на проект (multi-source не реализован)
-- SQLite не масштабируется горизонтально (single-writer)
-
----
-
-## Хронология
-
-1. TypeScript-прототип (src/) — выпилен в пользу Python (`6d88e48`)
-2. Python stdlib HTTP-сервер + однофайловый HTML-дашборд
-3. Jira API: POST /search/jql + changelog fetch
-4. Пагинация (PAGE_SIZE=50, isLast loop)
-5. Period-фильтр (7d/30d/90d/all)
-6. localStorage-персистентность
-7. Case-insensitive статусы (BUG-S01)
-8. Smart Telegram chunking (BUG-S04)
-9. Regression suite (33 → 61 → 87 тестов — legacy, удалён вместе с server_app.py)
-10. UX overhaul: KPI-акценты, collapsible sidebar, period bar, AI/Risks иерархия
-11. Flow Efficiency (5-я KPI), Time to Market rename, Throughput delta
-12. **Архитектурный рефакторинг (апрель 2026):**
-    - `server.py` → пакет `server/` (metrics, storage, ingestion, api, scheduler)
-    - SQLite персистентное хранение снапшотов (иммутабельные строки)
-    - Read-only UI: браузер только читает через GET /latest и GET /history
-    - POST /sync → фоновый поток → 202 queued
-    - Auto-sync + polling при 404 /latest
-    - Throughput = дельта между снапшотами
-    - Фоновый планировщик (PROJECTS env + SYNC_INTERVAL_SECONDS)
-    - 108 тестов в 5 файлах
-13. Tab switch: переключение проекта автоматически загружает его данные (`switchProject` async)
-14. **Flow Metrics Refactor v2 (апрель 2026):**
-    - P50/P85 перцентили вместо средних для Cycle Time и Time to Market
-    - `calculate_metrics` разделён: структурные → `calculate_metrics`, flow → `calculate_flow_metrics`
-    - Интервальная фильтрация: flow metrics считаются только по задачам, завершённым с последнего снапшота
-    - `completedCount` — новое кумулятивное поле; `throughputPerDay` вычисляется фронтом
-    - Статус: одна метка "Updated Xm ago" вместо чипов Connected/Refreshed
-    - `wipRatio` удалён
-    - Period-фильтр обновляет KPI-карточки (раньше только графики)
-    - 120 тестов
-15. **UI Simplification MVP (апрель 2026):**
-    - Period picker удалён — метрики всегда interval-based (последний снапшот)
-    - Графики удалены (chart panels, drawChart, drawThroughputChart, loadHistory)
-    - AI-блок поднят сразу под KPI; статические hints при отсутствии OpenAI
-    - Stale data: >30 мин — amber, >120 мин — red
-    - Empty state: короткий заголовок + 4 буллета
-    - Auto-sync при открытии страницы если данные старше 1 часа
-16. **KPI Refinement (апрель 2026):**
-    - 6 KPI-карточек в сетке 3×2: Cycle Time · Time to Market · Flow Efficiency · Reopened · WIP · Backlog Aging
-    - Throughput и Backlog удалены из UI (данные остаются в снапшотах)
-17. **UX polish (апрель 2026):**
-    - Demo-кнопка перенесена в сайдбар — доступна всегда, не только в empty state
-    - server_app.py и test_server.py удалены (legacy pipeline выпилен полностью)
+- STARTED/DONE mappings are static in `server/metrics.py`.
+- SQLite and in-memory sessions are single-instance facilities.
+- The service is local single-user software, not a LAN/Internet multi-user deployment.
+- In-memory sessions and queued work are lost on process restart.

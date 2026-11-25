@@ -133,7 +133,7 @@ Status отображается lozenge-бейджем справа в заго�
 
 ### StaleIssuesPanel
 
-StaleIssuesPanel отображается как плоский Jira backlog-like issue list без внешней рамки панели. Над таблицей отображаются quick filters: `All`, `Aging`, `Blocked`, `Unassigned`; строки группируются по текущему статусу.
+StaleIssuesPanel отображается как плоский Jira backlog-like issue list без внешней рамки панели. Над таблицей отображаются quick filters: `All`, `Aging`, `Blocked`, `Unassigned`; строки всегда отсортированы по возрасту, самые старые задачи сверху.
 
 ```text
 All 5   Aging 3   Blocked 2   Unassigned 0
@@ -146,9 +146,12 @@ PROJ-1   Payment retry handling      IN PROGRESS  Alexey M.    14d
 Key отображается как ссылка, если доступен URL задачи. Age отображается lozenge-бейджем справа.
 
 **Delta** — формат зависит от типа метрики:
-- Flow (Cycle Time, TTM): `±Xd vs last` — скрывается если throughput < 5 или нет prev
+- Flow (Cycle Time, TTM): `±Xd vs last` — скрывается если `flowSampleSize < 5` или нет prev
 - Snapshot (WIP, Backlog): `+3 (−44%)` — абсолютное + относительное %
-- Проценты (Flow Efficiency, Sprint Completion, Reopened Rate): `±X% vs last`
+- Проценты (Sprint Completion, Reopened Rate): `±Xpp vs last`
+- Flow Efficiency: `±Xpp vs recent` — сравнение с baseline из последних 3 предыдущих снапшотов с `flowSampleSize ≥ 5`; скрывается если текущий `flowSampleSize < 5`
+
+Snapshots без `flowSample*` полей считаются legacy: sample sublabel показывает legacy-состояние, flow delta скрывается.
 
 **Insight** — детерминированный текст, рассчитывается в `buildInsight()` в App.jsx на основе `metrics + wipItems`. Цвет: `T.bad` / `T.warn` / `T.textMuted`.
 
